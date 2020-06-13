@@ -54,11 +54,10 @@ void TipsWidget::paintEvent(QPaintEvent *event)
     option.setAlignment(Qt::AlignCenter);
 
     switch (m_type) {
-    case SingleLine: {
+    case SingleLine:
         painter.drawText(rect(), m_text, option);
-    }
         break;
-    case MultiLine: {
+    case MultiLine:
         int y = 0;
         if (m_textList.size() != 1)
             option.setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
@@ -66,7 +65,6 @@ void TipsWidget::paintEvent(QPaintEvent *event)
             painter.drawText(QRect(0, y, m_width, fontHeight), text, option);
             y += fontHeight;
         }
-    }
         break;
     }
 }

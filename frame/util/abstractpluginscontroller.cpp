@@ -140,15 +140,6 @@ void AbstractPluginsController::startLoader(PluginLoader *loader)
                        loader, [ = ] { loader->start(QThread::LowestPriority); });
 }
 
-void AbstractPluginsController::displayModeChanged()
-{
-    const Dock::DisplayMode displayMode = qApp->property(PROP_DISPLAY_MODE).value<Dock::DisplayMode>();
-    const auto inters = m_pluginsMap.keys();
-
-    for (auto inter : inters)
-        inter->displayModeChanged(displayMode);
-}
-
 void AbstractPluginsController::positionChanged()
 {
     const Dock::Position position = qApp->property(PROP_POSITION).value<Dock::Position>();
@@ -292,8 +283,6 @@ bool AbstractPluginsController::eventFilter(QObject *o, QEvent *e)
 
     if (propertyName == PROP_POSITION)
         positionChanged();
-    else if (propertyName == PROP_DISPLAY_MODE)
-        displayModeChanged();
 
     return false;
 }

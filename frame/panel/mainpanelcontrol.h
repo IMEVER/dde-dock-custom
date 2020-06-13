@@ -30,22 +30,10 @@
 
 using namespace Dock;
 
-class TrayPluginItem;
-class PluginsItem;
-
 class MainPanelDelegate
 {
 public:
     virtual bool appIsOnDock(const QString &appDesktop) = 0;
-};
-
-class DesktopWidget : public QWidget
-{
-    Q_OBJECT
-
-public:
-    DesktopWidget(QWidget *parent) : QWidget(parent){
-    }
 };
 
 class DockItem;
@@ -60,15 +48,9 @@ public:
 
     void addFixedAreaItem(int index, QWidget *wdg);
     void addAppAreaItem(int index, QWidget *wdg);
-    void addTrayAreaItem(int index, QWidget *wdg);
-    void addPluginAreaItem(int index, QWidget *wdg);
     void removeFixedAreaItem(QWidget *wdg);
     void removeAppAreaItem(QWidget *wdg);
-    void removeTrayAreaItem(QWidget *wdg);
-    void removePluginAreaItem(QWidget *wdg);
     void setPositonValue(Position position);
-    void setDisplayMode(DisplayMode m_displayMode);
-    void getTrayVisableItemCount();
 
     MainPanelDelegate *delegate() const;
     void setDelegate(MainPanelDelegate *delegate);
@@ -83,8 +65,6 @@ private:
     void init();
     void updateAppAreaSonWidgetSize();
     void updateMainPanelLayout();
-    void updateDisplayMode();
-    void moveAppSonWidget();
 
     void dragMoveEvent(QDragMoveEvent *e) override;
     void dragEnterEvent(QDragEnterEvent *e) override;
@@ -97,47 +77,26 @@ private:
     DockItem *dropTargetItem(DockItem *sourceItem, QPoint point);
     void moveItem(DockItem *sourceItem, DockItem *targetItem);
     void handleDragMove(QDragMoveEvent *e, bool isFilter);
-    void paintEvent(QPaintEvent *event) override;
     void resizeDockIcon();
-    void calcuDockIconSize(int w, int h, PluginsItem *trashPlugin, PluginsItem *shutdownPlugin, PluginsItem *keyboardPlugin, PluginsItem *notificationPlugin);
-   void resizeDesktopWidget();
+    void calcuDockIconSize(int w, int h);
 public slots:
     void insertItem(const int index, DockItem *item);
     void removeItem(DockItem *item);
     void itemUpdated(DockItem *item);
-
-    // void
-    void onGSettingsChanged(const QString &key);
     
-protected:
-    void showEvent(QShowEvent *event) override;
 private:
     QBoxLayout *m_mainPanelLayout;
     QWidget *m_fixedAreaWidget;
     QWidget *m_appAreaWidget;
-    QWidget *m_trayAreaWidget;
-    QWidget *m_pluginAreaWidget;
-    DesktopWidget *m_desktopWidget;
     QBoxLayout *m_fixedAreaLayout;
-    QBoxLayout *m_trayAreaLayout;
-    QBoxLayout *m_pluginLayout;
-    QWidget *m_appAreaSonWidget;
-    QBoxLayout *m_appAreaSonLayout;
-    //    QBoxLayout *m_appAreaLayout;
+    QBoxLayout *m_appAreaLayout;
     Position m_position;
     QPointer<PlaceholderItem> m_placeholderItem;
     MainPanelDelegate *m_delegate;
     QString m_draggingMimeKey;
     AppDragWidget *m_appDragWidget;
-    DisplayMode m_dislayMode;
     QLabel *m_fixedSpliter;
-    QLabel *m_appSpliter;
-    QLabel *m_traySpliter;
     QPoint m_mousePressPos;
-    int m_trayIconCount;
-    TrayPluginItem *m_tray = nullptr;
-    bool m_isHover;//判断鼠标是否移到desktop区域
-    bool m_isEnableLaunch;//判断是否使能了com.deepin.dde.dock.module.launcher
 };
 
 #endif // MAINPANELCONTROL_H

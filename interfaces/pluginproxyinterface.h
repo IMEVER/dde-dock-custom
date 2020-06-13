@@ -23,7 +23,6 @@
 #define PLUGINPROXYINTERFACE_H
 
 #include "constants.h"
-
 #include <QtCore>
 
 class PluginsItemInterface;

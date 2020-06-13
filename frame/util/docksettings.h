@@ -47,7 +47,6 @@ class DockSettings : public QObject
 public:
     static DockSettings &Instance();
 
-    inline DisplayMode displayMode() const { return m_displayMode; }
     inline HideMode hideMode() const { return m_hideMode; }
     inline HideState hideState() const { return m_hideState; }
     inline Position position() const { return m_position; }
@@ -65,6 +64,8 @@ public:
     inline const QSize windowSize() const { return m_mainWindowSize; }
     inline const quint8 Opacity() const { return m_opacity * 255; }
     const int dockMargin() const;
+    void setDockWindowSize(int size);
+    void calculateWindowConfig();
 
     const QSize panelSize() const;
     const QRect windowRect(const Position position, const bool hide = false);
@@ -76,39 +77,30 @@ public:
     void setDockScreen(const QString &scrName);
     QString &currentDockScreen() { return m_currentScreen; }
     
-    QSize m_mainWindowSize;
     DBusDock *m_dockInter;
-    bool m_menuVisible;
 
 signals:
     void dataChanged() const;
     void positionChanged(const Position prevPosition, const Position nextPosition) const;
     void autoHideChanged(const bool autoHide) const;
-    void displayModeChanegd() const;
     void windowVisibleChanged() const;
     void windowHideModeChanged() const;
     void windowGeometryChanged() const;
     void opacityChanged(const quint8 value) const;
-    void trayCountChanged() const;
 
 public slots:
-    void updateGeometry();
     void setAutoHide(const bool autoHide);
 
 private slots:
     void menuActionClicked(QAction *action);
-    void onGSettingsChanged(const QString &key);
     void onPositionChanged();
-    void onDisplayModeChanged();
     void hideModeChanged();
     void hideStateChanged();
     void dockItemCountChanged();
     void primaryScreenChanged();
     void resetFrontendGeometry();
     void onOpacityChanged(const double value);
-    void trayVisableCountChanged(const int &count);
     void onWindowSizeChanged();
-    void onTrashGSettingsChanged(const QString &key);
     void onMonitorListChanged(const QList<QDBusObjectPath> &mons);
 
 private:
@@ -116,7 +108,6 @@ private:
     DockSettings(DockSettings const &) = delete;
     DockSettings operator =(DockSettings const &) = delete;
 
-    void calculateWindowConfig();
     void gtkIconThemeChanged();
     void checkService();
 
@@ -139,16 +130,12 @@ private:
     Position m_position;
     HideMode m_hideMode;
     HideState m_hideState;
-    DisplayMode m_displayMode;
     QRect m_primaryRawRect;
     mutable QRect m_currentRawRect;
     QRect m_frontendRect;
+    QSize m_mainWindowSize;
 
     QMenu m_settingsMenu;
-    QMenu *m_hideSubMenu;
-    QAction m_fashionModeAct;
-    QAction m_efficientModeAct;
-    QAction m_topPosAct;
     QAction m_bottomPosAct;
     QAction m_leftPosAct;
     QAction m_rightPosAct;
@@ -158,7 +145,6 @@ private:
 
     DisplayInter *m_displayInter;
     DockItemManager *m_itemManager;
-    bool m_trashPluginShow;
 
     QMap<Monitor *, MonitorInter *> m_monitors;
     bool m_isMouseMoveCause;

@@ -21,7 +21,6 @@
 
 #include "dockitem.h"
 #include "components/hoverhighlighteffect.h"
-#include "pluginsitem.h"
 
 #include <QMouseEvent>
 #include <QJsonObject>
@@ -31,7 +30,6 @@
 #define ITEM_MAXSIZE    100
 
 Position DockItem::DockPosition = Position::Top;
-DisplayMode DockItem::DockDisplayMode = DisplayMode::Efficient;
 QPointer<DockPopupWindow> DockItem::PopupWindow(nullptr);
 
 DockItem::DockItem(QWidget *parent)
@@ -97,11 +95,6 @@ DockItem::~DockItem()
 void DockItem::setDockPosition(const Position side)
 {
     DockPosition = side;
-}
-
-void DockItem::setDockDisplayMode(const DisplayMode mode)
-{
-    DockDisplayMode = mode;
 }
 
 void DockItem::gestureEvent(QGestureEvent *event)
@@ -370,13 +363,6 @@ const QPoint DockItem::popupMarkPoint()
 {
     QPoint p(topleftPoint());
     int margin = PLUGIN_MARGIN;
-    if (itemType() == Plugins){
-        PluginsItem *pluginItem = dynamic_cast<PluginsItem*>(this);
-        if (nullptr != pluginItem){
-            if (pluginItem->pluginName() == "datetime")
-                margin = 0;
-        }
-    }
     const QRect r = rect();
     switch (DockPosition) {
     case Top: {

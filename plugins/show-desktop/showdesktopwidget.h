@@ -29,6 +29,7 @@ class ShowDesktopWidget : public QWidget
     Q_OBJECT
 
 public:
+    QSize sizeHint() const;
     explicit ShowDesktopWidget(QWidget *parent = 0);
     void refreshIcon();
 

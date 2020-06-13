@@ -74,7 +74,10 @@ private:
     QPointer<DatetimeWidget> m_centralWidget;
     QPointer<TipsWidget> m_dateTipsLabel;
     QTimer *m_refershTimer;
-    QString m_currentTimeString;
+    QStringList tips;
+    int hour;
+    int minute;
+    
     QDBusInterface *m_interface;
     bool m_pluginLoaded;
 };

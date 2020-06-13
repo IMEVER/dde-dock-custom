@@ -33,8 +33,8 @@
 
 DatetimePlugin::DatetimePlugin(QObject *parent)
     : QObject(parent)
-    , m_pluginLoaded(false)
     , m_interface(nullptr)
+    , m_pluginLoaded(false)
 {
     QDBusConnection sessionBus = QDBusConnection::sessionBus();
     sessionBus.connect("com.deepin.daemon.Timedate", "/com/deepin/daemon/Timedate", "org.freedesktop.DBus.Properties",  "PropertiesChanged", this, SLOT(propertiesChanged()));
@@ -209,17 +209,34 @@ void DatetimePlugin::updateCurrentTimeString()
 {
     const QDateTime currentDateTime = QDateTime::currentDateTime();
 
+    int h = currentDateTime.time().hour();
+
+    if (tips.count() == 0 || h != hour)
+    {
+        hour = h;
+        tips = m_centralWidget->dateString();
+    }
+
+    QStringList t;
+    foreach(QString s, tips)
+        t.append(s);
+    
     if (m_centralWidget->is24HourFormat())
-        m_dateTipsLabel->setText(currentDateTime.date().toString(Qt::SystemLocaleLongDate) + currentDateTime.toString(" HH:mm:ss"));
+    {
+        t.append("阳历：" + currentDateTime.date().toString(Qt::SystemLocaleLongDate) + currentDateTime.toString(" HH:mm:ss"));
+    }
     else
-        m_dateTipsLabel->setText(currentDateTime.date().toString(Qt::SystemLocaleLongDate) + currentDateTime.toString(" hh:mm:ss A"));
+    {
+        t.append("阳历：" + currentDateTime.date().toString(Qt::SystemLocaleLongDate) + currentDateTime.toString(" hh:mm:ss A"));
+    }
+    m_dateTipsLabel->setTextList(t);
 
-    const QString currentString = currentDateTime.toString("yyyy/MM/dd hh:mm");
+    const int min = currentDateTime.time().minute();
 
-    if (currentString == m_currentTimeString)
+    if (min == minute)
         return;
 
-    m_currentTimeString = currentString;
+    minute = min;
     m_centralWidget->update();
 }
 

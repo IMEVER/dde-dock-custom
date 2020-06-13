@@ -203,10 +203,8 @@ void AppItem::moveEvent(QMoveEvent *e)
 void AppItem::paintEvent(QPaintEvent *e)
 {
     DockItem::paintEvent(e);
-    if (m_draging)
-        return;
 
-    if (m_dragging || (m_swingEffectView != nullptr && DockDisplayMode != Fashion))
+    if (m_dragging || (m_swingEffectView != nullptr))
         return;
 
     QPainter painter(this);
@@ -217,25 +215,6 @@ void AppItem::paintEvent(QPaintEvent *e)
 
     const QRectF itemRect = rect();
 
-    if (DockDisplayMode == Efficient) {
-        // draw background
-        qreal min = qMin(itemRect.width(), itemRect.height());
-        QRectF backgroundRect = QRectF(itemRect.x(), itemRect.y(), min, min);
-        backgroundRect = backgroundRect.marginsRemoved(QMargins(2, 2, 2, 2));
-        backgroundRect.moveCenter(itemRect.center());
-
-        QPainterPath path;
-        path.addRoundedRect(backgroundRect, 8, 8);
-
-        if (m_active) {
-            painter.fillPath(path, QColor(0, 0, 0, 255 * 0.8));
-        } else if (!m_windowInfos.isEmpty()) {
-            if (hasAttention())
-                painter.fillPath(path, QColor(241, 138, 46, 255 * .8));
-            else
-                painter.fillPath(path, QColor(0, 0, 0, 255 * 0.3));
-        }
-    } else {
         if (!m_windowInfos.isEmpty()) {
             QPoint p;
             QPixmap pixmap;
@@ -281,7 +260,6 @@ void AppItem::paintEvent(QPaintEvent *e)
             else
                 painter.drawPixmap(p, pixmap);
         }
-    }
 
     if (m_swingEffectView != nullptr)
         return;
@@ -576,8 +554,7 @@ void AppItem::updateWindowInfos(const WindowInfoMap &info)
 
     // process attention effect
     if (hasAttention()) {
-        if (DockDisplayMode == DisplayMode::Fashion)
-            playSwingEffect();
+        playSwingEffect();
     } else {
         stopSwingEffect();
     }
@@ -593,10 +570,7 @@ void AppItem::refershIcon()
     const QString icon = m_itemEntryInter->icon();
     const int iconSize = qMin(width(), height());
 
-    if (DockDisplayMode == Efficient)
-        m_appIcon = ThemeAppIcon::getIcon(icon, iconSize * 0.7, devicePixelRatioF());
-    else
-        m_appIcon = ThemeAppIcon::getIcon(icon, iconSize * 0.8, devicePixelRatioF());
+    m_appIcon = ThemeAppIcon::getIcon(icon, iconSize * 0.8, devicePixelRatioF());
 
     if (!m_refershIconTimer->isActive() && m_itemEntryInter->icon() == "dde-calendar") {
         m_refershIconTimer->start();
@@ -688,7 +662,7 @@ void AppItem::stopSwingEffect()
 void AppItem::checkAttentionEffect()
 {
     QTimer::singleShot(1000, this, [ = ] {
-        if (DockDisplayMode == DisplayMode::Fashion && hasAttention())
+        if (hasAttention())
             playSwingEffect();
     });
 }

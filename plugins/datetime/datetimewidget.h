@@ -33,6 +33,7 @@ public:
 
     bool is24HourFormat() const { return m_24HourFormat; }
     QSize sizeHint() const;
+    QStringList dateString();
 
 signals:
     void requestUpdateGeometry() const;
@@ -43,6 +44,7 @@ public slots:
 private:
     void paintEvent(QPaintEvent *e);
     QSize curTimeSize() const;
+    QString currentChinaTime() const;
 
 private:
     bool m_24HourFormat;

@@ -22,14 +22,12 @@
 #ifndef DOCKITEMMANAGER_H
 #define DOCKITEMMANAGER_H
 
-#include "dockpluginscontroller.h"
-#include "pluginsiteminterface.h"
 #include "item/dockitem.h"
 #include "item/appitem.h"
+#include "item/launcheritem.h"
 #include "item/placeholderitem.h"
 
 #include <com_deepin_dde_daemon_dock.h>
-
 #include <QObject>
 
 using DBusDock = com::deepin::dde::daemon::Dock;
@@ -42,22 +40,18 @@ public:
     static DockItemManager *instance(QObject *parent = nullptr);
 
     const QList<QPointer<DockItem> > itemList() const;
-    const QList<PluginsItemInterface *> pluginList() const;
     bool appIsOnDock(const QString &appDesktop) const;
-    void startLoadPlugins() const;
+    LauncherItem* getLauncherItem();
 
 signals:
     void itemInserted(const int index, DockItem *item) const;
     void itemRemoved(DockItem *item) const;
     void itemUpdated(DockItem *item) const;
-    void trayVisableCountChanged(const int &count) const;
     void requestWindowAutoHide(const bool autoHide) const;
     void requestRefershWindowVisible() const;
 
 public slots:
     void refershItemsIcon();
-    void sortPluginItems();
-    void updatePluginsItemOrderKey();
     void itemMoved(DockItem *const sourceItem, DockItem *const targetItem);
     void itemAdded(const QString &appDesktop, int idx);
 
@@ -66,17 +60,15 @@ private:
     void appItemAdded(const QDBusObjectPath &path, const int index);
     void appItemRemoved(const QString &appId);
     void appItemRemoved(AppItem *appItem);
-    void pluginItemInserted(PluginsItem *item);
-    void pluginItemRemoved(PluginsItem *item);
     void reloadAppItems();
     void manageItem(DockItem *item);
 
 private:
-    QTimer *m_updatePluginsOrderTimer;
     DBusDock *m_appInter;
-    DockPluginsController *m_pluginsInter;
 
     static DockItemManager *INSTANCE;
+
+    LauncherItem *launcherItem;
 
     QList<QPointer<DockItem>> m_itemList;
 };

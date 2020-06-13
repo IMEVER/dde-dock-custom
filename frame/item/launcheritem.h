@@ -42,9 +42,6 @@ public:
 
     void refershIcon() override;
 
-protected:
-    void showEvent(QShowEvent* event) override;
-
 private:
     void paintEvent(QPaintEvent *e) override;
     void resizeEvent(QResizeEvent *e) override;
@@ -53,15 +50,10 @@ private:
 
     QWidget *popupTips() override;
 
-    void onGSettingsChanged(const QString& key);
-
-    bool checkGSettingsControl() const;
-
 private:
     QPixmap m_icon;
     LauncherInter *m_launcherInter;
     TipsWidget *m_tips;
-    QGSettings* m_gsettings;
 };
 
 #endif // LAUNCHERITEM_H

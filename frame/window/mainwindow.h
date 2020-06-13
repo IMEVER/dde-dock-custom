@@ -70,13 +70,11 @@ public slots:
 private:
     using QWidget::show;
     bool event(QEvent *e);
-    void showEvent(QShowEvent *e);
     void mousePressEvent(QMouseEvent *e);
     void keyPressEvent(QKeyEvent *e);
     void enterEvent(QEvent *e);
     void leaveEvent(QEvent *e);
     void dragEnterEvent(QDragEnterEvent *e);
-    void mouseMoveEvent(QMouseEvent *e);
 
     void initSNIHost();
     void initComponents();
@@ -90,7 +88,6 @@ private:
     bool appIsOnDock(const QString &appDesktop);
     void onRegionMonitorChanged(int x, int y, const QString &key);
     void updateRegionMonitorWatch();
-    void getTrayVisableItemCount();
 
 signals:
     void panelGeometryChanged();
@@ -103,7 +100,6 @@ private slots:
     void setStrutPartial();
     void compositeChanged();
     void internalMove(const QPoint &p);
-    void updateDisplayMode();
 
     void expand();
     void narrow(const Position prevPos);

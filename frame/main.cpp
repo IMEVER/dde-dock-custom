@@ -20,7 +20,7 @@
  */
 
 #include "window/mainwindow.h"
-#include "window/accessible.h"
+// #include "window/accessible.h"
 #include "util/themeappicon.h"
 #include "controller/dockitemmanager.h"
 
@@ -82,7 +82,7 @@ int main(int argc, char *argv[])
     app.setAttribute(Qt::AA_EnableHighDpiScaling, true);
     app.setAttribute(Qt::AA_UseHighDpiPixmaps, false);
 
-    QAccessible::installFactory(accessibleFactory);
+    // QAccessible::installFactory(accessibleFactory);
 
     // load dde-network-utils translator
     QTranslator translator;
@@ -118,10 +118,6 @@ int main(int argc, char *argv[])
     QDBusConnection::sessionBus().registerObject("/com/deepin/dde/Dock", "com.deepin.dde.Dock", &mw);
 
     QTimer::singleShot(1, &mw, &MainWindow::launch);
-
-    if (!parser.isSet(disablePlugOption)) {
-        DockItemManager::instance()->startLoadPlugins();
-    }
 
     return app.exec();
 }
