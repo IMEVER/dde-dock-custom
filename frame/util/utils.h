@@ -5,19 +5,19 @@
 
 namespace Utils {
     static QPixmap renderSVG(const QString &path, const QSize &size, const qreal devicePixelRatio) {
-    QImageReader reader;
-    QPixmap pixmap;
-    reader.setFileName(path);
-    if (reader.canRead()) {
-        reader.setScaledSize(size * devicePixelRatio);
-        pixmap = QPixmap::fromImage(reader.read());
-        pixmap.setDevicePixelRatio(devicePixelRatio);
-    }
-    else {
-        pixmap.load(path);
-    }
+        QImageReader reader;
+        QPixmap pixmap;
+        reader.setFileName(path);
+        if (reader.canRead()) {
+            reader.setScaledSize(size * devicePixelRatio);
+            pixmap = QPixmap::fromImage(reader.read());
+            pixmap.setDevicePixelRatio(devicePixelRatio);
+        }
+        else {
+            pixmap.load(path);
+        }
 
-    return pixmap;
+        return pixmap;
     }
 
     static QScreen * screenAt(const QPoint &point) {

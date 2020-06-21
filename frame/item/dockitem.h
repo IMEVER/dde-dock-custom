@@ -118,6 +118,9 @@ protected:
 
     static Position DockPosition;
     static QPointer<DockPopupWindow> PopupWindow;
+
+    QVariantAnimation *m_scaleLarger;
+    QVariantAnimation *m_scaleSmaller;
 };
 
 #endif // DOCKITEM_H

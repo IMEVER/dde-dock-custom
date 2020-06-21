@@ -195,23 +195,24 @@ MainWindow::MainWindow(QWidget *parent) : DBlurEffectWidget(parent)
         // 当前dock尺寸
         const QRectF windowRect = m_settings->windowRect(m_curDockPos, false);
 
+        if (m_curDockPos == Dock::Top || m_curDockPos == Dock::Bottom) {
+            QWidget::setFixedHeight(val);
+        } else {
+            QWidget::setFixedWidth(val);
+        }
+
         switch (m_curDockPos) {
             case Dock::Bottom:
                 QWidget::move(windowRect.left(), windowRect.bottom() - val);
                 break;
             case Dock::Left:
-                QWidget::move(val - windowRect.right(), windowRect.top());
+                m_mainPanel->move(val - windowRect.width(), 0);
+                QWidget::move(windowRect.left(), windowRect.top());
                 break;
             case Dock::Right:
                 QWidget::move(windowRect.right() - val, windowRect.top());
                 break;
             default: break;
-        }
-
-        if (m_curDockPos == Dock::Top || m_curDockPos == Dock::Bottom) {
-            QWidget::setFixedHeight(val);
-        } else {
-            QWidget::setFixedWidth(val);
         }
     });
 
@@ -261,11 +262,11 @@ MainWindow::MainWindow(QWidget *parent) : DBlurEffectWidget(parent)
 
         QWidget::move(windowRect.left(), windowRect.top());
         QWidget::setFixedSize(windowRect.size());
-        // if(m_settings->hideMode() != HideMode::KeepShowing)
-        //     setVisible(false);
+        if(m_settings->hideMode() != HideMode::KeepShowing)
+            setVisible(false);
     });
 
-    updateRegionMonitorWatch();
+    // updateRegionMonitorWatch();
 }
 
 MainWindow::~MainWindow()
@@ -447,7 +448,7 @@ void MainWindow::internalMove(const QPoint &p)
     }
 
     // using platform window to set real window position
-//    windowHandle()->handle()->setGeometry(QRect(rp.x(), rp.y(), wx, hx));
+   windowHandle()->handle()->setGeometry(QRect(rp.x(), rp.y(), wx, hx));
 }
 
 void MainWindow::initConnections()
@@ -555,8 +556,6 @@ void MainWindow::positionChanged(const Position prevPos, const Position nextPos)
 
         updatePanelVisible();
     });
-
-    updateRegionMonitorWatch();
 }
 
 void MainWindow::updatePosition()
@@ -688,7 +687,7 @@ void MainWindow::setStrutPartial()
     //        return;
     //    }
 
-    m_xcbMisc->set_strut_partial(winId(), orientation, strut + m_settings->dockMargin() * ratio, strutStart, strutEnd);
+    m_xcbMisc->set_strut_partial(winId(), orientation, strut, strutStart, strutEnd);
 }
 
 void MainWindow::expand()
@@ -706,21 +705,20 @@ void MainWindow::expand()
     int startValue = 2;
     int endValue = 2;
 
-    resetPanelEnvironment(true, false);
-    if (showAniState != QPropertyAnimation::Running /*&& pos() != m_panelShowAni->currentValue()*/) {
-        bool isHide = m_settings->hideState() == Hide && !testAttribute(Qt::WA_UnderMouse);
-        const QRectF windowRect = m_settings->windowRect(m_curDockPos, isHide);
+    // resetPanelEnvironment(true, false);
+    if (showAniState != QPropertyAnimation::Running) {
+        const QRectF windowRect = m_settings->windowRect(m_curDockPos, false);
         switch (m_curDockPos) {
-        case Top:
-        case Bottom:
-            startValue = height();
-            endValue = windowRect.height();
-            break;
-        case Left:
-        case Right:
-            startValue = width();
-            endValue = windowRect.width();
-            break;
+            case Top:
+            case Bottom:
+                startValue = height();
+                endValue = windowRect.height();
+                break;
+            case Left:
+            case Right:
+                startValue = width();
+                endValue = windowRect.width();
+                break;
         }
 
         if (startValue > DOCK_MAX_SIZE || endValue > DOCK_MAX_SIZE) {
@@ -797,19 +795,18 @@ void MainWindow::updatePanelVisible()
             break;
 
         QRectF r(pos(), size());
-        const int margin = m_settings->dockMargin();
         switch (m_curDockPos) {
         case Dock::Top:
-            r.setY(r.y() - margin);
+            r.setY(r.y());
             break;
         case Dock::Bottom:
-            r.setHeight(r.height() + margin);
+            r.setHeight(r.height());
             break;
         case Dock::Left:
-            r.setX(r.x() - margin);
+            r.setX(r.x());
             break;
         case Dock::Right:
-            r.setWidth(r.width() + margin);
+            r.setWidth(r.width());
             break;
         }
         if (r.contains(QCursor::pos())) {
@@ -966,6 +963,8 @@ void MainWindow::onRegionMonitorChanged(int x, int y, const QString &key)
 
     if (!isVisible())
         setVisible(true);
+
+    // qDebug()<<"Monitor occur, x: "<<x<<", y: "<<y;
 }
 
 void MainWindow::updateRegionMonitorWatch()
@@ -973,12 +972,16 @@ void MainWindow::updateRegionMonitorWatch()
     if (m_settings->hideMode() == KeepShowing)
         return;
 
+    if (!m_registerKey.isEmpty())
+    {
+        m_eventInter->UnregisterArea(m_registerKey);
+    }    
+
     const int flags = Motion | Button | Key;
     bool isHide = m_settings->hideState() == Hide && !testAttribute(Qt::WA_UnderMouse);
     const QRect windowRect = m_settings->windowRect(m_curDockPos, isHide);
     const qreal scale = devicePixelRatioF();
     int val = 5;
-    const int margin = m_settings->dockMargin();
     int x, y, w, h;
 
     switch (m_curDockPos) {
@@ -986,33 +989,33 @@ void MainWindow::updateRegionMonitorWatch()
         x = windowRect.topLeft().x();
         y = windowRect.topLeft().y();
         w = m_settings->primaryRect().width();
-        h = val + margin;
+        h = val;
     }
     break;
     case Dock::Bottom: {
         x = windowRect.bottomLeft().x();
         y = windowRect.bottomLeft().y() - val;
-        w = m_settings->primaryRect().width();
-        h = val + margin;
+        w = x + windowRect.width();
+        h = m_settings->primaryRect().height();
     }
     break;
     case Dock::Left: {
         x = windowRect.topLeft().x();
         y = windowRect.topLeft().y();
-        w = val + margin;
-        h = m_settings->primaryRect().height();
+        w = val;
+        h = y + windowRect.height();
     }
     break;
     case Dock::Right: {
-        x = windowRect.topRight().x() - val - margin;
+        x = windowRect.topRight().x() - val;
         y = windowRect.topRight().y();
         w = m_settings->primaryRect().width();
-        h = m_settings->primaryRect().height();
+        h = y + windowRect.height();
     }
     break;
     }
-
-    m_eventInter->RegisterArea(x * scale, y * scale, w * scale, h * scale, flags);
+    // qDebug()<<QString("Monitor: (%1, %2, %3, %4)").arg(x).arg(y).arg(w).arg(h);
+    m_registerKey = m_eventInter->RegisterArea(x * scale, y * scale, w * scale, h * scale, flags);
 }
 
 #include "mainwindow.moc"

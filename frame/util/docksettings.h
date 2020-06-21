@@ -35,6 +35,8 @@
 #include <QObject>
 #include <QSize>
 
+#define MODE_PADDING    5
+
 using namespace Dock;
 using DBusDock = com::deepin::dde::daemon::Dock;
 using DisplayInter = com::deepin::daemon::Display;
@@ -63,9 +65,10 @@ public:
     inline const QRect frontendWindowRect() const { return m_frontendRect; }
     inline const QSize windowSize() const { return m_mainWindowSize; }
     inline const quint8 Opacity() const { return m_opacity * 255; }
-    const int dockMargin() const;
     void setDockWindowSize(int size);
     void calculateWindowConfig();
+    int itemCount();
+    int itemSize();
 
     const QSize panelSize() const;
     const QRect windowRect(const Position position, const bool hide = false);
@@ -134,6 +137,7 @@ private:
     mutable QRect m_currentRawRect;
     QRect m_frontendRect;
     QSize m_mainWindowSize;
+    int m_itemSize;
 
     QMenu m_settingsMenu;
     QAction m_bottomPosAct;

@@ -91,6 +91,8 @@ enum HideState {
     Hide        = 2,
 };
 
+#define SCALE_RADIO 1.5
+
 }
 
 Q_DECLARE_METATYPE(Dock::DisplayMode)

@@ -21,6 +21,7 @@
 
 #include "dockitem.h"
 #include "components/hoverhighlighteffect.h"
+#include "../util/docksettings.h"
 
 #include <QMouseEvent>
 #include <QJsonObject>
@@ -41,6 +42,8 @@ DockItem::DockItem(QWidget *parent)
     , m_hoverEffect(new HoverHighlightEffect(this))
     , m_popupTipsDelayTimer(new QTimer(this))
     , m_popupAdjustDelayTimer(new QTimer(this))
+    , m_scaleLarger(new QVariantAnimation(this))
+    , m_scaleSmaller(new QVariantAnimation(this))
 
 {
     if (PopupWindow.isNull()) {
@@ -70,6 +73,26 @@ DockItem::DockItem(QWidget *parent)
     grabGesture(Qt::TapAndHoldGesture);
 
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+
+    m_scaleLarger->setDuration(150);
+    m_scaleLarger->setEasingCurve(QEasingCurve::Linear);
+    connect(m_scaleLarger, &QVariantAnimation::valueChanged, this, [this](const QVariant &value){
+        setFixedSize(value.toInt(), value.toInt());
+    });
+    connect(m_scaleLarger, &QVariantAnimation::finished, this, [this](){
+        int size = DockSettings::Instance().itemSize();
+        setFixedSize(QSize(size + 20, size + 20));
+    });
+
+    m_scaleSmaller->setDuration(150);
+    m_scaleSmaller->setEasingCurve(QEasingCurve::Linear);
+    connect(m_scaleSmaller, &QVariantAnimation::valueChanged, this, [this](const QVariant &value){
+        setFixedSize(value.toInt(), value.toInt());
+    });
+    connect(m_scaleSmaller, &QVariantAnimation::finished, this, [this](){
+        int size = DockSettings::Instance().itemSize();
+        setFixedSize(QSize(size, size));
+    });
 }
 
 QSize DockItem::sizeHint() const
@@ -175,7 +198,20 @@ void DockItem::enterEvent(QEvent *e)
     m_hoverEffect->setHighlighting(true);
     m_popupTipsDelayTimer->start();
 
-    update();
+    // setFixedSize(size() + QSize(20, 20));
+
+    if (m_scaleSmaller->state() == QVariantAnimation::Running)
+    {
+        m_scaleSmaller->stop();
+    }    
+
+    if (m_scaleLarger->state() == QVariantAnimation::Stopped)
+    {
+        int originSize = DockSettings::Instance().itemSize();
+        m_scaleLarger->setStartValue(size().width());
+        m_scaleLarger->setEndValue(originSize + 20);
+        m_scaleLarger->start();        
+    }
 
     return QWidget::enterEvent(e);
 }
@@ -192,7 +228,18 @@ void DockItem::leaveEvent(QEvent *e)
     if (m_popupShown && !PopupWindow->model())
         hidePopup();
 
-    update();
+    if (m_scaleLarger->state() == QVariantAnimation::Running)
+    {
+        m_scaleLarger->stop();
+    }
+
+    if (m_scaleSmaller->state() == QVariantAnimation::Stopped)
+    {
+        int originSize = DockSettings::Instance().itemSize();
+        m_scaleSmaller->setStartValue(size().width());
+        m_scaleSmaller->setEndValue(originSize);
+        m_scaleSmaller->start();
+    }
 }
 
 const QRect DockItem::perfectIconRect() const

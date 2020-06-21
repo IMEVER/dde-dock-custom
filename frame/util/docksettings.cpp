@@ -32,9 +32,6 @@
 #include <DApplication>
 #include <QScreen>
 
-#define MODE_PADDING    5
-#define DOCK_MARGIN       0
-
 #define DEFAULT_HEIGHT 72
 #define WINDOW_MAX_SIZE          100
 #define WINDOW_MIN_SIZE          40
@@ -68,7 +65,7 @@ DockSettings::DockSettings(QWidget *parent)
     m_currentRawRect = m_primaryRawRect;
     m_screenRawHeight = m_displayInter->screenHeight();
     m_screenRawWidth = m_displayInter->screenWidth();
-    m_position = Dock::Bottom; // Dock::Position(m_dockInter->position());
+    m_position = Dock::Position(m_dockInter->position());
     m_hideMode = Dock::HideMode(m_dockInter->hideMode());
     m_hideState = Dock::HideState(m_dockInter->hideState());
     DockItem::setDockPosition(m_position);
@@ -187,11 +184,6 @@ const QRect DockSettings::currentRect() const
     return rect;
 }
 
-const int DockSettings::dockMargin() const
-{
-    return DOCK_MARGIN;
-}
-
 const QSize DockSettings::panelSize() const
 {
     return m_mainWindowSize;
@@ -212,20 +204,16 @@ const QRect DockSettings::windowRect(const Position position, const bool hide)
     const QRect primaryRect = this->currentRect();
     const int offsetX = (primaryRect.width() - size.width()) / 2;
     const int offsetY = (primaryRect.height() - size.height()) / 2;
-    int margin = hide ?  0 : this->dockMargin();
     QPoint p(0, 0);
     switch (position) {
-        case Top:
-            p = QPoint(offsetX, margin);
-            break;
         case Left:
-            p = QPoint(margin, offsetY);
+            p = QPoint(0, offsetY);
             break;
         case Right:
-            p = QPoint(primaryRect.width() - size.width() - margin, offsetY);
+            p = QPoint(primaryRect.width() - size.width(), offsetY);
             break;
         case Bottom:
-            p = QPoint(offsetX, primaryRect.height() - size.height() - margin);
+            p = QPoint(offsetX, primaryRect.height() - size.height());
             break;
     }
 
@@ -369,6 +357,16 @@ void DockSettings::onOpacityChanged(const double value)
     emit opacityChanged(value * 255);
 }
 
+int DockSettings::itemCount()
+{
+    return m_itemManager->itemList().count() + 1;
+}
+
+int DockSettings::itemSize()
+{
+    return m_itemSize;
+}
+
 void DockSettings::calculateWindowConfig()
 {
     setDockWindowSize(int(m_dockInter->windowSizeFashion()));
@@ -380,19 +378,39 @@ void DockSettings::setDockWindowSize(int size)
     if (m_dockWindowSize > WINDOW_MAX_SIZE || m_dockWindowSize < WINDOW_MIN_SIZE) {
         m_dockWindowSize = DEFAULT_HEIGHT;
     }
-    m_dockInter->setWindowSize(DEFAULT_HEIGHT);
+    m_dockInter->setWindowSize(m_dockWindowSize);
 
-    int count = m_itemManager->itemList().count() + 1;
+    int count = itemCount(), length;
+    m_itemSize = m_dockWindowSize - 20;
     switch (m_position) {
         case Top:
         case Bottom: {
             m_mainWindowSize.setHeight(m_dockWindowSize);
-            m_mainWindowSize.setWidth(m_dockWindowSize * count + MODE_PADDING * count + DOCK_MARGIN * 2);
+            length = primaryRect().width();
+            if (m_itemSize * count + MODE_PADDING * count > length * 0.9)
+            {
+                m_mainWindowSize.setWidth(length * 0.9);
+                m_itemSize = round(length * 0.9 / count - MODE_PADDING);
+            }
+            else
+            {
+                m_mainWindowSize.setWidth(m_itemSize * count + MODE_PADDING * (count + 4));
+            }
             break;
         }
         case Left:
         case Right: {
-            m_mainWindowSize.setHeight(m_dockWindowSize * count + MODE_PADDING * count + DOCK_MARGIN * 2);
+            length = primaryRect().height();
+            if (m_itemSize * count + MODE_PADDING * count > length * 0.9)
+            {
+                m_mainWindowSize.setHeight(length * 0.9);
+                m_itemSize = round(length * 0.9 / count - MODE_PADDING);
+            }
+            else
+            {
+                m_mainWindowSize.setHeight(m_itemSize * count + MODE_PADDING * (count + 4));                
+            }
+
             m_mainWindowSize.setWidth(m_dockWindowSize);
             break;
         }

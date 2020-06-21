@@ -37,7 +37,6 @@
 #include <DGuiApplicationHelper>
 #include <DWindowManagerHelper>
 
-#define SPLITER_SIZE 2
 DWIDGET_USE_NAMESPACE
 
 MainPanelControl::MainPanelControl(QWidget *parent) : QWidget(parent)
@@ -49,7 +48,6 @@ MainPanelControl::MainPanelControl(QWidget *parent) : QWidget(parent)
     , m_position(Position::Bottom)
     , m_placeholderItem(nullptr)
     , m_appDragWidget(nullptr)
-    , m_fixedSpliter(new QLabel(this))
 {
     init();
     updateMainPanelLayout();
@@ -57,7 +55,6 @@ MainPanelControl::MainPanelControl(QWidget *parent) : QWidget(parent)
     setMouseTracking(true);
 
     m_appAreaWidget->installEventFilter(this);
-    m_fixedSpliter->setFixedSize(0,0);
 }
 
 MainPanelControl::~MainPanelControl()
@@ -66,30 +63,32 @@ MainPanelControl::~MainPanelControl()
 
 void MainPanelControl::init()
 {
-    m_fixedSpliter->setObjectName("spliter_fix");
-    m_appAreaWidget->setAccessibleName("AppFullArea");
-    m_mainPanelLayout->addWidget(m_fixedAreaWidget);
-    m_mainPanelLayout->addWidget(m_fixedSpliter);
+    m_mainPanelLayout->setAlignment(Qt::AlignBottom);
 
+    m_appAreaWidget->setAccessibleName("AppFullArea");
+    m_mainPanelLayout->addStretch(1);
+    m_mainPanelLayout->addWidget(m_fixedAreaWidget);
     m_mainPanelLayout->addWidget(m_appAreaWidget);
+    m_mainPanelLayout->addStretch(1);
 
     m_mainPanelLayout->setMargin(0);
     m_mainPanelLayout->setContentsMargins(0, 0, 0, 0);
     m_mainPanelLayout->setSpacing(0);
-    m_mainPanelLayout->setAlignment(m_fixedSpliter, Qt::AlignCenter);
 
     // 固定区域
     m_fixedAreaWidget->setLayout(m_fixedAreaLayout);
-    m_fixedAreaWidget->setObjectName("fixedarea");
+    m_fixedAreaWidget->setObjectName("fixedarea");// m_fixedAreaWidget->setStyleSheet("QWidget{background-color: rgba(0,0,0,255);}");
     m_fixedAreaLayout->setMargin(0);
     m_fixedAreaLayout->setContentsMargins(0, 0, 0, 0);
-    m_fixedAreaLayout->setSpacing(0);
+    m_fixedAreaLayout->setSpacing(MODE_PADDING);
+    m_fixedAreaLayout->setAlignment(Qt::AlignCenter);
     // 应用程序
     m_appAreaWidget->setLayout(m_appAreaLayout);
     m_appAreaWidget->setObjectName("apparea");
     m_appAreaLayout->setMargin(0);
     m_appAreaLayout->setContentsMargins(0, 0, 0, 0);
-    m_appAreaLayout->setSpacing(0);
+    m_appAreaLayout->setSpacing(MODE_PADDING);
+    m_appAreaLayout->setAlignment(Qt::AlignCenter);
 }
 
 void MainPanelControl::updateMainPanelLayout()
@@ -117,22 +116,14 @@ void MainPanelControl::updateMainPanelLayout()
 
 void MainPanelControl::addFixedAreaItem(int index, QWidget *wdg)
 {
-    if(m_position == Position::Top || m_position == Position::Bottom){
-        wdg->setMaximumSize(height(),height());
-    } else {
-        wdg->setMaximumSize(width(),width());
-    }
+    wdg->setFixedSize(DockSettings::Instance().itemSize(), DockSettings::Instance().itemSize());
     m_fixedAreaLayout->insertWidget(index, wdg);
 }
 
 void MainPanelControl::addAppAreaItem(int index, QWidget *wdg)
 {
-    if(m_position == Position::Top || m_position == Position::Bottom){
-        wdg->setMaximumSize(height(),height());
-    } else {
-        wdg->setMaximumSize(width(),width());
-    }
-    m_appAreaLayout->insertWidget(index, wdg);
+    wdg->setFixedSize(DockSettings::Instance().itemSize(), DockSettings::Instance().itemSize());
+    m_appAreaLayout->insertWidget(index, wdg, 0, Qt::AlignCenter);
 }
 
 void MainPanelControl::removeAppAreaItem(QWidget *wdg)
@@ -536,36 +527,13 @@ void MainPanelControl::itemUpdated(DockItem *item)
 
 void MainPanelControl::resizeDockIcon()
 {
-    if ((m_position == Position::Top) || (m_position == Position::Bottom)) {
-        calcuDockIconSize(height(), height());
-    } else {
-        calcuDockIconSize(width(), width());
+    int size = DockSettings::Instance().itemSize();
+    QSize s(size, size);
+    if(m_fixedAreaLayout->count() > 0)
+    {
+        m_fixedAreaLayout->itemAt(0)->widget()->setFixedSize(s);
     }
-}
-
-void MainPanelControl::calcuDockIconSize(int w, int h)
-{
-    if (m_position == Dock::Position::Top || m_position == Dock::Position::Bottom) {
-        m_fixedSpliter->setFixedSize(SPLITER_SIZE, int(w * 0.6));
-        if(m_fixedAreaLayout->count() > 0)
-        {
-            m_fixedAreaLayout->itemAt(0)->widget()->setMaximumWidth(h);
-            m_fixedAreaLayout->itemAt(0)->widget()->setMaximumHeight(QWIDGETSIZE_MAX);
-        }
-        for (int i = 0; i < m_appAreaLayout->count(); ++ i) {
-            m_appAreaLayout->itemAt(i)->widget()->setMaximumWidth(h);
-            m_appAreaLayout->itemAt(i)->widget()->setMaximumHeight(QWIDGETSIZE_MAX);
-        }
-    } else {
-        m_fixedSpliter->setFixedSize(int(h * 0.6), SPLITER_SIZE);
-        if(m_fixedAreaLayout->count() > 0)
-        {
-            m_fixedAreaLayout->itemAt(0)->widget()->setMaximumWidth(h);
-            m_fixedAreaLayout->itemAt(0)->widget()->setMaximumHeight(QWIDGETSIZE_MAX);
-        }
-        for (int i = 0; i < m_appAreaLayout->count(); ++ i) {
-            m_appAreaLayout->itemAt(i)->widget()->setMaximumHeight(w);
-            m_appAreaLayout->itemAt(i)->widget()->setMaximumWidth(QWIDGETSIZE_MAX);
-        }
+    for (int i = 0; i < m_appAreaLayout->count(); ++ i) {
+        m_appAreaLayout->itemAt(i)->widget()->setFixedSize(s);
     }
 }

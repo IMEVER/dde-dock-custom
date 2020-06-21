@@ -84,9 +84,10 @@ void PreviewContainer::setWindowInfos(const WindowInfoMap &infos, const WindowLi
     }
 
     if (m_snapshots.isEmpty())
+    {
         emit requestCancelPreviewWindow();
         emit requestHidePopup();
-
+    }
     adjustSize();
 }
 
