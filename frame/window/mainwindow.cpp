@@ -40,14 +40,9 @@
 #include <X11/X.h>
 #include <X11/Xutil.h>
 
-#define SNI_WATCHER_SERVICE "org.kde.StatusNotifierWatcher"
-#define SNI_WATCHER_PATH "/StatusNotifierWatcher"
-
 #define MAINWINDOW_MAX_SIZE       DOCK_MAX_SIZE
 #define MAINWINDOW_MIN_SIZE       (40)
 #define DRAG_AREA_SIZE (5)
-
-using org::kde::StatusNotifierWatcher;
 
 class DragWidget : public QWidget
 {
@@ -142,13 +137,9 @@ MainWindow::MainWindow(QWidget *parent) : DBlurEffectWidget(parent)
     , m_panelShowAni(new QVariantAnimation(this))
     , m_panelHideAni(new QVariantAnimation(this))
     , m_xcbMisc(XcbMisc::instance())
-    , m_dbusDaemonInterface(QDBusConnection::sessionBus().interface())
-    , m_sniWatcher(new StatusNotifierWatcher(SNI_WATCHER_SERVICE, SNI_WATCHER_PATH, QDBusConnection::sessionBus(), this))
     , m_dragWidget(new DragWidget(this))
     , m_mouseCauseDock(false)
 {
-    setAccessibleName("mainwindow");
-    m_mainPanel->setAccessibleName("mainpanel");
     setAttribute(Qt::WA_TranslucentBackground);
     setMouseTracking(true);
     setAcceptDrops(true);
@@ -156,14 +147,13 @@ MainWindow::MainWindow(QWidget *parent) : DBlurEffectWidget(parent)
     DPlatformWindowHandle::enableDXcbForWindow(this, true);
     m_platformWindowHandle.setEnableBlurWindow(true);
     m_platformWindowHandle.setTranslucentBackground(true);
-    m_platformWindowHandle.setWindowRadius(0);
+    m_platformWindowHandle.setWindowRadius(5);
     m_platformWindowHandle.setShadowOffset(QPoint(0, 5));
     m_platformWindowHandle.setShadowColor(QColor(0, 0, 0, 0.3 * 255));
 
     m_settings = &DockSettings::Instance();
     m_xcbMisc->set_window_type(winId(), XcbMisc::Dock);
     m_size = m_settings->windowSize();
-    initSNIHost();
     initComponents();
     initConnections();
 
@@ -351,21 +341,6 @@ void MainWindow::dragEnterEvent(QDragEnterEvent *e)
     }
 }
 
-void MainWindow::initSNIHost()
-{
-    // registor dock as SNI Host on dbus
-    QDBusConnection dbusConn = QDBusConnection::sessionBus();
-    m_sniHostService = QString("org.kde.StatusNotifierHost-") + QString::number(qApp->applicationPid());
-    dbusConn.registerService(m_sniHostService);
-    dbusConn.registerObject("/StatusNotifierHost", this);
-
-    if (m_sniWatcher->isValid()) {
-        m_sniWatcher->RegisterStatusNotifierHost(m_sniHostService);
-    } else {
-        qDebug() << SNI_WATCHER_SERVICE << "SNI watcher daemon is not exist for now!";
-    }
-}
-
 void MainWindow::initComponents()
 {
     m_positionUpdateTimer->setSingleShot(true);
@@ -473,8 +448,6 @@ void MainWindow::initConnections()
 
     connect(m_wmHelper, &DWindowManagerHelper::hasCompositeChanged, this, &MainWindow::compositeChanged, Qt::QueuedConnection);
     connect(&m_platformWindowHandle, &DPlatformWindowHandle::frameMarginsChanged, m_shadowMaskOptimizeTimer, static_cast<void (QTimer::*)()>(&QTimer::start));
-
-    connect(m_dbusDaemonInterface, &QDBusConnectionInterface::serviceOwnerChanged, this, &MainWindow::onDbusNameOwnerChanged);
 
     connect(DockItemManager::instance(), &DockItemManager::itemInserted, m_mainPanel, &MainPanelControl::insertItem, Qt::DirectConnection);
     connect(DockItemManager::instance(), &DockItemManager::itemRemoved, m_mainPanel, &MainPanelControl::removeItem, Qt::DirectConnection);
@@ -851,16 +824,6 @@ void MainWindow::positionCheck()
 
     // this may cause some position error and animation caton
     //internalMove();
-}
-
-void MainWindow::onDbusNameOwnerChanged(const QString &name, const QString &oldOwner, const QString &newOwner)
-{
-    Q_UNUSED(oldOwner);
-
-    if (name == SNI_WATCHER_SERVICE && !newOwner.isEmpty()) {
-        qDebug() << SNI_WATCHER_SERVICE << "SNI watcher daemon started, register dock to watcher as SNI Host";
-        m_sniWatcher->RegisterStatusNotifierHost(m_sniHostService);
-    }
 }
 
 void MainWindow::setEffectEnabled(const bool enabled)

@@ -27,7 +27,6 @@
 #include <QJsonObject>
 #include <QCursor>
 
-#define PLUGIN_MARGIN  10
 #define ITEM_MAXSIZE    100
 
 Position DockItem::DockPosition = Position::Top;
@@ -80,8 +79,8 @@ DockItem::DockItem(QWidget *parent)
         setFixedSize(value.toInt(), value.toInt());
     });
     connect(m_scaleLarger, &QVariantAnimation::finished, this, [this](){
-        int size = DockSettings::Instance().itemSize();
-        setFixedSize(QSize(size + 20, size + 20));
+        int size = DockSettings::Instance().dockWindowSize();
+        setFixedSize(QSize(size, size));
     });
 
     m_scaleSmaller->setDuration(150);
@@ -207,10 +206,10 @@ void DockItem::enterEvent(QEvent *e)
 
     if (m_scaleLarger->state() == QVariantAnimation::Stopped)
     {
-        int originSize = DockSettings::Instance().itemSize();
+        int originSize = DockSettings::Instance().dockWindowSize();
         m_scaleLarger->setStartValue(size().width());
-        m_scaleLarger->setEndValue(originSize + 20);
-        m_scaleLarger->start();        
+        m_scaleLarger->setEndValue(originSize);
+        m_scaleLarger->start();
     }
 
     return QWidget::enterEvent(e);
@@ -247,14 +246,9 @@ const QRect DockItem::perfectIconRect() const
     const QRect itemRect = rect();
     QRect iconRect;
 
-    if (itemType() == Plugins) {
-        iconRect.setWidth(itemRect.width());
-        iconRect.setHeight(itemRect.height());
-    } else {
-        const int iconSize = std::min(itemRect.width(), itemRect.height()) * 0.8;
-        iconRect.setWidth(iconSize);
-        iconRect.setHeight(iconSize);
-    }
+    const int iconSize = std::min(itemRect.width(), itemRect.height()) * 0.8;
+    iconRect.setWidth(iconSize);
+    iconRect.setHeight(iconSize);
 
     iconRect.moveTopLeft(itemRect.center() - iconRect.center());
     return iconRect;
@@ -409,39 +403,22 @@ bool DockItem::checkAndResetTapHoldGestureState()
 const QPoint DockItem::popupMarkPoint()
 {
     QPoint p(topleftPoint());
-    int margin = PLUGIN_MARGIN;
     const QRect r = rect();
     switch (DockPosition) {
     case Top: {
-        if (itemType() == Plugins) {
-            p += QPoint(r.width() / 2, r.height() + margin);
-        } else {
-            p += QPoint(r.width() / 2, r.height());
-        }
+        p += QPoint(r.width() / 2, r.height());
         break;
     }
     case Bottom: {
-        if (itemType() == Plugins) {
-            p += QPoint(r.width() / 2, 0 - margin);
-        } else {
-            p += QPoint(r.width() / 2, 0);
-        }
+        p += QPoint(r.width() / 2, 0);
         break;
     }
     case Left: {
-        if (itemType() == Plugins) {
-            p += QPoint(r.width() + margin, r.height() / 2);
-        } else {
-            p += QPoint(r.width(), r.height() / 2);
-        }
+        p += QPoint(r.width(), r.height() / 2);
         break;
     }
     case Right: {
-        if (itemType() == Plugins) {
-            p += QPoint(0 - margin, r.height() / 2);
-        } else {
-            p += QPoint(0, r.height() / 2);
-        }
+        p += QPoint(0, r.height() / 2);
         break;
         }
     }

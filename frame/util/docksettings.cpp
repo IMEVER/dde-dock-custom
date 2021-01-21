@@ -206,6 +206,7 @@ const QRect DockSettings::windowRect(const Position position, const bool hide)
     const int offsetY = (primaryRect.height() - size.height()) / 2;
     QPoint p(0, 0);
     switch (position) {
+        case Top:
         case Left:
             p = QPoint(0, offsetY);
             break;
@@ -360,6 +361,11 @@ void DockSettings::onOpacityChanged(const double value)
 int DockSettings::itemCount()
 {
     return m_itemManager->itemList().count() + 1;
+}
+
+int DockSettings::dockWindowSize()
+{
+    return m_dockWindowSize;
 }
 
 int DockSettings::itemSize()

@@ -24,7 +24,6 @@
 #define MAINWINDOW_H
 
 #include "xcb/xcb_misc.h"
-#include "dbus/sni/statusnotifierwatcher_interface.h"
 #include "panel/mainpanelcontrol.h"
 
 #include <com_deepin_api_xeventmonitor.h>
@@ -76,7 +75,6 @@ private:
     void leaveEvent(QEvent *e);
     void dragEnterEvent(QDragEnterEvent *e);
 
-    void initSNIHost();
     void initComponents();
     void initConnections();
     void resizeMainWindow();
@@ -109,7 +107,6 @@ private slots:
     void adjustShadowMask();
     void positionCheck();
 
-    void onDbusNameOwnerChanged(const QString &name, const QString &oldOwner, const QString &newOwner);
     void onMainWindowSizeChanged(QPoint offset);
     void onDragFinished();
     void themeTypeChanged(DGuiApplicationHelper::ColorType themeType);
@@ -134,9 +131,6 @@ private:
     XcbMisc *m_xcbMisc;
     DockSettings *m_settings;
 
-    QDBusConnectionInterface *m_dbusDaemonInterface;
-    org::kde::StatusNotifierWatcher *m_sniWatcher;
-    QString m_sniHostService;
     QSize m_size;
     DragWidget *m_dragWidget;
     Position m_curDockPos;

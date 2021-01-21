@@ -69,6 +69,7 @@ public:
     void calculateWindowConfig();
     int itemCount();
     int itemSize();
+    int dockWindowSize();
 
     const QSize panelSize() const;
     const QRect windowRect(const Position position, const bool hide = false);

@@ -63,9 +63,9 @@ MainPanelControl::~MainPanelControl()
 
 void MainPanelControl::init()
 {
-    m_mainPanelLayout->setAlignment(Qt::AlignBottom);
+    m_mainPanelLayout->setAlignment(Qt::AlignCenter);
 
-    m_appAreaWidget->setAccessibleName("AppFullArea");
+    m_mainPanelLayout->setSpacing(MODE_PADDING);
     m_mainPanelLayout->addStretch(1);
     m_mainPanelLayout->addWidget(m_fixedAreaWidget);
     m_mainPanelLayout->addWidget(m_appAreaWidget);
@@ -73,18 +73,16 @@ void MainPanelControl::init()
 
     m_mainPanelLayout->setMargin(0);
     m_mainPanelLayout->setContentsMargins(0, 0, 0, 0);
-    m_mainPanelLayout->setSpacing(0);
+    m_mainPanelLayout->setSpacing(MODE_PADDING);
 
     // 固定区域
     m_fixedAreaWidget->setLayout(m_fixedAreaLayout);
-    m_fixedAreaWidget->setObjectName("fixedarea");// m_fixedAreaWidget->setStyleSheet("QWidget{background-color: rgba(0,0,0,255);}");
     m_fixedAreaLayout->setMargin(0);
     m_fixedAreaLayout->setContentsMargins(0, 0, 0, 0);
     m_fixedAreaLayout->setSpacing(MODE_PADDING);
     m_fixedAreaLayout->setAlignment(Qt::AlignCenter);
     // 应用程序
     m_appAreaWidget->setLayout(m_appAreaLayout);
-    m_appAreaWidget->setObjectName("apparea");
     m_appAreaLayout->setMargin(0);
     m_appAreaLayout->setContentsMargins(0, 0, 0, 0);
     m_appAreaLayout->setSpacing(MODE_PADDING);
@@ -379,7 +377,7 @@ bool MainPanelControl::eventFilter(QObject *watched, QEvent *event)
     if (!item)
         return false;
 
-    if (item->itemType() != DockItem::App && item->itemType() != DockItem::Plugins && item->itemType() != DockItem::FixedPlugin)
+    if (item->itemType() != DockItem::App)
         return false;
 
     const QPoint pos = mouseEvent->globalPos();
@@ -457,9 +455,6 @@ DockItem *MainPanelControl::dropTargetItem(DockItem *sourceItem, QPoint point)
         switch (sourceItem->itemType()) {
         case DockItem::App:
             parentWidget = m_appAreaWidget;
-            break;
-        case DockItem::Plugins:
-        case DockItem::FixedPlugin:
             break;
         default:
             break;

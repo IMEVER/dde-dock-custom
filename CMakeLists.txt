@@ -41,7 +41,6 @@ endif()
 file(GLOB INTERFACES "interfaces/*.h")
 
 add_subdirectory("frame")
-add_subdirectory("plugins")
 
 # Install settings
 if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
@@ -65,7 +64,7 @@ install(FILES "cmake/DdeDock/DdeDockConfig.cmake"
 
 ## services files
 install(FILES frame/com.deepin.dde.Dock.service
-        DESTINATION /usr/share/dbus-1/services)
+        DESTINATION share/dbus-1/services)
 
 install(FILES gschema/com.deepin.dde.dock.module.gschema.xml
         DESTINATION share/glib-2.0/schemas)

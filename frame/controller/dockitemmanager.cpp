@@ -23,9 +23,6 @@
 #include "item/appitem.h"
 #include "util/docksettings.h"
 
-#include <QDebug>
-#include <QGSettings>
-
 DockItemManager *DockItemManager::INSTANCE = nullptr;
 
 DockItemManager::DockItemManager(QObject *parent)
@@ -34,16 +31,7 @@ DockItemManager::DockItemManager(QObject *parent)
     , m_appInter(new DBusDock("com.deepin.dde.daemon.Dock", "/com/deepin/dde/daemon/Dock", QDBusConnection::sessionBus(), this))
 {
     // 应用区域
-    for (auto entry : m_appInter->entries()) {
-        AppItem *it = new AppItem(entry);
-
-        manageItem(it);
-        connect(it, &AppItem::requestActivateWindow, m_appInter, &DBusDock::ActivateWindow, Qt::QueuedConnection);
-        connect(it, &AppItem::requestPreviewWindow, m_appInter, &DBusDock::PreviewWindow);
-        connect(it, &AppItem::requestCancelPreview, m_appInter, &DBusDock::CancelPreviewWindow);
-
-        m_itemList.append(it);        
-    }
+    reloadAppItems();
 
     // 应用信号
     connect(m_appInter, &DBusDock::EntryAdded, this, &DockItemManager::appItemAdded);
@@ -98,11 +86,6 @@ void DockItemManager::itemMoved(DockItem *const sourceItem, DockItem *const targ
     // app move
     if (moveType == DockItem::App || moveType == DockItem::Placeholder)
         if (replaceType != DockItem::App)
-            return;
-
-    // plugins move
-    if (moveType == DockItem::Plugins || moveType == DockItem::TrayPlugin)
-        if (replaceType != DockItem::Plugins && replaceType != DockItem::TrayPlugin)
             return;
 
     const int moveIndex = m_itemList.indexOf(sourceItem);
