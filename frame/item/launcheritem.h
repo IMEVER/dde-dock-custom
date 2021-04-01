@@ -30,7 +30,6 @@
 
 using LauncherInter = com::deepin::dde::Launcher;
 
-class QGSettings;
 class LauncherItem : public DockItem
 {
     Q_OBJECT

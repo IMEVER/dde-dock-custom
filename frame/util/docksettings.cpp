@@ -27,8 +27,6 @@
 
 #include <QDebug>
 #include <QX11Info>
-#include <QGSettings>
-
 #include <DApplication>
 #include <QScreen>
 
@@ -45,18 +43,17 @@ DockSettings::DockSettings(QWidget *parent)
     , m_dockInter(new DBusDock("com.deepin.dde.daemon.Dock", "/com/deepin/dde/daemon/Dock", QDBusConnection::sessionBus(), this))
     , m_autoHide(true)
     , m_opacity(0.4)
-    , m_bottomPosAct(tr("Bottom"), this)
-    , m_leftPosAct(tr("Left"), this)
-    , m_rightPosAct(tr("Right"), this)
-    , m_keepShownAct(tr("Keep Shown"), this)
-    , m_keepHiddenAct(tr("Keep Hidden"), this)
-    , m_smartHideAct(tr("Smart Hide"), this)
+    , m_bottomPosAct("下", this)
+    , m_leftPosAct("左", this)
+    , m_rightPosAct("右", this)
+    , m_keepShownAct("一直显示", this)
+    , m_keepHiddenAct("一直隐藏", this)
+    , m_smartHideAct("智能隐藏", this)
     , m_displayInter(new DisplayInter("com.deepin.daemon.Display", "/com/deepin/daemon/Display", QDBusConnection::sessionBus(), this))
     , m_itemManager(DockItemManager::instance(this))
     , m_isMouseMoveCause(false)
     , m_mouseCauseDockScreen(nullptr)
 {
-    m_settingsMenu.setAccessibleName("settingsmenu");
     checkService();
 
     onMonitorListChanged(m_displayInter->monitors());
@@ -79,24 +76,22 @@ DockSettings::DockSettings(QWidget *parent)
     m_smartHideAct.setCheckable(true);
 
     QMenu *locationSubMenu = new QMenu(&m_settingsMenu);
-    locationSubMenu->setAccessibleName("locationsubmenu");
     locationSubMenu->addAction(&m_bottomPosAct);
     locationSubMenu->addAction(&m_leftPosAct);
     locationSubMenu->addAction(&m_rightPosAct);
-    QAction *locationSubMenuAct = new QAction(tr("Location"), this);
+    QAction *locationSubMenuAct = new QAction("位置", this);
     locationSubMenuAct->setMenu(locationSubMenu);
 
     QMenu *statusSubMenu = new QMenu(&m_settingsMenu);
-    statusSubMenu->setAccessibleName("statussubmenu");
     statusSubMenu->addAction(&m_keepShownAct);
     statusSubMenu->addAction(&m_keepHiddenAct);
     statusSubMenu->addAction(&m_smartHideAct);
-    QAction *statusSubMenuAct = new QAction(tr("Status"), this);
+    QAction *statusSubMenuAct = new QAction("状态", this);
     statusSubMenuAct->setMenu(statusSubMenu);
 
     m_settingsMenu.addAction(locationSubMenuAct);
     m_settingsMenu.addAction(statusSubMenuAct);
-    m_settingsMenu.setTitle("Settings Menu");
+    m_settingsMenu.setTitle("设置");
 
     connect(&m_settingsMenu, &QMenu::triggered, this, &DockSettings::menuActionClicked);
     connect(m_dockInter, &DBusDock::PositionChanged, this, &DockSettings::onPositionChanged);

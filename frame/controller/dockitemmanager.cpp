@@ -152,7 +152,8 @@ void DockItemManager::reloadAppItems()
     for (auto item : m_itemList)
         appItemRemoved(static_cast<AppItem *>(item.data()));
 
-    for (auto path : m_appInter->entries())
+    QList<QDBusObjectPath> list = m_appInter->entries();
+    for (auto path : list)
         appItemAdded(path, -1);
 }
 

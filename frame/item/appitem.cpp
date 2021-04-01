@@ -39,30 +39,11 @@
 #include <QGraphicsScene>
 #include <QTimeLine>
 #include <QX11Info>
-#include <QGSettings>
 #include <DGuiApplicationHelper>
 
 #define APP_DRAG_THRESHOLD      20
 
 QPoint AppItem::MousePressPos;
-
-static QGSettings *GSettingsByApp()
-{
-    static QGSettings settings("com.deepin.dde.dock.module.app");
-    return &settings;
-}
-
-static QGSettings *GSettingsByActiveApp()
-{
-    static QGSettings settings("com.deepin.dde.dock.module.activeapp");
-    return &settings;
-}
-
-static QGSettings *GSettingsByDockApp()
-{
-    static QGSettings settings("com.deepin.dde.dock.module.dockapp");
-    return &settings;
-}
 
 AppItem::AppItem(const QDBusObjectPath &entry, QWidget *parent)
     : DockItem(parent)
@@ -120,8 +101,6 @@ AppItem::AppItem(const QDBusObjectPath &entry, QWidget *parent)
     updateWindowInfos(m_itemEntryInter->windowInfos());
     refershIcon();
 
-    connect(GSettingsByApp(), &QGSettings::changed, this, &AppItem::onGSettingsChanged);
-    connect(GSettingsByDockApp(), &QGSettings::changed, this, &AppItem::onGSettingsChanged);
     connect(DGuiApplicationHelper::instance(), &DGuiApplicationHelper::themeTypeChanged, this, &AppItem::onThemeTypeChanged);
 
     connect(m_refershIconTimer, &QTimer::timeout, this, [ = ]() {
@@ -273,10 +252,6 @@ void AppItem::paintEvent(QPaintEvent *e)
 
 void AppItem::mouseReleaseEvent(QMouseEvent *e)
 {
-    if (checkGSettingsControl()) {
-        return;
-    }
-
     int curTimestamp = QX11Info::getTimestamp();
     if ((curTimestamp - m_lastclickTimes) < 300)
         return;
@@ -309,10 +284,6 @@ void AppItem::mouseReleaseEvent(QMouseEvent *e)
 
 void AppItem::mousePressEvent(QMouseEvent *e)
 {
-    if (checkGSettingsControl()) {
-        return;
-    }
-
     m_updateIconGeometryTimer->stop();
     hidePopup();
 
@@ -346,10 +317,6 @@ void AppItem::mouseMoveEvent(QMouseEvent *e)
 
 void AppItem::wheelEvent(QWheelEvent *e)
 {
-    if (checkGSettingsControl()) {
-        return;
-    }
-
     QWidget::wheelEvent(e);
 
     if (qAbs(e->angleDelta().y()) > 20) {
@@ -366,10 +333,6 @@ void AppItem::resizeEvent(QResizeEvent *e)
 
 void AppItem::dragEnterEvent(QDragEnterEvent *e)
 {
-    if (checkGSettingsControl()) {
-        return;
-    }
-
     // ignore drag from panel
     if (e->source()) {
         return e->ignore();
@@ -386,10 +349,6 @@ void AppItem::dragEnterEvent(QDragEnterEvent *e)
 
 void AppItem::dragMoveEvent(QDragMoveEvent *e)
 {
-    if (checkGSettingsControl()) {
-        return;
-    }
-
     DockItem::dragMoveEvent(e);
 
     if (m_windowInfos.isEmpty())
@@ -424,20 +383,11 @@ void AppItem::leaveEvent(QEvent *e)
 void AppItem::showEvent(QShowEvent *e)
 {
     DockItem::showEvent(e);
-
-    QTimer::singleShot(0, this, [ = ] {
-        onGSettingsChanged("enable");
-    });
-
     refershIcon();
 }
 
 void AppItem::showHoverTips()
 {
-    if (checkGSettingsControl()) {
-        return;
-    }
-
     if (!m_windowInfos.isEmpty())
         return showPreview();
 
@@ -458,10 +408,6 @@ const QString AppItem::contextMenu() const
 
 QWidget *AppItem::popupTips()
 {
-    if (checkGSettingsControl()) {
-        return nullptr;
-    }
-
     if (m_dragging)
         return nullptr;
 
@@ -483,10 +429,6 @@ void AppItem::startDrag()
     /*
     if (!acceptDrops())
         return;
-
-    if (checkGSettingsControl()) {
-        return;
-    }
 
     m_dragging = true;
     update();
@@ -665,32 +607,6 @@ void AppItem::checkAttentionEffect()
         if (hasAttention())
             playSwingEffect();
     });
-}
-
-void AppItem::onGSettingsChanged(const QString &key)
-{
-    if (key != "enable") {
-        return;
-    }
-
-    QGSettings *setting = m_itemEntryInter->isDocked()
-                          ? GSettingsByDockApp()
-                          : GSettingsByActiveApp();
-
-    if (setting->keys().contains("enable")) {
-        const bool isEnable = GSettingsByApp()->keys().contains("enable") && GSettingsByApp()->get("enable").toBool();
-        setVisible(isEnable && setting->get("enable").toBool());
-    }
-}
-
-bool AppItem::checkGSettingsControl() const
-{
-    QGSettings *setting = m_itemEntryInter->isDocked()
-                          ? GSettingsByDockApp()
-                          : GSettingsByActiveApp();
-
-    return (setting->keys().contains("control") && setting->get("control").toBool()) ||
-           (GSettingsByApp()->keys().contains("control") && GSettingsByApp()->get("control").toBool());
 }
 
 void AppItem::onThemeTypeChanged(DGuiApplicationHelper::ColorType themeType)

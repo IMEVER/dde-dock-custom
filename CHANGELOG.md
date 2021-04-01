@@ -866,7 +866,6 @@
 
 #### Features
 
-*   use gsettings value delay load plugins ([3ac07aed](3ac07aed))
 *   the maximum volume is 150 ([154df257](154df257))
 *   add keybord_layout.json ([e4faf0b5](e4faf0b5))
 *   add keyboard layout plugin. ([3d19f67c](3d19f67c))

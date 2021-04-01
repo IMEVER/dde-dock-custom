@@ -94,8 +94,6 @@ private slots:
     void playSwingEffect();
     void stopSwingEffect();
     void checkAttentionEffect();
-    void onGSettingsChanged(const QString& key);
-    bool checkGSettingsControl() const;
     void onThemeTypeChanged(DGuiApplicationHelper::ColorType themeType);
 
 private:
