@@ -26,8 +26,7 @@
 #include "dockitem.h"
 #include "components/previewcontainer.h"
 #include "components/appdrag.h"
-#include "dbus/dbusclientmanager.h"
-#include "../widgets/tipswidget.h"
+#include "tipswidget.h"
 
 #include <QGraphicsView>
 #include <QGraphicsItem>
@@ -55,7 +54,6 @@ public:
 
     inline ItemType itemType() const Q_DECL_OVERRIDE { return App; }
     QPixmap appIcon(){ return m_appIcon; }
-    virtual QString accessibleName();
 
 signals:
     void requestActivateWindow(const WId wid) const;
@@ -111,7 +109,6 @@ private:
     bool m_dragging;
     bool m_active;
     int m_retryTimes;
-    int m_lastShowDay;
     unsigned long m_lastclickTimes;
 
     WindowInfoMap m_windowInfos;
@@ -124,9 +121,6 @@ private:
 
     QTimer *m_updateIconGeometryTimer;
     QTimer *m_retryObtainIconTimer;
-    QTimer *m_refershIconTimer;
-
-    QDate m_curDate;
 
     QFutureWatcher<QPixmap> *m_smallWatcher;
     QFutureWatcher<QPixmap> *m_largeWatcher;

@@ -870,7 +870,6 @@
 *   add keybord_layout.json ([e4faf0b5](e4faf0b5))
 *   add keyboard layout plugin. ([3d19f67c](3d19f67c))
 *   support indicator traywidget ([58fd2df6](58fd2df6))
-*   open dde-calendar with dbus call ([fb6ee52b](fb6ee52b))
 * **keyboard_layout:**  add new dbus interface ([7ef2fea7](7ef2fea7))
 * **network:**
   *  add refresh animation ([5bb7b22e](5bb7b22e))
@@ -1017,7 +1016,6 @@
 *   add keybord_layout.json ([e4faf0b5](e4faf0b5))
 *   add keyboard layout plugin. ([3d19f67c](3d19f67c))
 *   support indicator traywidget ([58fd2df6](58fd2df6))
-*   open dde-calendar with dbus call ([fb6ee52b](fb6ee52b))
 * **keyboard_layout:**  add new dbus interface ([7ef2fea7](7ef2fea7))
 * **network:**
   *  add refresh animation ([5bb7b22e](5bb7b22e))
@@ -1035,7 +1033,6 @@
 
 *   add keyboard layout plugin. ([3d19f67c](3d19f67c))
 *   support indicator traywidget ([58fd2df6](58fd2df6))
-*   open dde-calendar with dbus call ([fb6ee52b](fb6ee52b))
 * **network:**
   *  add refresh animation ([5bb7b22e](5bb7b22e))
   *  support cloned address ([e2983ded](e2983ded))

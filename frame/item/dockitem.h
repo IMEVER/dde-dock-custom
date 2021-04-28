@@ -22,7 +22,7 @@
 #ifndef DOCKITEM_H
 #define DOCKITEM_H
 
-#include "constants.h"
+#include "../interfaces/constants.h"
 #include "util/dockpopupwindow.h"
 #include "components/hoverhighlighteffect.h"
 
@@ -30,7 +30,6 @@
 #include <QPointer>
 #include <QGestureEvent>
 #include <QMenu>
-#include <memory>
 
 using namespace Dock;
 
@@ -57,7 +56,6 @@ public:
     inline virtual ItemType itemType() const {Q_UNREACHABLE(); return App;}
 
     QSize sizeHint() const override;
-    virtual QString accessibleName();
 
 public slots:
     virtual void refershIcon() {}

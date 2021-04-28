@@ -48,27 +48,17 @@ public slots:
 
 signals:
     void accept() const;
-    // 在把专业版的仓库降级到debian的stable时, dock出现了一个奇怪的问题:
-    // 在plugins/tray/system-trays/systemtrayitem.cpp中的showPopupWindow函数中
-    // 无法连接到上面这个信号: "accept", qt给出一个运行时警告提示找不到信号
-    // 目前的解决方案就是在下面增加了这个信号
-    void unusedSignal();
 
 protected:
-    void showEvent(QShowEvent *e);
-    void enterEvent(QEvent *e);
     bool eventFilter(QObject *o, QEvent *e);
 
 private slots:
     void onGlobMouseRelease(const QPoint &mousePos, const int flag);
     void compositeChanged();
-    void ensureRaised();
 
 private:
     bool m_model;
     QPoint m_lastPoint;
-
-    QTimer *m_acceptDelayTimer;
 
     DRegionMonitor *m_regionInter;
     DWindowManagerHelper *m_wmHelper;

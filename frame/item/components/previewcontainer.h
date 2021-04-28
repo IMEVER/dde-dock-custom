@@ -26,7 +26,7 @@
 #include <QBoxLayout>
 #include <QTimer>
 
-#include "constants.h"
+#include "../../interfaces/constants.h"
 #include "appsnapshot.h"
 #include "floatingpreview.h"
 

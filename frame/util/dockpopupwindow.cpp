@@ -21,23 +21,13 @@
 
 #include "dockpopupwindow.h"
 
-#include <QScreen>
-#include <QApplication>
-#include <QDesktopWidget>
-#include <QAccessible>
-#include <QAccessibleEvent>
-
 DWIDGET_USE_NAMESPACE
 
 DockPopupWindow::DockPopupWindow(QWidget *parent)
     : DArrowRectangle(ArrowBottom, parent),
       m_model(false),
-      m_acceptDelayTimer(new QTimer(this)),
       m_regionInter(new DRegionMonitor(this))
 {
-    m_acceptDelayTimer->setSingleShot(true);
-    m_acceptDelayTimer->setInterval(100);
-
     m_wmHelper = DWindowManagerHelper::instance();
 
     compositeChanged();
@@ -45,7 +35,6 @@ DockPopupWindow::DockPopupWindow(QWidget *parent)
     setWindowFlags(Qt::X11BypassWindowManagerHint | Qt::WindowStaysOnTopHint | Qt::WindowDoesNotAcceptFocus);
     setAttribute(Qt::WA_InputMethodEnabled, false);
 
-    connect(m_acceptDelayTimer, &QTimer::timeout, this, &DockPopupWindow::accept);
     connect(m_wmHelper, &DWindowManagerHelper::hasCompositeChanged, this, &DockPopupWindow::compositeChanged);
     connect(m_regionInter, &DRegionMonitor::buttonPress, this, &DockPopupWindow::onGlobMouseRelease);
 }
@@ -66,18 +55,12 @@ void DockPopupWindow::setContent(QWidget *content)
         lastWidget->removeEventFilter(this);
     content->installEventFilter(this);
 
-    QAccessibleEvent event(this, QAccessible::NameChanged);
-    QAccessible::updateAccessibility(&event);
-
-    setAccessibleName(content->objectName() + "-popup");
-
     DArrowRectangle::setContent(content);
 }
 
 void DockPopupWindow::show(const QPoint &pos, const bool model)
 {
     m_model = model;
-    m_lastPoint = pos;
 
     show(pos.x(), pos.y());
 
@@ -103,20 +86,6 @@ void DockPopupWindow::hide()
         m_regionInter->unregisterRegion();
 
     DArrowRectangle::hide();
-}
-
-void DockPopupWindow::showEvent(QShowEvent *e)
-{
-    DArrowRectangle::showEvent(e);
-
-    QTimer::singleShot(1, this, &DockPopupWindow::ensureRaised);
-}
-
-void DockPopupWindow::enterEvent(QEvent *e)
-{
-    DArrowRectangle::enterEvent(e);
-
-    QTimer::singleShot(1, this, &DockPopupWindow::ensureRaised);
 }
 
 bool DockPopupWindow::eventFilter(QObject *o, QEvent *e)
@@ -161,10 +130,4 @@ void DockPopupWindow::compositeChanged()
         setBorderColor(QColor(255, 255, 255, 255 * 0.05));
     else
         setBorderColor(QColor("#2C3238"));
-}
-
-void DockPopupWindow::ensureRaised()
-{
-    if (isVisible())
-        raise();
 }

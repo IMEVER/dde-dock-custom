@@ -23,7 +23,7 @@
 #define LAUNCHERITEM_H
 
 #include "dockitem.h"
-#include "../widgets/tipswidget.h"
+#include "tipswidget.h"
 
 #include <com_deepin_dde_launcher.h>
 

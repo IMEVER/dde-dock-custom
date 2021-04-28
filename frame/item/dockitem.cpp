@@ -76,7 +76,8 @@ DockItem::DockItem(QWidget *parent)
     m_scaleLarger->setDuration(150);
     m_scaleLarger->setEasingCurve(QEasingCurve::Linear);
     connect(m_scaleLarger, &QVariantAnimation::valueChanged, this, [this](const QVariant &value){
-        setFixedSize(value.toInt(), value.toInt());
+        int size = value.toInt();
+        setFixedSize(size, size);
     });
     connect(m_scaleLarger, &QVariantAnimation::finished, this, [this](){
         int size = DockSettings::Instance().dockWindowSize();
@@ -101,11 +102,6 @@ QSize DockItem::sizeHint() const
         size = ITEM_MAXSIZE;
 
     return QSize(size, size);
-}
-
-QString DockItem::accessibleName()
-{
-    return QString();
 }
 
 DockItem::~DockItem()
@@ -196,8 +192,6 @@ void DockItem::enterEvent(QEvent *e)
     m_hover = true;
     m_hoverEffect->setHighlighting(true);
     m_popupTipsDelayTimer->start();
-
-    // setFixedSize(size() + QSize(20, 20));
 
     if (m_scaleSmaller->state() == QVariantAnimation::Running)
     {
@@ -318,11 +312,7 @@ void DockItem::showHoverTips()
 
 void DockItem::showPopupWindow(QWidget *const content, const bool model)
 {
-    if(itemType() == App){
-        PopupWindow->setRadius(18);
-    }else {
-        PopupWindow->setRadius(6);
-    }
+    PopupWindow->setRadius(10);
 
     m_popupShown = true;
     m_lastPopupWidget = content;

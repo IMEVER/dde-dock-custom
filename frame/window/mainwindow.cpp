@@ -21,8 +21,8 @@
  */
 
 #include "mainwindow.h"
-#include "panel/mainpanelcontrol.h"
-#include "controller/dockitemmanager.h"
+#include "mainpanelcontrol.h"
+#include "dockitemmanager.h"
 #include "util/utils.h"
 #include "util/docksettings.h"
 
@@ -159,7 +159,6 @@ MainWindow::MainWindow(QWidget *parent) : DBlurEffectWidget(parent)
 
     resizeMainPanelWindow();
 
-    m_mainPanel->setDelegate(this);
     m_mainPanel->insertItem(0, DockItemManager::instance()->getLauncherItem());
     for (auto item : DockItemManager::instance()->itemList())
         m_mainPanel->insertItem(-1, item);
@@ -838,11 +837,6 @@ void MainWindow::setEffectEnabled(const bool enabled)
 void MainWindow::setComposite(const bool hasComposite)
 {
     setEffectEnabled(hasComposite);
-}
-
-bool MainWindow::appIsOnDock(const QString &appDesktop)
-{
-    return DockItemManager::instance()->appIsOnDock(appDesktop);
 }
 
 void MainWindow::resizeMainWindow()

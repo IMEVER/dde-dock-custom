@@ -5,7 +5,7 @@ set(BIN_NAME dde-dock)
 configure_file(environments.h.in environments.h @ONLY)
 
 # Sources files
-file(GLOB_RECURSE SRCS "*.h" "*.cpp" "../widgets/*.h" "../widgets/*.cpp")
+file(GLOB_RECURSE SRCS "*.h" "*.cpp")
 
 # Find the library
 find_package(PkgConfig REQUIRED)
@@ -22,7 +22,7 @@ pkg_check_modules(DFrameworkDBus REQUIRED dframeworkdbus)
 pkg_check_modules(DtkGUI REQUIRED dtkgui)
 
 # driver-manager
-add_executable(${BIN_NAME} ${SRCS} ${INTERFACES} item/item.qrc frame.qrc)
+add_executable(${BIN_NAME} ${SRCS} item/item.qrc frame.qrc)
 target_include_directories(${BIN_NAME} PUBLIC ${DtkWidget_INCLUDE_DIRS}
                                               ${XCB_EWMH_INCLUDE_DIRS}
                                               ${DFrameworkDBus_INCLUDE_DIRS}
@@ -30,7 +30,7 @@ target_include_directories(${BIN_NAME} PUBLIC ${DtkWidget_INCLUDE_DIRS}
                                               ${PROJECT_BINARY_DIR}
                                               ${DtkGUI_INCLUDE_DIRS}
                                               ${Qt5Svg_INCLUDE_DIRS}
-                                              ../interfaces)
+                                              )
 
 target_link_libraries(${BIN_NAME} PRIVATE
     ${XCB_EWMH_LIBRARIES}

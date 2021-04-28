@@ -23,7 +23,7 @@
 #ifndef DOCKSETTINGS_H
 #define DOCKSETTINGS_H
 
-#include "constants.h"
+#include "../interfaces/constants.h"
 #include "monitor.h"
 
 #include <com_deepin_dde_daemon_dock.h>

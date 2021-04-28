@@ -40,6 +40,7 @@ LauncherItem::LauncherItem(QWidget *parent)
 
     m_tips->setVisible(false);
     m_tips->setObjectName("launcher");
+    m_tips->setText("启动器");
 }
 
 void LauncherItem::refershIcon()
@@ -91,6 +92,5 @@ void LauncherItem::mouseReleaseEvent(QMouseEvent *e)
 
 QWidget *LauncherItem::popupTips()
 {
-    m_tips->setText(tr("Launcher"));
     return m_tips;
 }

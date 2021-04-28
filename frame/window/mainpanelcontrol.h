@@ -22,19 +22,13 @@
 #ifndef MAINPANELCONTROL_H
 #define MAINPANELCONTROL_H
 
-#include "constants.h"
+#include "../interfaces/constants.h"
 
 #include <QWidget>
 #include <QBoxLayout>
 #include <QLabel>
 
 using namespace Dock;
-
-class MainPanelDelegate
-{
-public:
-    virtual bool appIsOnDock(const QString &appDesktop) = 0;
-};
 
 class DockItem;
 class PlaceholderItem;
@@ -52,9 +46,6 @@ public:
     void removeAppAreaItem(QWidget *wdg);
     void setPositonValue(Position position);
 
-    MainPanelDelegate *delegate() const;
-    void setDelegate(MainPanelDelegate *delegate);
-
 signals:
     void itemMoved(DockItem *sourceItem, DockItem *targetItem);
     void itemAdded(const QString &appDesktop, int idx);
@@ -71,7 +62,6 @@ private:
     void dragLeaveEvent(QDragLeaveEvent *e) override;
     void dropEvent(QDropEvent *) override;
     bool eventFilter(QObject *watched, QEvent *event) override;
-    void mousePressEvent(QMouseEvent *e) override;
 
     void startDrag(DockItem *);
     DockItem *dropTargetItem(DockItem *sourceItem, QPoint point);
@@ -91,7 +81,6 @@ private:
     QBoxLayout *m_appAreaLayout;
     Position m_position;
     QPointer<PlaceholderItem> m_placeholderItem;
-    MainPanelDelegate *m_delegate;
     QString m_draggingMimeKey;
     AppDragWidget *m_appDragWidget;
     QPoint m_mousePressPos;

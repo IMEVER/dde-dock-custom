@@ -20,21 +20,14 @@
  */
 
 #include "window/mainwindow.h"
-// #include "window/accessible.h"
-#include "util/themeappicon.h"
-#include "controller/dockitemmanager.h"
-
-#include <QAccessible>
+#include "window/dockitemmanager.h"
+#include "dbus/dbusdockadaptors.h"
 #include <QDir>
-
 #include <DApplication>
 #include <DLog>
 #include <DDBusSender>
 #include <DGuiApplicationHelper>
-
 #include <unistd.h>
-#include "dbus/dbusdockadaptors.h"
-
 #include <sys/mman.h>
 
 DWIDGET_USE_NAMESPACE
@@ -67,27 +60,17 @@ void RegisterDdeSession()
 
 int main(int argc, char *argv[])
 {
+    DApplication::setAttribute(Qt::AA_EnableHighDpiScaling, true);
     DGuiApplicationHelper::setUseInactiveColorGroup(false);
     DApplication::loadDXcbPlugin();
     DApplication app(argc, argv);
-
-    // 锁定物理内存，用于国测测试[会显著增加内存占用]
-//    qDebug() << "lock memory result:" << mlockall(MCL_CURRENT | MCL_FUTURE);
 
     app.setOrganizationName("deepin");
     app.setApplicationName("dde-dock");
     app.setApplicationDisplayName("DDE Dock");
     app.setApplicationVersion("2.0");
     app.loadTranslator();
-    app.setAttribute(Qt::AA_EnableHighDpiScaling, true);
     app.setAttribute(Qt::AA_UseHighDpiPixmaps, false);
-
-    // QAccessible::installFactory(accessibleFactory);
-
-    // load dde-network-utils translator
-    QTranslator translator;
-    translator.load("/usr/share/dde-network-utils/translations/dde-network-utils_" + QLocale::system().name());
-    app.installTranslator(&translator);
 
     DLogManager::registerConsoleAppender();
     DLogManager::registerFileAppender();
@@ -101,11 +84,9 @@ int main(int argc, char *argv[])
     parser.process(app);
 
     if (!app.setSingleInstance(QString("dde-dock_%1").arg(getuid()))) {
-        qDebug() << "set single instance failed!";
         return -1;
     }
 
-    qDebug() << "\n\ndde-dock startup";
     RegisterDdeSession();
 
 #ifndef QT_DEBUG

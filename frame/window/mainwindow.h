@@ -24,10 +24,9 @@
 #define MAINWINDOW_H
 
 #include "xcb/xcb_misc.h"
-#include "panel/mainpanelcontrol.h"
+#include "../interfaces/constants.h"
 
 #include <com_deepin_api_xeventmonitor.h>
-
 #include <DPlatformWindowHandle>
 #include <DWindowManagerHelper>
 #include <DBlurEffectWidget>
@@ -38,13 +37,14 @@
 DWIDGET_USE_NAMESPACE
 
 using XEventMonitor = ::com::deepin::api::XEventMonitor;
+using namespace Dock;
 
 class DockSettings;
 class DragWidget;
 class MainPanel;
 class MainPanelControl;
 class QTimer;
-class MainWindow : public DBlurEffectWidget, public MainPanelDelegate
+class MainWindow : public DBlurEffectWidget
 {
     Q_OBJECT
 
@@ -83,7 +83,6 @@ private:
     const QPoint x11GetWindowPos();
     void x11MoveWindow(const int x, const int y);
     void x11MoveResizeWindow(const int x, const int y, const int w, const int h);
-    bool appIsOnDock(const QString &appDesktop);
     void onRegionMonitorChanged(int x, int y, const QString &key);
     void updateRegionMonitorWatch();
 

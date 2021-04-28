@@ -23,7 +23,7 @@
 #include "docksettings.h"
 #include "item/appitem.h"
 #include "util/utils.h"
-#include "controller/dockitemmanager.h"
+#include "window/dockitemmanager.h"
 
 #include <QDebug>
 #include <QX11Info>

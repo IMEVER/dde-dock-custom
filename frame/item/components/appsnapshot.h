@@ -25,9 +25,9 @@
 #include <QWidget>
 #include <QDebug>
 #include <QTimer>
-#include "../widgets/tipswidget.h"
+#include "../tipswidget.h"
 
-#include <dimagebutton.h>
+#include <DIconButton>
 #include <DWindowManagerHelper>
 
 #include <com_deepin_dde_daemon_dock_entry.h>
@@ -90,7 +90,7 @@ private:
 
     TipsWidget *m_title;
     QTimer *m_waitLeaveTimer;
-    DImageButton *m_closeBtn2D;
+    DIconButton *m_closeBtn2D;
     DWindowManagerHelper *m_wmHelper;
 };
 

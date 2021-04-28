@@ -56,14 +56,14 @@ AppSnapshot::AppSnapshot(const WId wid, QWidget *parent)
     , m_wid(wid)
     , m_title(new TipsWidget)
     , m_waitLeaveTimer(new QTimer(this))
-    , m_closeBtn2D(new DImageButton)
+    , m_closeBtn2D(new DIconButton(DStyle::SP_DockWidgetCloseButton, this))
     , m_wmHelper(DWindowManagerHelper::instance())
 {
     m_closeBtn2D->setFixedSize(24, 24);
     m_closeBtn2D->setObjectName("closebutton-2d");
-    m_closeBtn2D->setNormalPic(":/icons/resources/close_round_normal.svg");
-    m_closeBtn2D->setHoverPic(":/icons/resources/close_round_hover.svg");
-    m_closeBtn2D->setPressPic(":/icons/resources/close_round_press.svg");
+    // m_closeBtn2D->setNormalPic(":/icons/resources/close_round_normal.svg");
+    // m_closeBtn2D->setHoverPic(":/icons/resources/close_round_hover.svg");
+    // m_closeBtn2D->setPressPic(":/icons/resources/close_round_press.svg");
     m_closeBtn2D->setVisible(false);
     m_title->setObjectName("AppSnapshotTitle");
 
@@ -79,7 +79,7 @@ AppSnapshot::AppSnapshot(const WId wid, QWidget *parent)
     setAcceptDrops(true);
     resize(SNAP_WIDTH, SNAP_HEIGHT);
 
-    connect(m_closeBtn2D, &DImageButton::clicked, this, &AppSnapshot::closeWindow, Qt::QueuedConnection);
+    connect(m_closeBtn2D, &DIconButton::clicked, this, &AppSnapshot::closeWindow, Qt::QueuedConnection);
     connect(m_wmHelper, &DWindowManagerHelper::hasCompositeChanged, this, &AppSnapshot::compositeChanged, Qt::QueuedConnection);
     QTimer::singleShot(1, this, &AppSnapshot::compositeChanged);
 }

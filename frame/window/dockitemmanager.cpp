@@ -20,15 +20,15 @@
  */
 
 #include "dockitemmanager.h"
-#include "item/appitem.h"
-#include "util/docksettings.h"
+#include "../item/appitem.h"
+#include "../util/docksettings.h"
 
 DockItemManager *DockItemManager::INSTANCE = nullptr;
 
 DockItemManager::DockItemManager(QObject *parent)
     : QObject(parent)
-    , launcherItem(new LauncherItem)
     , m_appInter(new DBusDock("com.deepin.dde.daemon.Dock", "/com/deepin/dde/daemon/Dock", QDBusConnection::sessionBus(), this))
+    , launcherItem(new LauncherItem)
 {
     // 应用区域
     reloadAppItems();

@@ -21,11 +21,11 @@
 
 #include "mainpanelcontrol.h"
 #include "../item/dockitem.h"
-#include "util/docksettings.h"
+#include "../util/docksettings.h"
 #include "../item/placeholderitem.h"
 #include "../item/components/appdrag.h"
 #include "../item/appitem.h"
-#include "../controller/dockitemmanager.h"
+#include "dockitemmanager.h"
 
 #include <QDrag>
 #include <QTimer>
@@ -173,16 +173,6 @@ void MainPanelControl::removeItem(DockItem *item)
         default:
             break;
     }
-}
-
-MainPanelDelegate *MainPanelControl::delegate() const
-{
-    return m_delegate;
-}
-
-void MainPanelControl::setDelegate(MainPanelDelegate *delegate)
-{
-    m_delegate = delegate;
 }
 
 void MainPanelControl::moveItem(DockItem *sourceItem, DockItem *targetItem)
@@ -341,8 +331,8 @@ void MainPanelControl::dragMoveEvent(QDragMoveEvent *e)
         return;
     }
 
-    if (m_delegate && m_delegate->appIsOnDock(DragmineData->data(m_draggingMimeKey))) {
-        e->setAccepted(false);
+    if (DockItemManager::instance()->appIsOnDock(DragmineData->data(m_draggingMimeKey))) {
+        e->setAccepted(false); 
         return;
     }
 
@@ -388,11 +378,6 @@ bool MainPanelControl::eventFilter(QObject *watched, QEvent *event)
     startDrag(item);
 
     return QWidget::eventFilter(watched, event);
-}
-
-void MainPanelControl::mousePressEvent(QMouseEvent *e)
-{
-    QWidget::mousePressEvent(e);
 }
 
 void MainPanelControl::startDrag(DockItem *item)

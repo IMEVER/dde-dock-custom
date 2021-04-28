@@ -22,22 +22,20 @@
 
 #include "appitem.h"
 
-#include "util/themeappicon.h"
 #include "util/imagefactory.h"
+#include "util/utils.h"
 #include "xcb/xcb_misc.h"
 #include "components/appswingeffectbuilder.h"
 #include "components/appspreviewprovider.h"
 
 #include <X11/X.h>
 #include <X11/Xlib.h>
-
 #include <QPainter>
 #include <QDrag>
 #include <QMouseEvent>
 #include <QApplication>
 #include <QHBoxLayout>
 #include <QGraphicsScene>
-#include <QTimeLine>
 #include <QX11Info>
 #include <DGuiApplicationHelper>
 
@@ -56,15 +54,14 @@ AppItem::AppItem(const QDBusObjectPath &entry, QWidget *parent)
     , m_drag(nullptr)
     , m_dragging(false)
     , m_retryTimes(0)
-    , m_lastShowDay(0)
     , m_lastclickTimes(0)
     , m_appIcon(QPixmap())
     , m_updateIconGeometryTimer(new QTimer(this))
     , m_retryObtainIconTimer(new QTimer(this))
-    , m_refershIconTimer(new QTimer(this))
     , m_smallWatcher(new QFutureWatcher<QPixmap>(this))
     , m_largeWatcher(new QFutureWatcher<QPixmap>(this))
 {
+    // setWindowFlags(Qt::ToolTip);
     QHBoxLayout *centralLayout = new QHBoxLayout;
     centralLayout->setMargin(0);
     centralLayout->setSpacing(0);
@@ -76,7 +73,6 @@ AppItem::AppItem(const QDBusObjectPath &entry, QWidget *parent)
     m_id = m_itemEntryInter->id();
     m_active = m_itemEntryInter->isActive();
 
-    m_appNameTips->setObjectName("AppItemTips");
     m_appNameTips->setObjectName(m_itemEntryInter->name());
     m_appNameTips->setVisible(false);
     m_appNameTips->installEventFilter(this);
@@ -86,9 +82,6 @@ AppItem::AppItem(const QDBusObjectPath &entry, QWidget *parent)
 
     m_retryObtainIconTimer->setInterval(500);
     m_retryObtainIconTimer->setSingleShot(true);
-
-    m_refershIconTimer->setInterval(1000);
-    m_refershIconTimer->setSingleShot(false);
 
     connect(m_itemEntryInter, &DockEntryInter::IsActiveChanged, this, &AppItem::activeChanged);
     connect(m_itemEntryInter, &DockEntryInter::IsActiveChanged, this, static_cast<void (AppItem::*)()>(&AppItem::update));
@@ -102,14 +95,6 @@ AppItem::AppItem(const QDBusObjectPath &entry, QWidget *parent)
     refershIcon();
 
     connect(DGuiApplicationHelper::instance(), &DGuiApplicationHelper::themeTypeChanged, this, &AppItem::onThemeTypeChanged);
-
-    connect(m_refershIconTimer, &QTimer::timeout, this, [ = ]() {
-        m_curDate = QDate::currentDate();
-        if (m_curDate.day() != m_lastShowDay) {
-            m_lastShowDay = m_curDate.day();
-            refershIcon();
-        }
-    });
 }
 
 AppItem::~AppItem()
@@ -161,11 +146,6 @@ void AppItem::setDockInfo(Dock::Position dockPosition, const QRect &dockGeometry
     if (m_drag) {
         m_drag->appDragWidget()->setDockInfo(dockPosition, dockGeometry);
     }
-}
-
-QString AppItem::accessibleName()
-{
-    return m_itemEntryInter->name();
 }
 
 void AppItem::moveEvent(QMoveEvent *e)
@@ -512,11 +492,7 @@ void AppItem::refershIcon()
     const QString icon = m_itemEntryInter->icon();
     const int iconSize = qMin(width(), height());
 
-    m_appIcon = ThemeAppIcon::getIcon(icon, iconSize * 0.8, devicePixelRatioF());
-
-    if (!m_refershIconTimer->isActive() && m_itemEntryInter->icon() == "dde-calendar") {
-        m_refershIconTimer->start();
-    }
+    m_appIcon = Utils::getIcon(icon, iconSize * 0.8, devicePixelRatioF());
 
     if (m_appIcon.isNull()) {
         if (m_retryTimes < 5) {
@@ -547,7 +523,7 @@ void AppItem::showPreview()
 
     m_appPreviewTips = PreviewWindow(m_windowInfos, m_itemEntryInter->GetAllowedCloseWindows().value(), DockPosition);
 
-    // connect(m_appPreviewTips, &PreviewContainer::requestActivateWindow, this, &AppItem::requestActivateWindow, Qt::QueuedConnection);
+    connect(m_appPreviewTips, &PreviewContainer::requestActivateWindow, this, &AppItem::requestActivateWindow, Qt::QueuedConnection);
     connect(m_appPreviewTips, &PreviewContainer::requestPreviewWindow, this, &AppItem::requestPreviewWindow, Qt::QueuedConnection);
     connect(m_appPreviewTips, &PreviewContainer::requestCancelPreviewWindow, this, &AppItem::requestCancelPreview);
     connect(m_appPreviewTips, &PreviewContainer::requestHidePopup, this, &AppItem::hidePopup);
