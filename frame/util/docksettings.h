@@ -76,11 +76,10 @@ public:
     qreal dockRatio() const;
 
     void showDockSettingsMenu();
-    void updateFrontendGeometry();
 
     void setDockScreen(const QString &scrName);
     QString &currentDockScreen() { return m_currentScreen; }
-    
+
     DBusDock *m_dockInter;
 
 signals:
@@ -94,17 +93,16 @@ signals:
 
 public slots:
     void setAutoHide(const bool autoHide);
+    void onWindowSizeChanged();
 
 private slots:
     void menuActionClicked(QAction *action);
     void onPositionChanged();
     void hideModeChanged();
     void hideStateChanged();
-    void dockItemCountChanged();
     void primaryScreenChanged();
     void resetFrontendGeometry();
     void onOpacityChanged(const double value);
-    void onWindowSizeChanged();
     void onMonitorListChanged(const QList<QDBusObjectPath> &mons);
 
 private:

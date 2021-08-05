@@ -191,6 +191,8 @@ void PreviewContainer::enterEvent(QEvent *e)
     if (m_wmHelper->hasComposite()) {
         m_waitForShowPreviewTimer->start();
     }
+
+    Q_EMIT enterPreviewWindow();
 }
 
 void PreviewContainer::leaveEvent(QEvent *e)

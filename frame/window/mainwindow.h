@@ -91,7 +91,6 @@ signals:
 
 private slots:
     void positionChanged(const Position prevPos, const Position nextPos);
-    void updatePosition();
     void updateGeometry();
     void clearStrutPartial();
     void setStrutPartial();

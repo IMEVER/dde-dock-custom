@@ -23,8 +23,8 @@
 #include "mainwindow.h"
 #include "mainpanelcontrol.h"
 #include "dockitemmanager.h"
-#include "util/utils.h"
 #include "util/docksettings.h"
+#include "util/imageutil.h"
 
 #include <DStyle>
 #include <DPlatformWindowHandle>
@@ -34,6 +34,7 @@
 #include <QResizeEvent>
 #include <QScreen>
 #include <QGuiApplication>
+#include <QApplication>
 #include <QX11Info>
 #include <qpa/qplatformwindow.h>
 
@@ -106,7 +107,7 @@ class DragWidget : public QWidget
 
 const QPoint rawXPosition(const QPoint &scaledPos)
 {
-    QScreen const *screen = Utils::screenAtByScaled(scaledPos);
+    QScreen const *screen = ImageUtil::screenAtByScaled(scaledPos);
 
     return screen ? screen->geometry().topLeft() +
            (scaledPos - screen->geometry().topLeft()) *
@@ -116,7 +117,7 @@ const QPoint rawXPosition(const QPoint &scaledPos)
 
 const QPoint scaledPos(const QPoint &rawXPos)
 {
-    QScreen const *screen = Utils::screenAt(rawXPos);
+    QScreen const *screen = ImageUtil::screenAt(rawXPos);
 
     return screen
            ? screen->geometry().topLeft() +
@@ -159,9 +160,7 @@ MainWindow::MainWindow(QWidget *parent) : DBlurEffectWidget(parent)
 
     resizeMainPanelWindow();
 
-    m_mainPanel->insertItem(0, DockItemManager::instance()->getLauncherItem());
-    for (auto item : DockItemManager::instance()->itemList())
-        m_mainPanel->insertItem(-1, item);
+    DockItemManager::instance()->reloadAppItems();
 
     m_dragWidget->setMouseTracking(true);
     m_dragWidget->setFocusPolicy(Qt::NoFocus);
@@ -437,7 +436,7 @@ void MainWindow::initConnections()
     connect(m_settings, &DockSettings::windowVisibleChanged, this, &MainWindow::updatePanelVisible, Qt::QueuedConnection);
     connect(&DockSettings::Instance(), &DockSettings::opacityChanged, this, &MainWindow::setMaskAlpha);
 
-    connect(m_positionUpdateTimer, &QTimer::timeout, this, &MainWindow::updatePosition, Qt::QueuedConnection);
+    connect(m_positionUpdateTimer, &QTimer::timeout, this, &MainWindow::updateGeometry, Qt::QueuedConnection);
     connect(m_expandDelayTimer, &QTimer::timeout, this, &MainWindow::expand, Qt::QueuedConnection);
     connect(m_leaveDelayTimer, &QTimer::timeout, this, &MainWindow::updatePanelVisible, Qt::QueuedConnection);
     connect(m_shadowMaskOptimizeTimer, &QTimer::timeout, this, &MainWindow::adjustShadowMask, Qt::QueuedConnection);
@@ -450,6 +449,9 @@ void MainWindow::initConnections()
 
     connect(DockItemManager::instance(), &DockItemManager::itemInserted, m_mainPanel, &MainPanelControl::insertItem, Qt::DirectConnection);
     connect(DockItemManager::instance(), &DockItemManager::itemRemoved, m_mainPanel, &MainPanelControl::removeItem, Qt::DirectConnection);
+    connect(DockItemManager::instance(), &DockItemManager::itemUpdated, m_mainPanel, &MainPanelControl::itemUpdated, Qt::DirectConnection);
+    connect(DockItemManager::instance(), &DockItemManager::requestRefershWindowVisible, this, &MainWindow::updatePanelVisible, Qt::QueuedConnection);
+    connect(DockItemManager::instance(), &DockItemManager::requestWindowAutoHide, m_settings, &DockSettings::setAutoHide);
 
     connect(m_mainPanel, &MainPanelControl::itemAdded, this, [this](const QString &appDesktop, int idx){
         m_settings->calculateWindowConfig();
@@ -459,11 +461,11 @@ void MainWindow::initConnections()
         m_settings->calculateWindowConfig();
     }, Qt::DirectConnection);
 
-    connect(DockItemManager::instance(), &DockItemManager::itemUpdated, m_mainPanel, &MainPanelControl::itemUpdated, Qt::DirectConnection);
-    connect(DockItemManager::instance(), &DockItemManager::requestRefershWindowVisible, this, &MainWindow::updatePanelVisible, Qt::QueuedConnection);
-    connect(DockItemManager::instance(), &DockItemManager::requestWindowAutoHide, m_settings, &DockSettings::setAutoHide);
     connect(m_mainPanel, &MainPanelControl::itemMoved, DockItemManager::instance(), &DockItemManager::itemMoved, Qt::DirectConnection);
     connect(m_mainPanel, &MainPanelControl::itemAdded, DockItemManager::instance(), &DockItemManager::itemAdded, Qt::DirectConnection);
+    connect(m_mainPanel, &MainPanelControl::itemCountChanged, m_settings, &DockSettings::onWindowSizeChanged);
+    connect(m_mainPanel, &MainPanelControl::dirAppChanged, DockItemManager::instance(), &DockItemManager::updateDirApp);
+
     connect(m_dragWidget, &DragWidget::dragPointOffset, this, &MainWindow::onMainWindowSizeChanged);
     connect(m_dragWidget, &DragWidget::dragFinished, this, &MainWindow::onDragFinished);
     connect(DGuiApplicationHelper::instance(), &DGuiApplicationHelper::themeTypeChanged, this, &MainWindow::themeTypeChanged);
@@ -528,15 +530,6 @@ void MainWindow::positionChanged(const Position prevPos, const Position nextPos)
 
         updatePanelVisible();
     });
-}
-
-void MainWindow::updatePosition()
-{
-    // all update operation need pass by timer
-    Q_ASSERT(sender() == m_positionUpdateTimer);
-
-    //clearStrutPartial();
-    updateGeometry();
 }
 
 void MainWindow::updateGeometry()
@@ -847,6 +840,7 @@ void MainWindow::resizeMainWindow()
     internalMove(windowRect.topLeft());
     resizeMainPanelWindow();
     QWidget::setFixedSize(size);
+
 }
 
 void MainWindow::resizeMainPanelWindow()
@@ -883,6 +877,7 @@ void MainWindow::onMainWindowSizeChanged(QPoint offset)
 
     m_settings->setDockWindowSize(newWidth);
     resizeMainWindow();
+    m_settings->onWindowSizeChanged();
 }
 
 void MainWindow::onDragFinished()
@@ -932,7 +927,7 @@ void MainWindow::updateRegionMonitorWatch()
     if (!m_registerKey.isEmpty())
     {
         m_eventInter->UnregisterArea(m_registerKey);
-    }    
+    }
 
     const int flags = Motion | Button | Key;
     bool isHide = m_settings->hideState() == Hide && !testAttribute(Qt::WA_UnderMouse);

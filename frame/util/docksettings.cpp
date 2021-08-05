@@ -22,8 +22,8 @@
 
 #include "docksettings.h"
 #include "item/appitem.h"
-#include "util/utils.h"
 #include "window/dockitemmanager.h"
+#include "imageutil.h"
 
 #include <QDebug>
 #include <QX11Info>
@@ -102,8 +102,8 @@ DockSettings::DockSettings(QWidget *parent)
     connect(m_dockInter, &DBusDock::WindowSizeEfficientChanged, this, &DockSettings::onWindowSizeChanged);
     connect(m_dockInter, &DBusDock::WindowSizeFashionChanged, this, &DockSettings::onWindowSizeChanged);
 
-    connect(m_itemManager, &DockItemManager::itemInserted, this, &DockSettings::dockItemCountChanged, Qt::QueuedConnection);
-    connect(m_itemManager, &DockItemManager::itemRemoved, this, &DockSettings::dockItemCountChanged, Qt::QueuedConnection);
+    connect(m_itemManager, &DockItemManager::itemInserted, this, &DockSettings::onWindowSizeChanged, Qt::QueuedConnection);
+    connect(m_itemManager, &DockItemManager::itemRemoved, this, &DockSettings::onWindowSizeChanged, Qt::QueuedConnection);
 
     connect(m_displayInter, &DisplayInter::PrimaryRectChanged, this, &DockSettings::primaryScreenChanged, Qt::QueuedConnection);
     connect(m_displayInter, &DisplayInter::ScreenHeightChanged, this, &DockSettings::primaryScreenChanged, Qt::QueuedConnection);
@@ -118,7 +118,6 @@ DockSettings::DockSettings(QWidget *parent)
 
     calculateMultiScreensPos();
     calculateWindowConfig();
-    resetFrontendGeometry();
 
     QTimer::singleShot(0, this, [ = ] {onOpacityChanged(m_dockInter->opacity());});
 }
@@ -301,12 +300,6 @@ void DockSettings::hideStateChanged()
     emit windowVisibleChanged();
 }
 
-void DockSettings::dockItemCountChanged()
-{
-    calculateWindowConfig();
-    emit windowGeometryChanged();
-}
-
 void DockSettings::primaryScreenChanged()
 {
 //    qDebug() << Q_FUNC_INFO;
@@ -339,11 +332,6 @@ void DockSettings::resetFrontendGeometry()
     m_dockInter->SetFrontendWindowRect(p.x(), p.y(), w, h);
 }
 
-void DockSettings::updateFrontendGeometry()
-{
-    resetFrontendGeometry();
-}
-
 void DockSettings::onOpacityChanged(const double value)
 {
     if (m_opacity == value) return;
@@ -355,7 +343,13 @@ void DockSettings::onOpacityChanged(const double value)
 
 int DockSettings::itemCount()
 {
-    return m_itemManager->itemList().count() + 1;
+    int count = m_itemManager->itemList().count() + 1;
+    for(auto item : m_itemManager->dirList())
+    {
+        count = count - item->currentCount() + 1;
+    }
+
+    return count;
 }
 
 int DockSettings::dockWindowSize()
@@ -378,8 +372,8 @@ void DockSettings::setDockWindowSize(int size)
     m_dockWindowSize = size;
     if (m_dockWindowSize > WINDOW_MAX_SIZE || m_dockWindowSize < WINDOW_MIN_SIZE) {
         m_dockWindowSize = DEFAULT_HEIGHT;
+        m_dockInter->setWindowSize(m_dockWindowSize);
     }
-    m_dockInter->setWindowSize(m_dockWindowSize);
 
     int count = itemCount(), length;
     m_itemSize = m_dockWindowSize - 20;
@@ -401,6 +395,7 @@ void DockSettings::setDockWindowSize(int size)
         }
         case Left:
         case Right: {
+            m_mainWindowSize.setWidth(m_dockWindowSize);
             length = primaryRect().height();
             if (m_itemSize * count + MODE_PADDING * count > length * 0.9)
             {
@@ -409,10 +404,9 @@ void DockSettings::setDockWindowSize(int size)
             }
             else
             {
-                m_mainWindowSize.setHeight(m_itemSize * count + MODE_PADDING * (count + 4));                
+                m_mainWindowSize.setHeight(m_itemSize * count + MODE_PADDING * (count + 4));
             }
 
-            m_mainWindowSize.setWidth(m_dockWindowSize);
             break;
         }
     }
@@ -427,7 +421,7 @@ void DockSettings::gtkIconThemeChanged()
 
 qreal DockSettings::dockRatio() const
 {
-    QScreen const *screen = Utils::screenAtByScaled(m_frontendRect.center());
+    QScreen const *screen = ImageUtil::screenAtByScaled(m_frontendRect.center());
 
     return screen ? screen->devicePixelRatio() : qApp->devicePixelRatio();
 }
@@ -454,7 +448,7 @@ void DockSettings::checkService()
                 hideStateChanged();
                 onOpacityChanged(m_dockInter->opacity());
                 onWindowSizeChanged();
-                
+
                 disconnect(ifc);
             }
         });

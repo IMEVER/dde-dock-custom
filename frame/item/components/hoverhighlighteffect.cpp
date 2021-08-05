@@ -20,7 +20,7 @@
  */
 
 #include "hoverhighlighteffect.h"
-#include "util/imagefactory.h"
+#include "util/imageutil.h"
 
 #include <QPainter>
 #include <QDebug>
@@ -39,7 +39,7 @@ void HoverHighlightEffect::draw(QPainter *painter)
 
     if (m_highlighting)
     {
-        painter->drawPixmap(0, 0, ImageFactory::lighterEffect(pix));
+        painter->drawPixmap(0, 0, ImageUtil::lighterEffect(pix));
     } else {
         painter->drawPixmap(0, 0, pix);
     }

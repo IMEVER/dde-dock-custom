@@ -28,7 +28,6 @@
 
 #include <QFrame>
 #include <QPointer>
-#include <QGestureEvent>
 #include <QMenu>
 
 using namespace Dock;
@@ -42,9 +41,13 @@ public:
         Launcher,
         App,
         Plugins,
-        FixedPlugin,
         Placeholder,
-        TrayPlugin,
+        DirApp
+    };
+
+    enum Place {
+        DockPlace,
+        DirPlace
     };
 
 public:
@@ -56,17 +59,16 @@ public:
     inline virtual ItemType itemType() const {Q_UNREACHABLE(); return App;}
 
     QSize sizeHint() const override;
+    virtual Place getPlace() { return DockPlace; }
 
 public slots:
     virtual void refershIcon() {}
 
     void showPopupApplet(QWidget *const applet);
     void hidePopup();
-    virtual void setDraging(bool bDrag);
+    void easeIn();
 
-    bool isDragging();
 signals:
-    void dragStarted() const;
     void itemDropped(QObject *destination, const QPoint &dropPoint) const;
     void requestWindowAutoHide(const bool autoHide) const;
     void requestRefreshWindowVisible() const;
@@ -90,9 +92,6 @@ protected:
     virtual const QString contextMenu() const;
     virtual QWidget *popupTips();
 
-    bool checkAndResetTapHoldGestureState();
-    virtual void gestureEvent(QGestureEvent *event);
-
 protected slots:
     void showContextMenu();
     void onContextMenuAccepted();
@@ -104,8 +103,6 @@ private:
 protected:
     bool m_hover;
     bool m_popupShown;
-    bool m_tapAndHold;
-    bool m_draging;
     QMenu m_contextMenu;
 
     QPointer<QWidget> m_lastPopupWidget;

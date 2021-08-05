@@ -24,8 +24,8 @@
 #define APPITEM_H
 
 #include "dockitem.h"
+#include "diritem.h"
 #include "components/previewcontainer.h"
-#include "components/appdrag.h"
 #include "tipswidget.h"
 
 #include <QGraphicsView>
@@ -36,6 +36,7 @@
 #include <com_deepin_dde_daemon_dock_entry.h>
 
 using DockEntryInter = com::deepin::dde::daemon::dock::Entry;
+class DirItem;
 
 class AppItem : public DockItem
 {
@@ -54,6 +55,11 @@ public:
 
     inline ItemType itemType() const Q_DECL_OVERRIDE { return App; }
     QPixmap appIcon(){ return m_appIcon; }
+    QString getDesktopFile();
+    Place getPlace() override { return m_place; }
+    DirItem *getDirItem();
+    void setDirItem(DirItem *dirItem);
+    void removeDirItem();
 
 signals:
     void requestActivateWindow(const WId wid) const;
@@ -61,12 +67,14 @@ signals:
     void requestCancelPreview() const;
     void dragReady(QWidget *dragWidget);
 
+    void enterPreviewWindow() const;
+    void leavePreviewWindow() const;
+
 private:
     void moveEvent(QMoveEvent *e) override;
     void paintEvent(QPaintEvent *e) override;
     void mouseReleaseEvent(QMouseEvent *e) override;
     void mousePressEvent(QMouseEvent *e) override;
-    void mouseMoveEvent(QMouseEvent *e) override;
     void wheelEvent(QWheelEvent *e) override;
     void resizeEvent(QResizeEvent *e) override;
     void dragEnterEvent(QDragEnterEvent *e) override;
@@ -79,7 +87,6 @@ private:
     void invokedMenuItem(const QString &itemId, const bool checked) Q_DECL_OVERRIDE;
     const QString contextMenu() const Q_DECL_OVERRIDE;
     QWidget *popupTips() Q_DECL_OVERRIDE;
-    void startDrag();
     bool hasAttention() const;
 
     QPoint appIconPosition() const;
@@ -92,7 +99,6 @@ private slots:
     void playSwingEffect();
     void stopSwingEffect();
     void checkAttentionEffect();
-    void onThemeTypeChanged(DGuiApplicationHelper::ColorType themeType);
 
 private:
     TipsWidget *m_appNameTips;
@@ -102,17 +108,13 @@ private:
     QGraphicsView *m_swingEffectView;
     QGraphicsItemAnimation *m_itemAnimation;
 
-    DWindowManagerHelper *m_wmHelper;
-
-    QPointer<AppDrag> m_drag;
-
-    bool m_dragging;
     bool m_active;
     int m_retryTimes;
     unsigned long m_lastclickTimes;
 
     WindowInfoMap m_windowInfos;
     QString m_id;
+    QString m_desktopFile;
     QPixmap m_appIcon;
     QPixmap m_horizontalIndicator;
     QPixmap m_verticalIndicator;
@@ -124,9 +126,10 @@ private:
 
     QFutureWatcher<QPixmap> *m_smallWatcher;
     QFutureWatcher<QPixmap> *m_largeWatcher;
-    DGuiApplicationHelper::ColorType m_themeType;
 
-    static QPoint MousePressPos;
+    DGuiApplicationHelper::ColorType m_themeType;
+    Place m_place = DockPlace;
+    DirItem *m_dirItem;
 };
 
 #endif // APPITEM_H

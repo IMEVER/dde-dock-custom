@@ -65,7 +65,7 @@ int main(int argc, char *argv[])
     DApplication::loadDXcbPlugin();
     DApplication app(argc, argv);
 
-    app.setOrganizationName("deepin");
+    app.setOrganizationName("IMEVER");
     app.setApplicationName("dde-dock");
     app.setApplicationDisplayName("DDE Dock");
     app.setApplicationVersion("2.0");

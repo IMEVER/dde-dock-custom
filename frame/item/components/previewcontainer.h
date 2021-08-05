@@ -49,6 +49,7 @@ signals:
     void requestCheckWindows() const;
     void requestCancelPreviewWindow() const;
     void requestHidePopup() const;
+    void enterPreviewWindow() const;
 
 public:
     void setWindowInfos(const WindowInfoMap &infos, const WindowList &allowClose);

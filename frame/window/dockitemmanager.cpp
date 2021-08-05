@@ -23,23 +23,24 @@
 #include "../item/appitem.h"
 #include "../util/docksettings.h"
 
+#include <QSet>
+
 DockItemManager *DockItemManager::INSTANCE = nullptr;
+bool first = true;
 
 DockItemManager::DockItemManager(QObject *parent)
     : QObject(parent)
     , m_appInter(new DBusDock("com.deepin.dde.daemon.Dock", "/com/deepin/dde/daemon/Dock", QDBusConnection::sessionBus(), this))
+    , m_qsettings(new QSettings(QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation) + "/setting.ini", QSettings::IniFormat))
     , launcherItem(new LauncherItem)
 {
-    // 应用区域
-    reloadAppItems();
-
     // 应用信号
     connect(m_appInter, &DBusDock::EntryAdded, this, &DockItemManager::appItemAdded);
     connect(m_appInter, &DBusDock::EntryRemoved, this, static_cast<void (DockItemManager::*)(const QString &)>(&DockItemManager::appItemRemoved), Qt::QueuedConnection);
     connect(m_appInter, &DBusDock::ServiceRestarted, this, &DockItemManager::reloadAppItems);
 
     // 刷新图标
-    QMetaObject::invokeMethod(this, "refershItemsIcon", Qt::QueuedConnection);
+    // QMetaObject::invokeMethod(this, "refershItemsIcon", Qt::QueuedConnection);
 }
 
 
@@ -56,9 +57,14 @@ LauncherItem * DockItemManager::getLauncherItem()
     return launcherItem;
 }
 
-const QList<QPointer<DockItem>> DockItemManager::itemList() const
+const QList<QPointer<DockItem>> DockItemManager::itemList()
 {
     return m_itemList;
+}
+
+const QList<QPointer<DirItem>> DockItemManager::dirList()
+{
+    return m_dirList;
 }
 
 bool DockItemManager::appIsOnDock(const QString &appDesktop) const
@@ -109,13 +115,29 @@ void DockItemManager::appItemAdded(const QDBusObjectPath &path, const int index)
     int insertIndex = index != -1 ? index : m_itemList.count();
 
     AppItem *item = new AppItem(path);
-    manageItem(item);
+
+    connect(item, &DockItem::requestRefreshWindowVisible, this, &DockItemManager::requestRefershWindowVisible, Qt::UniqueConnection);
+    connect(item, &DockItem::requestWindowAutoHide, this, &DockItemManager::requestWindowAutoHide, Qt::UniqueConnection);
 
     connect(item, &AppItem::requestActivateWindow, m_appInter, &DBusDock::ActivateWindow, Qt::QueuedConnection);
     connect(item, &AppItem::requestPreviewWindow, m_appInter, &DBusDock::PreviewWindow);
     connect(item, &AppItem::requestCancelPreview, m_appInter, &DBusDock::CancelPreviewWindow);
 
     m_itemList.insert(insertIndex, item);
+
+    for(auto dirItem : m_dirList)
+    {
+        if(dirItem->hasId(item->getDesktopFile()))
+        {
+            dirItem->addItem(item);
+
+            if(index == -1 && dirItem->getIndex() == insertIndex)
+                emit itemInserted(insertIndex, dirItem);
+
+            return;
+        }
+    }
+
     emit itemInserted(insertIndex, item);
 }
 
@@ -140,25 +162,84 @@ void DockItemManager::appItemRemoved(AppItem *appItem)
 {
     m_itemList.removeOne(appItem);
 
-    if (appItem->isDragging()) {
-        QDrag::cancel();
-    }
     appItem->deleteLater();
     emit itemRemoved(appItem);
 }
 
 void DockItemManager::reloadAppItems()
 {
-    for (auto item : m_itemList)
-        appItemRemoved(static_cast<AppItem *>(item.data()));
+    if(first)
+    {
+        emit itemInserted(0, launcherItem);
+    }
+    else
+    {
+        for (auto item : m_itemList)
+            appItemRemoved(static_cast<AppItem *>(item.data()));
+
+        for(auto item : m_dirList)
+        {
+            item->deleteLater();
+            emit itemRemoved(item);
+        }
+    }
+
+    loadDirAppData();
 
     QList<QDBusObjectPath> list = m_appInter->entries();
     for (auto path : list)
         appItemAdded(path, -1);
+
+    for(auto dirItem : m_dirList)
+        if(!dirItem->parentWidget() && !dirItem->isEmpty())
+            emit itemInserted(dirItem->getIndex(), dirItem);
 }
 
-void DockItemManager::manageItem(DockItem *item)
+void DockItemManager::addDirApp(DirItem *dirItem)
 {
-    connect(item, &DockItem::requestRefreshWindowVisible, this, &DockItemManager::requestRefershWindowVisible, Qt::UniqueConnection);
-    connect(item, &DockItem::requestWindowAutoHide, this, &DockItemManager::requestWindowAutoHide, Qt::UniqueConnection);
+    m_dirList.append(dirItem);
+    connect(dirItem, &DockItem::requestWindowAutoHide, this, &DockItemManager::requestWindowAutoHide, Qt::UniqueConnection);
+}
+
+void DockItemManager::loadDirAppData()
+{
+    int count = m_qsettings->value("count", 0).toInt();
+    while (count >=1)
+    {
+        DirItem *item = new DirItem(m_qsettings->value(QString("dir_%1/title").arg(count), "").toString());
+        item->setIndex(m_qsettings->value(QString("dir_%1/index").arg(count), -1).toInt());
+        item->setIds(m_qsettings->value(QString("dir_%1/ids").arg(count), QStringList()).value<QStringList>());
+
+        m_dirList.append(item);
+
+        connect(item, &DirItem::updateContent, this, &DockItemManager::updateDirApp);
+        connect(item, &DockItem::requestWindowAutoHide, this, &DockItemManager::requestWindowAutoHide, Qt::UniqueConnection);
+
+        count--;
+    }
+}
+
+void DockItemManager::updateDirApp()
+{
+    m_qsettings->setFallbacksEnabled(false);
+    m_qsettings->clear();
+    int index = 0;
+    for(auto itemDir : m_dirList)
+    {
+        QSet<QString> ids;
+        for(auto item : itemDir->getAppList())
+            ids.insert(item->getDesktopFile());
+
+        if(ids.isEmpty())
+            continue;
+
+        index++;
+        m_qsettings->setValue(QString("dir_%1/title").arg(index), itemDir->getTitle());
+        m_qsettings->setValue(QString("dir_%1/index").arg(index), itemDir->getIndex());
+        m_qsettings->setValue(QString("dir_%1/ids").arg(index), QStringList(ids.values()));
+
+    }
+
+    m_qsettings->setValue("count", index);
+    m_qsettings->sync();
 }

@@ -20,8 +20,8 @@
  */
 
 #include "launcheritem.h"
-#include "util/themeappicon.h"
-#include "util/imagefactory.h"
+
+#include "util/imageutil.h"
 
 #include <QPainter>
 #include <QProcess>
@@ -46,7 +46,7 @@ LauncherItem::LauncherItem(QWidget *parent)
 void LauncherItem::refershIcon()
 {
     const int iconSize = qMin(width(), height());
-    m_icon = ThemeAppIcon::getIcon("deepin-launcher", iconSize * 0.8, devicePixelRatioF());
+    m_icon = ImageUtil::getIcon("deepin-launcher", iconSize * 0.8, devicePixelRatioF());
     update();
 }
 

@@ -49,6 +49,8 @@ public:
 signals:
     void itemMoved(DockItem *sourceItem, DockItem *targetItem);
     void itemAdded(const QString &appDesktop, int idx);
+    void itemCountChanged();
+    void dirAppChanged();
 
 private:
     void resizeEvent(QResizeEvent *event) override;
@@ -64,7 +66,8 @@ private:
     bool eventFilter(QObject *watched, QEvent *event) override;
 
     void startDrag(DockItem *);
-    DockItem *dropTargetItem(DockItem *sourceItem, QPoint point);
+    void dropTargetItem(DockItem *sourceItem, QPoint point);
+    void handleDragDrop(DockItem *sourceItem, QPoint point);
     void moveItem(DockItem *sourceItem, DockItem *targetItem);
     void handleDragMove(QDragMoveEvent *e, bool isFilter);
     void resizeDockIcon();
@@ -72,18 +75,21 @@ public slots:
     void insertItem(const int index, DockItem *item);
     void removeItem(DockItem *item);
     void itemUpdated(DockItem *item);
-    
+
 private:
     QBoxLayout *m_mainPanelLayout;
     QWidget *m_fixedAreaWidget;
     QWidget *m_appAreaWidget;
     QBoxLayout *m_fixedAreaLayout;
     QBoxLayout *m_appAreaLayout;
+    QLabel *m_splitter;
+
     Position m_position;
     QPointer<PlaceholderItem> m_placeholderItem;
     QString m_draggingMimeKey;
     AppDragWidget *m_appDragWidget;
     QPoint m_mousePressPos;
+    int beforeIndex = -1;
 };
 
 #endif // MAINPANELCONTROL_H

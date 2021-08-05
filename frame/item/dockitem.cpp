@@ -20,7 +20,6 @@
  */
 
 #include "dockitem.h"
-#include "components/hoverhighlighteffect.h"
 #include "../util/docksettings.h"
 
 #include <QMouseEvent>
@@ -36,8 +35,6 @@ DockItem::DockItem(QWidget *parent)
     : QWidget(parent)
     , m_hover(false)
     , m_popupShown(false)
-    , m_tapAndHold(false)
-    , m_draging(false)
     , m_hoverEffect(new HoverHighlightEffect(this))
     , m_popupTipsDelayTimer(new QTimer(this))
     , m_popupAdjustDelayTimer(new QTimer(this))
@@ -69,11 +66,9 @@ DockItem::DockItem(QWidget *parent)
     connect(m_popupAdjustDelayTimer, &QTimer::timeout, this, &DockItem::updatePopupPosition, Qt::QueuedConnection);
     connect(&m_contextMenu, &QMenu::triggered, this, &DockItem::menuActionClicked);
 
-    grabGesture(Qt::TapAndHoldGesture);
-
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
-    m_scaleLarger->setDuration(150);
+    m_scaleLarger->setDuration(300);
     m_scaleLarger->setEasingCurve(QEasingCurve::Linear);
     connect(m_scaleLarger, &QVariantAnimation::valueChanged, this, [this](const QVariant &value){
         int size = value.toInt();
@@ -115,21 +110,6 @@ void DockItem::setDockPosition(const Position side)
     DockPosition = side;
 }
 
-void DockItem::gestureEvent(QGestureEvent *event)
-{
-    if (!event)
-        return;
-
-    QGesture *gesture = event->gesture(Qt::TapAndHoldGesture);
-
-    if (!gesture)
-        return;
-
-    qDebug() << "got TapAndHoldGesture";
-
-    m_tapAndHold = true;
-}
-
 bool DockItem::event(QEvent *event)
 {
     if (m_popupShown) {
@@ -141,9 +121,6 @@ bool DockItem::event(QEvent *event)
         default:;
         }
     }
-
-    if (event->type() == QEvent::Gesture)
-        gestureEvent(static_cast<QGestureEvent *>(event));
 
     return QWidget::event(event);
 }
@@ -193,19 +170,22 @@ void DockItem::enterEvent(QEvent *e)
     m_hoverEffect->setHighlighting(true);
     m_popupTipsDelayTimer->start();
 
-    if (m_scaleSmaller->state() == QVariantAnimation::Running)
+    if(getPlace() == DockPlace)
     {
-        m_scaleSmaller->stop();
-    }    
+        if (m_scaleSmaller->state() == QVariantAnimation::Running)
+        {
+            m_scaleSmaller->stop();
+        }
 
-    if (m_scaleLarger->state() == QVariantAnimation::Stopped)
-    {
-        int originSize = DockSettings::Instance().dockWindowSize();
-        m_scaleLarger->setStartValue(size().width());
-        m_scaleLarger->setEndValue(originSize);
-        m_scaleLarger->start();
+        if (m_scaleLarger->state() == QVariantAnimation::Stopped)
+        {
+            int originSize = DockSettings::Instance().dockWindowSize();
+            m_scaleLarger->setStartValue(size().width());
+            m_scaleLarger->setEndValue(originSize);
+            m_scaleLarger->start();
+        }
     }
-
+    update();
     return QWidget::enterEvent(e);
 }
 
@@ -221,18 +201,22 @@ void DockItem::leaveEvent(QEvent *e)
     if (m_popupShown && !PopupWindow->model())
         hidePopup();
 
-    if (m_scaleLarger->state() == QVariantAnimation::Running)
+    if(getPlace() == DockPlace)
     {
-        m_scaleLarger->stop();
-    }
+        if (m_scaleLarger->state() == QVariantAnimation::Running)
+        {
+            m_scaleLarger->stop();
+        }
 
-    if (m_scaleSmaller->state() == QVariantAnimation::Stopped)
-    {
-        int originSize = DockSettings::Instance().itemSize();
-        m_scaleSmaller->setStartValue(size().width());
-        m_scaleSmaller->setEndValue(originSize);
-        m_scaleSmaller->start();
+        if (m_scaleSmaller->state() == QVariantAnimation::Stopped)
+        {
+            int originSize = DockSettings::Instance().itemSize();
+            m_scaleSmaller->setStartValue(size().width());
+            m_scaleSmaller->setEndValue(originSize);
+            m_scaleSmaller->start();
+        }
     }
+    update();
 }
 
 const QRect DockItem::perfectIconRect() const
@@ -289,7 +273,8 @@ void DockItem::menuActionClicked(QAction *action)
 void DockItem::onContextMenuAccepted()
 {
     emit requestRefreshWindowVisible();
-    emit requestWindowAutoHide(true);
+    if(getPlace() == DockPlace)
+        emit requestWindowAutoHide(true);
 }
 
 void DockItem::showHoverTips()
@@ -351,6 +336,8 @@ void DockItem::popupWindowAccept()
     disconnect(PopupWindow.data(), &DockPopupWindow::accept, this, &DockItem::popupWindowAccept);
 
     hidePopup();
+
+    //TODO hide appdirwidget
 }
 
 void DockItem::showPopupApplet(QWidget *const applet)
@@ -360,6 +347,7 @@ void DockItem::showPopupApplet(QWidget *const applet)
         return;
 
     showPopupWindow(applet, true);
+    //TODO cancel appdirwidget's hide timer
 }
 
 void DockItem::invokedMenuItem(const QString &itemId, const bool checked)
@@ -376,18 +364,6 @@ const QString DockItem::contextMenu() const
 QWidget *DockItem::popupTips()
 {
     return nullptr;
-}
-
-/*!
- * \brief DockItem::checkAndResetTapHoldGestureState checks if a QTapAndHoldGesture
- * happens during the mouse press and release event pair.
- * \return true if yes, otherwise false.
- */
-bool DockItem::checkAndResetTapHoldGestureState()
-{
-    bool ret = m_tapAndHold;
-    m_tapAndHold = false;
-    return ret;
 }
 
 const QPoint DockItem::popupMarkPoint()
@@ -435,12 +411,20 @@ void DockItem::hidePopup()
     PopupWindow->hide();
 
     emit PopupWindow->accept();
-    emit requestWindowAutoHide(true);
+    if(getPlace() == DockPlace)
+        emit requestWindowAutoHide(true);
 }
 
-void DockItem::setDraging(bool bDrag)
+void DockItem::easeIn()
 {
-    m_draging = bDrag;
+    if(m_scaleLarger->state() == QVariantAnimation::Running)
+        m_scaleLarger->stop();
+    if(m_scaleSmaller->state() == QVariantAnimation::Running)
+        m_scaleSmaller->stop();
+
+    m_scaleLarger->setStartValue(5);
+    m_scaleLarger->setEndValue(DockSettings::Instance().itemSize());
+    m_scaleLarger->start();
 }
 
 void DockItem::hideNonModel()
@@ -448,10 +432,5 @@ void DockItem::hideNonModel()
     // auto hide if popup is not model window
     if (m_popupShown && !PopupWindow->model())
         hidePopup();
-}
-
-bool DockItem::isDragging()
-{
-    return m_draging;
 }
 

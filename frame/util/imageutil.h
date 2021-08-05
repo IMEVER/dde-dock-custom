@@ -24,12 +24,18 @@
 
 #include <QPixmap>
 #include <QSvgRenderer>
+#include <QScreen>
 
 class ImageUtil
 {
 public:
     static const QPixmap loadSvg(const QString &iconName, const QString &localPath, const int size, const qreal ratio);
     static const QPixmap loadSvg(const QString &iconName, const QSize size, const qreal ratio);
+    static const QPixmap lighterEffect(const QPixmap pixmap, const int delta = 120);
+    static const QPixmap getIcon(const QString iconName, const int size, const qreal ratio);
+    static QPixmap renderSVG(const QString &path, const QSize &size, const qreal devicePixelRatio);
+    static QScreen *screenAt(const QPoint &point);
+    static QScreen *screenAtByScaled(const QPoint &point);
 };
 
 #endif // IMAGEUTIL_H

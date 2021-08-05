@@ -26,6 +26,7 @@
 #include "item/appitem.h"
 #include "item/launcheritem.h"
 #include "item/placeholderitem.h"
+#include "item/diritem.h"
 
 #include <com_deepin_dde_daemon_dock.h>
 #include <QObject>
@@ -39,7 +40,9 @@ class DockItemManager : public QObject
 public:
     static DockItemManager *instance(QObject *parent = nullptr);
 
-    const QList<QPointer<DockItem> > itemList() const;
+    const QList<QPointer<DockItem> > itemList();
+    const QList<QPointer<DirItem>> dirList();
+    void addDirApp(DirItem *dirItem);
     bool appIsOnDock(const QString &appDesktop) const;
     LauncherItem* getLauncherItem();
 
@@ -51,26 +54,29 @@ signals:
     void requestRefershWindowVisible() const;
 
 public slots:
+    void reloadAppItems();
     void refershItemsIcon();
     void itemMoved(DockItem *const sourceItem, DockItem *const targetItem);
     void itemAdded(const QString &appDesktop, int idx);
+    void updateDirApp();
 
 private:
     explicit DockItemManager(QObject *parent = nullptr);
     void appItemAdded(const QDBusObjectPath &path, const int index);
     void appItemRemoved(const QString &appId);
     void appItemRemoved(AppItem *appItem);
-    void reloadAppItems();
-    void manageItem(DockItem *item);
+    void loadDirAppData();
 
 private:
     DBusDock *m_appInter;
+    QSettings *m_qsettings;
 
     static DockItemManager *INSTANCE;
 
     LauncherItem *launcherItem;
 
     QList<QPointer<DockItem>> m_itemList;
+    QList<QPointer<DirItem>> m_dirList;
 };
 
 #endif // DOCKITEMMANAGER_H
