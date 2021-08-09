@@ -13,7 +13,8 @@ DirItem::DirItem(QString title, QWidget *parent) : DockItem(parent)
 
     if (dirPopupWindow.isNull()) {
         DockPopupWindow *arrowRectangle = new DockPopupWindow(nullptr);
-        arrowRectangle->setWindowFlags(Qt::Tool | Qt::X11BypassWindowManagerHint | Qt::WindowStaysOnTopHint | Qt::WindowDoesNotAcceptFocus | Qt::WindowDoesNotAcceptFocus);
+        arrowRectangle->setWindowFlags(Qt::X11BypassWindowManagerHint | Qt::WindowStaysOnTopHint);
+        // arrowRectangle->setAttribute(Qt::WA_InputMethodEnabled, true);
         arrowRectangle->setShadowBlurRadius(20);
         arrowRectangle->setRadius(10);
         arrowRectangle->setShadowYOffset(2);
@@ -32,6 +33,10 @@ DirItem::DirItem(QString title, QWidget *parent) : DockItem(parent)
     m_dirTips->hide();
 
     m_popupGrid = new AppDirWidget(m_title, this);
+    m_showPopupTimer = new QTimer(this);
+    m_showPopupTimer->setSingleShot(true);
+    m_showPopupTimer->setInterval(310);
+    connect(m_showPopupTimer, &QTimer::timeout, this, &DirItem::showDirPopupWindow);
 
     connect(m_popupGrid, &AppDirWidget::updateTitle, [ this ](QString title){
         if(m_title != title)
@@ -112,6 +117,16 @@ QWidget * DirItem::popupTips()
     return nullptr;
 }
 
+const QPoint DirItem::popupDirMarkPoint()
+{
+    if(DockPosition == Position::Left)
+        return dirPopupWindow.data()->pos() + QPoint(dirPopupWindow.data()->width(), dirPopupWindow.data()->height() / 2);
+    if(DockPosition == Position::Right)
+        return dirPopupWindow.data()->pos() + QPoint(0, dirPopupWindow.data()->height() / 2);
+    else
+        return dirPopupWindow.data()->pos() + QPoint(dirPopupWindow.data()->width() / 2, 0);
+}
+
 int DirItem::currentCount()
 {
     return m_appList.count();
@@ -178,7 +193,7 @@ void DirItem::paintEvent(QPaintEvent *e)
 void DirItem::enterEvent(QEvent *e)
 {
     DockItem::enterEvent(e);
-    QTimer::singleShot(150, [ this ]{ showDirPopupWindow(); });
+    m_showPopupTimer->start();
 }
 
 void DirItem::leaveEvent(QEvent *e)

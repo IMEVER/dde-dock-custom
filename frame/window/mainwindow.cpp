@@ -28,7 +28,7 @@
 
 #include <DStyle>
 #include <DPlatformWindowHandle>
-
+#include <DPlatformTheme>
 #include <QDebug>
 #include <QEvent>
 #include <QResizeEvent>
@@ -148,7 +148,7 @@ MainWindow::MainWindow(QWidget *parent) : DBlurEffectWidget(parent)
     DPlatformWindowHandle::enableDXcbForWindow(this, true);
     m_platformWindowHandle.setEnableBlurWindow(true);
     m_platformWindowHandle.setTranslucentBackground(true);
-    m_platformWindowHandle.setWindowRadius(5);
+    m_platformWindowHandle.setWindowRadius(3);
     m_platformWindowHandle.setShadowOffset(QPoint(0, 5));
     m_platformWindowHandle.setShadowColor(QColor(0, 0, 0, 0.3 * 255));
 
@@ -276,35 +276,11 @@ void MainWindow::launch()
     });
 }
 
-bool MainWindow::event(QEvent *e)
-{
-    switch (e->type()) {
-    case QEvent::Move:
-        if (!e->spontaneous())
-            QTimer::singleShot(1, this, &MainWindow::positionCheck);
-        break;
-    default:;
-    }
-
-    return QWidget::event(e);
-}
-
 void MainWindow::mousePressEvent(QMouseEvent *e)
 {
     e->ignore();
     if (e->button() == Qt::RightButton) {
         m_settings->showDockSettingsMenu();
-        return;
-    }
-}
-
-void MainWindow::keyPressEvent(QKeyEvent *e)
-{
-    switch (e->key()) {
-#ifdef QT_DEBUG
-    case Qt::Key_Escape:        qApp->quit();       break;
-#endif
-    default:;
     }
 }
 
@@ -365,7 +341,7 @@ void MainWindow::initComponents()
 void MainWindow::compositeChanged()
 {
     const bool composite = m_wmHelper->hasComposite();
-    setComposite(composite);
+    setEffectEnabled(composite);
 
 // NOTE(justforlxz): On the sw platform, there is an unstable
 // display position error, disable animation solution
@@ -778,9 +754,6 @@ void MainWindow::updatePanelVisible()
             break;
         }
 
-//        const QRect windowRect = m_settings->windowRect(m_curDockPos, true);
-//        move(windowRect.topLeft());
-
         return narrow(m_curDockPos);
 
     } while (false);
@@ -790,46 +763,26 @@ void MainWindow::updatePanelVisible()
 
 void MainWindow::adjustShadowMask()
 {
-    if (!m_launched)
-        return;
-
-    if (m_shadowMaskOptimizeTimer->isActive())
+    if (!m_launched || m_shadowMaskOptimizeTimer->isActive())
         return;
 
     const bool composite = m_wmHelper->hasComposite();
+    int radius = 3;
 
-    DStyleHelper dstyle(style());
-    const int radius = dstyle.pixelMetric(DStyle::PM_TopLevelWindowRadius);
+    if(composite)
+    {
+        DPlatformTheme *theme = DGuiApplicationHelper::instance()->systemTheme();
+        radius = theme->windowRadius(radius);
+    }
 
-    m_platformWindowHandle.setWindowRadius(composite ? radius : 0);
-}
-
-void MainWindow::positionCheck()
-{
-    if (m_positionUpdateTimer->isActive())
-        return;
-
-    const QPoint scaledFrontPos = scaledPos(m_settings->frontendWindowRect().topLeft());
-
-    if (QPoint(pos() - scaledFrontPos).manhattanLength() < 2)
-        return;
-
-    // this may cause some position error and animation caton
-    //internalMove();
+    m_platformWindowHandle.setWindowRadius(radius);
 }
 
 void MainWindow::setEffectEnabled(const bool enabled)
 {
     setMaskColor(AutoColor);
-
     setMaskAlpha(DockSettings::Instance().Opacity());
-
     m_platformWindowHandle.setBorderWidth(enabled ? 1 : 0);
-}
-
-void MainWindow::setComposite(const bool hasComposite)
-{
-    setEffectEnabled(hasComposite);
 }
 
 void MainWindow::resizeMainWindow()
@@ -888,11 +841,11 @@ void MainWindow::onDragFinished()
     m_size = m_settings->windowSize();
 
     if (Dock::Bottom == m_curDockPos) {
-        m_settings->m_dockInter->setWindowSizeFashion(m_settings->windowSize().height());
-        m_settings->m_dockInter->setWindowSize(m_settings->windowSize().height());
+        m_settings->m_dockInter->setWindowSizeFashion(m_size.height());
+        m_settings->m_dockInter->setWindowSize(m_size.height());
     } else {
-        m_settings->m_dockInter->setWindowSizeFashion(m_settings->windowSize().width());
-        m_settings->m_dockInter->setWindowSize(m_settings->windowSize().width());
+        m_settings->m_dockInter->setWindowSizeFashion(m_size.width());
+        m_settings->m_dockInter->setWindowSize(m_size.width());
     }
 
     setStrutPartial();
@@ -915,8 +868,6 @@ void MainWindow::onRegionMonitorChanged(int x, int y, const QString &key)
 
     if (!isVisible())
         setVisible(true);
-
-    // qDebug()<<"Monitor occur, x: "<<x<<", y: "<<y;
 }
 
 void MainWindow::updateRegionMonitorWatch()

@@ -75,18 +75,18 @@ DockItem::DockItem(QWidget *parent)
         setFixedSize(size, size);
     });
     connect(m_scaleLarger, &QVariantAnimation::finished, this, [this](){
-        int size = DockSettings::Instance().dockWindowSize();
-        setFixedSize(QSize(size, size));
+        // int size = DockSettings::Instance().dockWindowSize();
+        // setFixedSize(QSize(size, size));
     });
 
-    m_scaleSmaller->setDuration(150);
+    m_scaleSmaller->setDuration(300);
     m_scaleSmaller->setEasingCurve(QEasingCurve::Linear);
     connect(m_scaleSmaller, &QVariantAnimation::valueChanged, this, [this](const QVariant &value){
         setFixedSize(value.toInt(), value.toInt());
     });
     connect(m_scaleSmaller, &QVariantAnimation::finished, this, [this](){
-        int size = DockSettings::Instance().itemSize();
-        setFixedSize(QSize(size, size));
+        // int size = DockSettings::Instance().itemSize();
+        // setFixedSize(QSize(size, size));
     });
 }
 
@@ -427,6 +427,17 @@ void DockItem::easeIn()
     m_scaleLarger->start();
 }
 
+void DockItem::easeOut()
+{
+    if(m_scaleLarger->state() == QVariantAnimation::Running)
+        m_scaleLarger->stop();
+    if(m_scaleSmaller->state() == QVariantAnimation::Running)
+        m_scaleSmaller->stop();
+
+    m_scaleSmaller->setStartValue(width());
+    m_scaleSmaller->setEndValue(0);
+    m_scaleSmaller->start();
+}
 void DockItem::hideNonModel()
 {
     // auto hide if popup is not model window

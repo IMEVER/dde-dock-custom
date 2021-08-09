@@ -58,7 +58,6 @@ public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
     void setEffectEnabled(const bool enabled);
-    void setComposite(const bool hasComposite);
 
     friend class MainPanel;
     friend class MainPanelControl;
@@ -68,9 +67,7 @@ public slots:
 
 private:
     using QWidget::show;
-    bool event(QEvent *e);
     void mousePressEvent(QMouseEvent *e);
-    void keyPressEvent(QKeyEvent *e);
     void enterEvent(QEvent *e);
     void leaveEvent(QEvent *e);
     void dragEnterEvent(QDragEnterEvent *e);
@@ -103,7 +100,6 @@ private slots:
     void updatePanelVisible();
 
     void adjustShadowMask();
-    void positionCheck();
 
     void onMainWindowSizeChanged(QPoint offset);
     void onDragFinished();

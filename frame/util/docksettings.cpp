@@ -372,8 +372,8 @@ void DockSettings::setDockWindowSize(int size)
     m_dockWindowSize = size;
     if (m_dockWindowSize > WINDOW_MAX_SIZE || m_dockWindowSize < WINDOW_MIN_SIZE) {
         m_dockWindowSize = DEFAULT_HEIGHT;
-        m_dockInter->setWindowSize(m_dockWindowSize);
     }
+    m_dockInter->setWindowSize(m_dockWindowSize);
 
     int count = itemCount(), length;
     m_itemSize = m_dockWindowSize - 20;

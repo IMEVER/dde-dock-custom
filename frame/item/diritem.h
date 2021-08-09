@@ -53,6 +53,7 @@ protected:
     void dragMoveEvent(QDragMoveEvent *e) override;
 
     QWidget *popupTips() override;
+    const QPoint popupDirMarkPoint();
 
     void showDirPopupWindow();
 
@@ -65,6 +66,8 @@ signals:
 private:
     AppDirWidget *m_popupGrid;
 
+    QTimer *m_showPopupTimer;
+
     int m_index;
 
     QString m_title;
@@ -72,6 +75,8 @@ private:
 
     TipsWidget *m_dirTips;
     QList<AppItem *> m_appList;
+
+    friend class AppItem;
 };
 
 #endif

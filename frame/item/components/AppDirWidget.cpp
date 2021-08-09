@@ -32,19 +32,21 @@ AppDirWidget::AppDirWidget(QString title, QWidget *parent) : QWidget(parent)
     vbox->addLayout(hbox);
 
     m_Layout = new QGridLayout;
+    m_Layout->setVerticalSpacing(10);
     vbox->addLayout(m_Layout);
 
     setLayout(vbox);
 
     setFixedWidth(360);
     setMinimumHeight(120);
+    setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+    setContentsMargins(10, 5, 10, 5);
     hide();
 
     m_mouseLeaveTimer->setSingleShot(true);
     m_mouseLeaveTimer->setInterval(100);
 
     connect(m_mouseLeaveTimer, &QTimer::timeout, this, &AppDirWidget::checkMouseLeave);
-
 }
 
 AppDirWidget::~AppDirWidget()
@@ -62,7 +64,7 @@ void AppDirWidget::addAppItem(AppItem *item)
         m_row++;
         m_column = 0;
 
-        setFixedHeight(60 * (m_row + 2));
+        // setFixedHeight(60 * (m_row + 2));
     }
 
     connect(item, &AppItem::enterPreviewWindow, [ this ]{ m_mouseLeaveTimer->stop(); });

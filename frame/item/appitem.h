@@ -87,6 +87,7 @@ private:
     void invokedMenuItem(const QString &itemId, const bool checked) Q_DECL_OVERRIDE;
     const QString contextMenu() const Q_DECL_OVERRIDE;
     QWidget *popupTips() Q_DECL_OVERRIDE;
+    const QPoint popupMarkPoint() override;
     bool hasAttention() const;
 
     QPoint appIconPosition() const;

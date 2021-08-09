@@ -42,7 +42,8 @@ public:
         App,
         Plugins,
         Placeholder,
-        DirApp
+        DirApp,
+        Window
     };
 
     enum Place {
@@ -67,6 +68,7 @@ public slots:
     void showPopupApplet(QWidget *const applet);
     void hidePopup();
     void easeIn();
+    void easeOut();
 
 signals:
     void itemDropped(QObject *destination, const QPoint &dropPoint) const;
@@ -81,7 +83,7 @@ protected:
     void leaveEvent(QEvent *e) override;
 
     const QRect perfectIconRect() const;
-    const QPoint popupMarkPoint() ;
+    virtual const QPoint popupMarkPoint() ;
     const QPoint topleftPoint() const;
 
     void hideNonModel();

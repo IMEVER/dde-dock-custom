@@ -51,6 +51,7 @@ AppItem::AppItem(const QDBusObjectPath &entry, QWidget *parent)
     , m_retryObtainIconTimer(new QTimer(this))
     , m_smallWatcher(new QFutureWatcher<QPixmap>(this))
     , m_largeWatcher(new QFutureWatcher<QPixmap>(this))
+    , m_dirItem(nullptr)
 {
     // setWindowFlags(Qt::ToolTip);
     QHBoxLayout *centralLayout = new QHBoxLayout;
@@ -254,9 +255,6 @@ void AppItem::mouseReleaseEvent(QMouseEvent *e)
             playSwingEffect();
 
     } else if (e->button() == Qt::LeftButton) {
-        qDebug() << "app item clicked, name:" << m_itemEntryInter->name()
-                 << "id:" << m_itemEntryInter->id() << "my-id:" << m_id << "icon:" << m_itemEntryInter->icon();
-
         m_itemEntryInter->Activate(QX11Info::getTimestamp());
 
         // play launch effect
@@ -383,6 +381,18 @@ QWidget *AppItem::popupTips()
     return m_appNameTips;
 }
 
+const QPoint AppItem::popupMarkPoint()
+{
+    if(getPlace() == DockItem::DirPlace)
+    {
+        return m_dirItem->popupDirMarkPoint();
+    }
+    else
+    {
+        return DockItem::popupMarkPoint();
+    }
+}
+
 bool AppItem::hasAttention() const
 {
     for (const auto &info : m_windowInfos)
@@ -420,8 +430,8 @@ void AppItem::updateWindowInfos(const WindowInfoMap &info)
 
 void AppItem::refershIcon()
 {
-    if (!isVisible())
-        return;
+    // if (!isVisible())
+        // return;
 
     const QString icon = m_itemEntryInter->icon();
     const int iconSize = qMin(width(), height());

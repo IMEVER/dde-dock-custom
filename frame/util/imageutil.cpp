@@ -111,10 +111,7 @@ const QPixmap ImageUtil::getIcon(const QString iconName, const int size, const q
                 // icons loaded are loaded by QIcon::fromTheme, really strange here.
                 if (QPixmapCache::find(key, &pixmap))
                     break;
-            }
 
-            // load pixmap from Byte-Data
-            if (iconName.startsWith("data:image/")) {
                 const QStringList strs = iconName.split("base64,");
                 if (strs.size() == 2)
                     pixmap.loadFromData(QByteArray::fromBase64(strs.at(1).toLatin1()));
