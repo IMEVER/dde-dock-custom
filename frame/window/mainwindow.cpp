@@ -448,37 +448,6 @@ void MainWindow::initConnections()
     connect(m_eventInter, &XEventMonitor::CursorMove, this, &MainWindow::onRegionMonitorChanged);
 }
 
-const QPoint MainWindow::x11GetWindowPos()
-{
-    const auto disp = QX11Info::display();
-
-    unsigned int unused;
-    int x;
-    int y;
-    Window unused_window;
-
-    XGetGeometry(disp, winId(), &unused_window, &x, &y, &unused, &unused, &unused, &unused);
-    XFlush(disp);
-
-    return QPoint(x, y);
-}
-
-void MainWindow::x11MoveWindow(const int x, const int y)
-{
-    const auto disp = QX11Info::display();
-
-    XMoveWindow(disp, winId(), x, y);
-    XFlush(disp);
-}
-
-void MainWindow::x11MoveResizeWindow(const int x, const int y, const int w, const int h)
-{
-    const auto disp = QX11Info::display();
-
-    XMoveResizeWindow(disp, winId(), x, y, w, h);
-    XFlush(disp);
-}
-
 void MainWindow::positionChanged(const Position prevPos, const Position nextPos)
 {
     m_newDockPos = nextPos;
@@ -830,7 +799,7 @@ void MainWindow::onMainWindowSizeChanged(QPoint offset)
 
     m_settings->setDockWindowSize(newWidth);
     resizeMainWindow();
-    m_settings->onWindowSizeChanged();
+    // m_settings->onWindowSizeChanged();
 }
 
 void MainWindow::onDragFinished()

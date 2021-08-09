@@ -41,6 +41,7 @@ extern const QPoint rawXPosition(const QPoint &scaledPos);
 DockSettings::DockSettings(QWidget *parent)
     : QObject(parent)
     , m_dockInter(new DBusDock("com.deepin.dde.daemon.Dock", "/com/deepin/dde/daemon/Dock", QDBusConnection::sessionBus(), this))
+    , m_dockWindowSize(32)
     , m_autoHide(true)
     , m_opacity(0.4)
     , m_bottomPosAct("下", this)
@@ -117,7 +118,6 @@ DockSettings::DockSettings(QWidget *parent)
     }
 
     calculateMultiScreensPos();
-    calculateWindowConfig();
 
     QTimer::singleShot(0, this, [ = ] {onOpacityChanged(m_dockInter->opacity());});
 }
@@ -452,6 +452,10 @@ void DockSettings::checkService()
                 disconnect(ifc);
             }
         });
+    }
+    else
+    {
+        m_dockWindowSize = m_dockInter->windowSizeFashion();
     }
 }
 

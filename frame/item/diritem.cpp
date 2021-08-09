@@ -199,6 +199,8 @@ void DirItem::enterEvent(QEvent *e)
 void DirItem::leaveEvent(QEvent *e)
 {
     DockItem::leaveEvent(e);
+    if(m_showPopupTimer->isActive())
+        m_showPopupTimer->stop();
     m_popupGrid->prepareHide();
 }
 

@@ -77,9 +77,6 @@ private:
     void resizeMainWindow();
     void resizeMainPanelWindow();
 
-    const QPoint x11GetWindowPos();
-    void x11MoveWindow(const int x, const int y);
-    void x11MoveResizeWindow(const int x, const int y, const int w, const int h);
     void onRegionMonitorChanged(int x, int y, const QString &key);
     void updateRegionMonitorWatch();
 
