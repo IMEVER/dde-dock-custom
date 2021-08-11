@@ -25,6 +25,7 @@
 
 #include "dockitem.h"
 #include "diritem.h"
+#include "WindowItem.h"
 #include "components/previewcontainer.h"
 #include "tipswidget.h"
 
@@ -37,7 +38,7 @@
 
 using DockEntryInter = com::deepin::dde::daemon::dock::Entry;
 class DirItem;
-
+class WindowItem;
 class AppItem : public DockItem
 {
     Q_OBJECT
@@ -60,6 +61,9 @@ public:
     DirItem *getDirItem();
     void setDirItem(DirItem *dirItem);
     void removeDirItem();
+    void check();
+    void fetchWindowInfos();
+    int windowCount() { return m_windowMap.size(); }
 
 signals:
     void requestActivateWindow(const WId wid) const;
@@ -69,6 +73,9 @@ signals:
 
     void enterPreviewWindow() const;
     void leavePreviewWindow() const;
+
+    void windowItemInserted(WindowItem *);
+    void windowItemRemoved(WindowItem *);
 
 private:
     void moveEvent(QMoveEvent *e) override;
@@ -94,6 +101,7 @@ private:
 
 private slots:
     void updateWindowInfos(const WindowInfoMap &info);
+    void mergeModeChanged(MergeMode mode);
     void refershIcon() Q_DECL_OVERRIDE;
     void activeChanged();
     void showPreview();
@@ -131,6 +139,7 @@ private:
     DGuiApplicationHelper::ColorType m_themeType;
     Place m_place = DockPlace;
     DirItem *m_dirItem;
+    QMap<WId, WindowItem *> m_windowMap;
 };
 
 #endif // APPITEM_H

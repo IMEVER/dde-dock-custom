@@ -58,6 +58,24 @@ LauncherItem * DockItemManager::getLauncherItem()
     return launcherItem;
 }
 
+MergeMode DockItemManager::getDockMergeMode()
+{
+    int i = m_qsettings->value("mergeMode", MergeAll).toInt();
+    if(i < 0 || i > 2)
+        i = 0;
+    return MergeMode(i);
+}
+
+void DockItemManager::saveDockMergeMode(MergeMode mode)
+{
+    if(mode != getDockMergeMode())
+    {
+        m_qsettings->setValue("mergeMode", mode);
+        m_qsettings->sync();
+        emit mergeModeChanged(mode);
+    }
+}
+
 const QList<QPointer<DockItem>> DockItemManager::itemList()
 {
     return m_itemList;
@@ -124,6 +142,11 @@ void DockItemManager::appItemAdded(const QDBusObjectPath &path, const int index)
     connect(item, &AppItem::requestPreviewWindow, m_appInter, &DBusDock::PreviewWindow);
     connect(item, &AppItem::requestCancelPreview, m_appInter, &DBusDock::CancelPreviewWindow);
 
+    connect(item, &AppItem::windowItemInserted, [this](WindowItem *item){ emit itemInserted(-1, item); });
+    connect(item, &AppItem::windowItemRemoved, [this](WindowItem *item){ emit itemRemoved(item); });
+
+    item->fetchWindowInfos();
+
     m_itemList.insert(insertIndex, item);
 
     for(auto dirItem : m_dirList)
@@ -163,8 +186,8 @@ void DockItemManager::appItemRemoved(AppItem *appItem)
 {
     m_itemList.removeOne(appItem);
 
-    appItem->deleteLater();
     emit itemRemoved(appItem);
+    QTimer::singleShot(500, [ appItem ] { appItem->deleteLater(); });;
 }
 
 void DockItemManager::reloadAppItems()
@@ -175,14 +198,15 @@ void DockItemManager::reloadAppItems()
     }
     else
     {
-        for (auto item : m_itemList)
-            appItemRemoved(static_cast<AppItem *>(item.data()));
+        while (!m_itemList.isEmpty())
+            appItemRemoved(qobject_cast<AppItem *>(m_itemList.first().data()));
 
         for(auto item : m_dirList)
         {
-            item->deleteLater();
             emit itemRemoved(item);
+            QTimer::singleShot(500, [ item] { item->deleteLater(); });
         }
+        m_dirList.clear();
     }
 
     loadDirAppData();

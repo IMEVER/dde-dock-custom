@@ -2,26 +2,41 @@
 #define WINDOW_ITEM_H
 
 #include "dockitem.h"
+#include "appitem.h"
+#include "components/previewcontainer.h"
+
+
 #include <com_deepin_dde_daemon_dock_entry.h>
 
+class AppItem;
 class WindowItem : public DockItem
 {
     Q_OBJECT
 
     public:
-        explicit WindowItem(WId wId, WindowInfo windowInfo, QWidget *parent=Q_NULLPTR);
+        explicit WindowItem(AppItem *appItem, WId wId, WindowInfo windowInfo, bool closeable, QWidget *parent=Q_NULLPTR);
         ~WindowItem();
         ItemType itemType() const override { return DockItem::Window; }
+        void fetchSnapshot();
 
-    private:
+    protected:
         void paintEvent(QPaintEvent *e) override;
-        QPoint windowIconPosition();
-        void refreshIcon();
+        void mouseReleaseEvent(QMouseEvent *e) override;
+        void resizeEvent(QResizeEvent *e) override;
+        void leaveEvent(QEvent *e) override;
 
     private:
+        void showPreview();
+        void showHoverTips() override;
+
+    private:
+        AppItem *m_appItem;
         WId m_WId;
         WindowInfo m_windowInfo;
-        QPixmap m_windowIcon;
+        bool m_closeable;
+        QImage m_snapshot;
+        QRectF m_snapshotSrcRect;
+        PreviewContainer *m_appPreview;
 };
 
 #endif

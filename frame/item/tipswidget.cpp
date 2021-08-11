@@ -13,7 +13,7 @@ void TipsWidget::setText(const QString &text)
     m_type = TipsWidget::SingleLine;
     m_text = text;
 
-    setFixedSize(fontMetrics().width(text) + 6, fontMetrics().height());
+    setFixedSize(fontMetrics().horizontalAdvance(text) + 6, fontMetrics().height());
 
     update();
 
@@ -34,7 +34,7 @@ void TipsWidget::setTextList(const QStringList &textList)
     int k = fontMetrics().height() * m_textList.size();
     setFixedHeight(k);
     for (QString text : m_textList) {
-        int fontLength = fontMetrics().width(text) + 6;
+        int fontLength = fontMetrics().horizontalAdvance(text) + 6;
         maxLength = maxLength > fontLength ? maxLength : fontLength;
     }
     m_width = maxLength;

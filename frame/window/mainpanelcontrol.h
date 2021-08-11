@@ -44,6 +44,8 @@ public:
     void addAppAreaItem(int index, QWidget *wdg);
     void removeFixedAreaItem(QWidget *wdg);
     void removeAppAreaItem(QWidget *wdg);
+    void addWindowAreaItem(int index, QWidget *wdg);
+    void removeWindowAreaItem(QWidget *wdg);
     void setPositonValue(Position position);
 
 signals:
@@ -59,6 +61,7 @@ private:
     void updateAppAreaSonWidgetSize();
     void updateMainPanelLayout();
 
+    void paintEvent(QPaintEvent *e) override;
     void dragMoveEvent(QDragMoveEvent *e) override;
     void dragEnterEvent(QDragEnterEvent *e) override;
     void dragLeaveEvent(QDragLeaveEvent *e) override;
@@ -82,6 +85,9 @@ private:
     QWidget *m_appAreaWidget;
     QBoxLayout *m_fixedAreaLayout;
     QBoxLayout *m_appAreaLayout;
+
+    QWidget *m_windowAreaWidget;
+    QBoxLayout *m_windowAreaLayout;
     QLabel *m_splitter;
 
     Position m_position;

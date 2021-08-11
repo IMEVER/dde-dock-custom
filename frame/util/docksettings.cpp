@@ -50,6 +50,9 @@ DockSettings::DockSettings(QWidget *parent)
     , m_keepShownAct("一直显示", this)
     , m_keepHiddenAct("一直隐藏", this)
     , m_smartHideAct("智能隐藏", this)
+    , m_mergeNoneAct("从不合并", this)
+    , m_mergeDockAct("合并Dock", this)
+    , m_mergeAllAct("合并所有", this)
     , m_displayInter(new DisplayInter("com.deepin.daemon.Display", "/com/deepin/daemon/Display", QDBusConnection::sessionBus(), this))
     , m_itemManager(DockItemManager::instance(this))
     , m_isMouseMoveCause(false)
@@ -69,12 +72,17 @@ DockSettings::DockSettings(QWidget *parent)
     DockItem::setDockPosition(m_position);
     qApp->setProperty(PROP_POSITION, QVariant::fromValue(m_position));
 
+    //TODO add merge mode init
+
     m_bottomPosAct.setCheckable(true);
     m_leftPosAct.setCheckable(true);
     m_rightPosAct.setCheckable(true);
     m_keepShownAct.setCheckable(true);
     m_keepHiddenAct.setCheckable(true);
     m_smartHideAct.setCheckable(true);
+    m_mergeNoneAct.setCheckable(true);
+    m_mergeDockAct.setCheckable(true);
+    m_mergeAllAct.setCheckable(true);
 
     QMenu *locationSubMenu = new QMenu(&m_settingsMenu);
     locationSubMenu->addAction(&m_bottomPosAct);
@@ -90,8 +98,14 @@ DockSettings::DockSettings(QWidget *parent)
     QAction *statusSubMenuAct = new QAction("状态", this);
     statusSubMenuAct->setMenu(statusSubMenu);
 
+    QMenu *mergeSubMenu = new QMenu("合并窗口", &m_settingsMenu);
+    mergeSubMenu->addAction(&m_mergeNoneAct);
+    mergeSubMenu->addAction(&m_mergeDockAct);
+    mergeSubMenu->addAction(&m_mergeAllAct);
+
     m_settingsMenu.addAction(locationSubMenuAct);
     m_settingsMenu.addAction(statusSubMenuAct);
+    m_settingsMenu.addMenu(mergeSubMenu);
     m_settingsMenu.setTitle("设置");
 
     connect(&m_settingsMenu, &QMenu::triggered, this, &DockSettings::menuActionClicked);
@@ -225,6 +239,11 @@ void DockSettings::showDockSettingsMenu()
     m_keepHiddenAct.setChecked(m_hideMode == KeepHidden);
     m_smartHideAct.setChecked(m_hideMode == SmartHide);
 
+    MergeMode mode = m_itemManager->getDockMergeMode();
+    m_mergeNoneAct.setChecked(mode == MergeNone);
+    m_mergeDockAct.setChecked(mode == MergeDock);
+    m_mergeAllAct.setChecked(mode == MergeAll);
+
     m_settingsMenu.exec(QCursor::pos());
 
     setAutoHide(true);
@@ -256,6 +275,16 @@ void DockSettings::menuActionClicked(QAction *action)
         return m_dockInter->setHideMode(KeepHidden);
     if (action == &m_smartHideAct)
         return m_dockInter->setHideMode(SmartHide);
+
+    MergeMode mode = m_itemManager->getDockMergeMode();
+    if(action == &m_mergeNoneAct)
+        mode = MergeNone;
+    else if(action == &m_mergeDockAct)
+        mode = MergeDock;
+    else if(action == &m_mergeAllAct)
+        mode = MergeAll;
+
+    m_itemManager->saveDockMergeMode(mode);
 }
 
 void DockSettings::onPositionChanged()
@@ -347,6 +376,12 @@ int DockSettings::itemCount()
     for(auto item : m_itemManager->dirList())
     {
         count = count - item->currentCount() + 1;
+    }
+
+    for(auto item : m_itemManager->itemList())
+    {
+        if(item->itemType() == DockItem::App)
+            count += qobject_cast<AppItem *>(item)->windowCount();
     }
 
     return count;

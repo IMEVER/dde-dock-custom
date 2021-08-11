@@ -26,6 +26,7 @@
 #include "xcb/xcb_misc.h"
 #include "components/appswingeffectbuilder.h"
 #include "components/appspreviewprovider.h"
+#include "../window/dockitemmanager.h"
 
 #include <X11/X.h>
 #include <X11/Xlib.h>
@@ -87,9 +88,9 @@ AppItem::AppItem(const QDBusObjectPath &entry, QWidget *parent)
 
     connect(DGuiApplicationHelper::instance(), &DGuiApplicationHelper::themeTypeChanged, [ = ](DGuiApplicationHelper::ColorType type){ m_themeType = type; });
 
-    updateWindowInfos(m_itemEntryInter->windowInfos());
-    refershIcon();
+    connect(DockItemManager::instance(), &DockItemManager::mergeModeChanged, this, &AppItem::mergeModeChanged);
 
+    refershIcon();
 }
 
 AppItem::~AppItem()
@@ -123,12 +124,18 @@ void AppItem::setDirItem(DirItem *dirItem)
 {
     m_dirItem = dirItem;
     m_place = DirPlace;
+
+    if(DockItemManager::instance()->getDockMergeMode() == MergeDock)
+        mergeModeChanged(DockItemManager::instance()->getDockMergeMode());
 }
 
 void AppItem::removeDirItem()
 {
     m_dirItem = nullptr;
     m_place = DockPlace;
+
+    if(DockItemManager::instance()->getDockMergeMode() == MergeDock)
+        mergeModeChanged(DockItemManager::instance()->getDockMergeMode());
 }
 
 // Update _NET_WM_ICON_GEOMETRY property for windows that every item
@@ -412,6 +419,11 @@ QPoint AppItem::appIconPosition() const
     return QPoint(iconX, iconY);
 }
 
+void AppItem::fetchWindowInfos()
+{
+    updateWindowInfos(m_itemEntryInter->windowInfos());
+}
+
 void AppItem::updateWindowInfos(const WindowInfoMap &info)
 {
     m_windowInfos = info;
@@ -426,12 +438,77 @@ void AppItem::updateWindowInfos(const WindowInfoMap &info)
     }
 
     update();
+
+    if(DockItemManager::instance()->getDockMergeMode() == MergeAll)
+        return;
+
+    if(DockItemManager::instance()->getDockMergeMode() == MergeDock && m_place == DockPlace)
+        return;
+
+    for(auto it(m_windowMap.begin()); it != m_windowMap.end(); )
+    {
+        if (!m_windowInfos.keys().contains(it.key()))
+        {
+            WindowItem *windowItem = it.value();
+            it = m_windowMap.erase(it);
+
+            emit windowItemRemoved(windowItem);
+            QTimer::singleShot(500, [ windowItem ]{
+                windowItem->deleteLater();
+            });
+        }
+        else
+        {
+            it++;
+        }
+    }
+
+    for(auto it(m_windowInfos.cbegin()); it != m_windowInfos.cend(); it++)
+    {
+        if(!m_windowMap.contains(it.key()))
+        {
+            WindowItem *windowItem = new WindowItem(this, it.key(), it.value(), m_itemEntryInter->GetAllowedCloseWindows().value().contains(it.key()));
+            m_windowMap.insert(it.key(), windowItem);
+            emit windowItemInserted(windowItem);
+            windowItem->fetchSnapshot();
+        }
+    }
+}
+
+void AppItem::mergeModeChanged(MergeMode mode)
+{
+    if(mode == MergeAll || (mode == MergeDock && m_place == DockPlace))
+    {
+        while( !m_windowMap.isEmpty() )
+        {
+            WindowItem *windowItem = m_windowMap.take(m_windowMap.firstKey());
+
+            emit windowItemRemoved(windowItem);
+            QTimer::singleShot(500, [ windowItem ]{
+                //Just wait for ease out animation complete
+                windowItem->deleteLater();
+            });
+        }
+    }
+    else if(mode == MergeNone || (mode == MergeDock && m_place == DirPlace))
+    {
+        for(auto it(m_windowInfos.cbegin()); it != m_windowInfos.cend(); it++)
+        {
+            if(!m_windowMap.contains(it.key()))
+            {
+                WindowItem *windowItem = new WindowItem(this, it.key(), it.value(), m_itemEntryInter->GetAllowedCloseWindows().value().contains(it.key()));
+                m_windowMap.insert(it.key(), windowItem);
+                emit windowItemInserted(windowItem);
+                windowItem->fetchSnapshot();
+            }
+        }
+    }
 }
 
 void AppItem::refershIcon()
 {
-    // if (!isVisible())
-        // return;
+    if (!isVisible() && m_place != DockItem::DirPlace)
+        return;
 
     const QString icon = m_itemEntryInter->icon();
     const int iconSize = qMin(width(), height());
@@ -481,6 +558,11 @@ void AppItem::showPreview()
     connect(m_appPreviewTips, &PreviewContainer::requestHidePopup, [ = ]() { m_appPreviewTips = nullptr; });
 
     showPopupWindow(m_appPreviewTips, true);
+}
+
+void AppItem::check()
+{
+    m_itemEntryInter->Check();
 }
 
 void AppItem::playSwingEffect()

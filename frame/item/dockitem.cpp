@@ -88,6 +88,8 @@ DockItem::DockItem(QWidget *parent)
         // int size = DockSettings::Instance().itemSize();
         // setFixedSize(QSize(size, size));
     });
+
+    setFixedSize(20, 20);
 }
 
 QSize DockItem::sizeHint() const
@@ -167,7 +169,10 @@ void DockItem::enterEvent(QEvent *e)
     }
 
     m_hover = true;
-    m_hoverEffect->setHighlighting(true);
+
+    // if(itemType() != DockItem::Window)
+        m_hoverEffect->setHighlighting(true);
+
     m_popupTipsDelayTimer->start();
 
     if(getPlace() == DockPlace)
@@ -194,7 +199,10 @@ void DockItem::leaveEvent(QEvent *e)
     QWidget::leaveEvent(e);
 
     m_hover = false;
-    m_hoverEffect->setHighlighting(false);
+
+    // if(itemType() != DockItem::Window)
+        m_hoverEffect->setHighlighting(false);
+
     m_popupTipsDelayTimer->stop();
 
     // auto hide if popup is not model window
@@ -435,7 +443,7 @@ void DockItem::easeOut()
         m_scaleSmaller->stop();
 
     m_scaleSmaller->setStartValue(width());
-    m_scaleSmaller->setEndValue(0);
+    m_scaleSmaller->setEndValue(1);
     m_scaleSmaller->start();
 }
 void DockItem::hideNonModel()

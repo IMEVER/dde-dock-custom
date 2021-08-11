@@ -145,6 +145,9 @@ private:
     QAction m_keepShownAct;
     QAction m_keepHiddenAct;
     QAction m_smartHideAct;
+    QAction m_mergeNoneAct;
+    QAction m_mergeDockAct;
+    QAction m_mergeAllAct;
 
     DisplayInter *m_displayInter;
     DockItemManager *m_itemManager;

@@ -16,6 +16,7 @@ find_package(Qt5DBus REQUIRED)
 find_package(Qt5Svg REQUIRED)
 find_package(DtkWidget REQUIRED)
 find_package(DtkCMake REQUIRED)
+find_package(KF5WindowSystem REQUIRED)
 
 pkg_check_modules(XCB_EWMH REQUIRED xcb-ewmh x11)
 pkg_check_modules(DFrameworkDBus REQUIRED dframeworkdbus)
@@ -29,6 +30,7 @@ target_include_directories(${BIN_NAME} PUBLIC ${DtkWidget_INCLUDE_DIRS}
                                               ${Qt5Gui_PRIVATE_INCLUDE_DIRS}
                                               ${PROJECT_BINARY_DIR}
                                               ${DtkGUI_INCLUDE_DIRS}
+                                              ${KF5WindowSystem_INCLUDE_DIRS}
                                               ${Qt5Svg_INCLUDE_DIRS}
                                               )
 
@@ -42,6 +44,9 @@ target_link_libraries(${BIN_NAME} PRIVATE
     ${Qt5DBus_LIBRARIES}
     ${DtkGUI_LIBRARIES}
     ${Qt5Svg_LIBRARIES}
+    KF5::WindowSystem
+    xdo
+    X11
 )
 
 if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "sw_64")

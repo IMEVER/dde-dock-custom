@@ -45,6 +45,8 @@ public:
     void addDirApp(DirItem *dirItem);
     bool appIsOnDock(const QString &appDesktop) const;
     LauncherItem* getLauncherItem();
+    MergeMode getDockMergeMode();
+    void saveDockMergeMode(MergeMode mode);
 
 signals:
     void itemInserted(const int index, DockItem *item) const;
@@ -52,6 +54,7 @@ signals:
     void itemUpdated(DockItem *item) const;
     void requestWindowAutoHide(const bool autoHide) const;
     void requestRefershWindowVisible() const;
+    void mergeModeChanged(MergeMode mode);
 
 public slots:
     void reloadAppItems();

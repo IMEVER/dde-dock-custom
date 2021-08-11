@@ -91,11 +91,20 @@ enum HideState {
     Hide        = 2,
 };
 
+enum MergeMode {
+    MergeNone   = 0,
+    MergeDock   = 1,
+    MergeAll    = 2,
+};
+
+
 #define SCALE_RADIO 1.5
 
 }
 
+Q_ENUMS(Dock::DisplayMode)
 Q_DECLARE_METATYPE(Dock::DisplayMode)
 Q_DECLARE_METATYPE(Dock::Position)
+Q_DECLARE_METATYPE(Dock::MergeMode)
 
 #endif // CONSTANTS_H

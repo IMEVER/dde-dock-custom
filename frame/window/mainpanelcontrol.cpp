@@ -39,15 +39,19 @@
 #include <DGuiApplicationHelper>
 #include <DWindowManagerHelper>
 
+#define SPLITER_SIZE 2
+
 DWIDGET_USE_NAMESPACE
 
 MainPanelControl::MainPanelControl(QWidget *parent) : QWidget(parent)
     , m_mainPanelLayout(new QBoxLayout(QBoxLayout::LeftToRight, this))
     , m_fixedAreaWidget(new QWidget(this))
     , m_appAreaWidget(new QWidget(this))
-    , m_splitter(new QLabel(this))
     , m_fixedAreaLayout(new QBoxLayout(QBoxLayout::LeftToRight))
     , m_appAreaLayout(new QBoxLayout(QBoxLayout::LeftToRight))
+    , m_windowAreaWidget(new QWidget(this))
+    , m_windowAreaLayout(new QBoxLayout(QBoxLayout::LeftToRight))
+    , m_splitter(new QLabel(this))
     , m_position(Position::Bottom)
     , m_placeholderItem(nullptr)
     , m_appDragWidget(nullptr)
@@ -57,6 +61,7 @@ MainPanelControl::MainPanelControl(QWidget *parent) : QWidget(parent)
     setAcceptDrops(true);
     setMouseTracking(true);
 
+    m_splitter->setFixedSize(0, 0);
     m_appAreaWidget->installEventFilter(this);
 }
 
@@ -72,11 +77,12 @@ void MainPanelControl::init()
     m_mainPanelLayout->addStretch(1);
     m_mainPanelLayout->addWidget(m_fixedAreaWidget);
     m_mainPanelLayout->addWidget(m_appAreaWidget);
+    m_mainPanelLayout->addWidget(m_splitter);
+    m_mainPanelLayout->addWidget(m_windowAreaWidget);
     m_mainPanelLayout->addStretch(1);
 
     m_mainPanelLayout->setMargin(0);
     m_mainPanelLayout->setContentsMargins(0, 0, 0, 0);
-    m_mainPanelLayout->setSpacing(MODE_PADDING);
 
     // 固定区域
     m_fixedAreaWidget->setLayout(m_fixedAreaLayout);
@@ -90,6 +96,15 @@ void MainPanelControl::init()
     m_appAreaLayout->setContentsMargins(0, 0, 0, 0);
     m_appAreaLayout->setSpacing(MODE_PADDING);
     m_appAreaLayout->setAlignment(Qt::AlignCenter);
+
+
+    m_windowAreaWidget->setLayout(m_windowAreaLayout);
+    m_windowAreaLayout->setMargin(0);
+    m_windowAreaLayout->setContentsMargins(0, 0, 0, 0);
+    m_windowAreaLayout->setSpacing(MODE_PADDING);
+    m_windowAreaLayout->setAlignment(Qt::AlignCenter);
+
+    m_mainPanelLayout->setAlignment(m_splitter, Qt::AlignCenter);
 }
 
 void MainPanelControl::updateMainPanelLayout()
@@ -102,6 +117,9 @@ void MainPanelControl::updateMainPanelLayout()
             m_mainPanelLayout->setDirection(QBoxLayout::LeftToRight);
             m_fixedAreaLayout->setDirection(QBoxLayout::LeftToRight);
             m_appAreaLayout->setDirection(QBoxLayout::LeftToRight);
+            m_windowAreaWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+            m_windowAreaLayout->setDirection(QBoxLayout::LeftToRight);
+
             break;
         case Position::Right:
         case Position::Left:
@@ -110,6 +128,8 @@ void MainPanelControl::updateMainPanelLayout()
             m_mainPanelLayout->setDirection(QBoxLayout::TopToBottom);
             m_fixedAreaLayout->setDirection(QBoxLayout::TopToBottom);
             m_appAreaLayout->setDirection(QBoxLayout::TopToBottom);
+            m_windowAreaWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+            m_windowAreaLayout->setDirection(QBoxLayout::TopToBottom);
             break;
     }
     resizeDockIcon();
@@ -128,6 +148,16 @@ void MainPanelControl::addAppAreaItem(int index, QWidget *wdg)
 }
 
 void MainPanelControl::removeAppAreaItem(QWidget *wdg)
+{
+    m_appAreaLayout->removeWidget(wdg);
+}
+
+void MainPanelControl::addWindowAreaItem(int index, QWidget *wdg)
+{
+    m_windowAreaLayout->insertWidget(index, wdg, 0, Qt::AlignCenter);
+}
+
+void MainPanelControl::removeWindowAreaItem(QWidget *wdg)
 {
     m_appAreaLayout->removeWidget(wdg);
 }
@@ -152,8 +182,11 @@ void MainPanelControl::setPositonValue(Dock::Position position)
 void MainPanelControl::insertItem(int index, DockItem *item)
 {
     item->installEventFilter(this);
-    item->setFixedSize(QSize(5, 5));
-    item->easeIn();
+    // if(item->itemType() != DockItem::Window)
+    // {
+        item->setFixedSize(QSize(5, 5));
+        item->easeIn();
+    // }
 
     switch (item->itemType()) {
         case DockItem::Launcher:
@@ -164,6 +197,9 @@ void MainPanelControl::insertItem(int index, DockItem *item)
         case DockItem::DirApp:
             addAppAreaItem(index, item);
             break;
+        case DockItem::Window:
+            addWindowAreaItem(index, item);
+            break;
         default:
             break;
     }
@@ -173,18 +209,21 @@ void MainPanelControl::removeItem(DockItem *item)
 {
     item->removeEventFilter(this);
     item->easeOut();
+    QTimer::singleShot(310, [ this, item ]{
 
-    switch (item->itemType()) {
-        case DockItem::App:
-        case DockItem::Placeholder:
-        case DockItem::DirApp:
-            QTimer::singleShot(310, [ this, item ]{
-                removeAppAreaItem(item);
-            });
-            break;
-        default:
-            break;
-    }
+        switch (item->itemType()) {
+            case DockItem::App:
+            case DockItem::Placeholder:
+            case DockItem::DirApp:
+                    removeAppAreaItem(item);
+                break;
+            case DockItem::Window:
+                removeWindowAreaItem(item);
+                break;
+            default:
+                break;
+        }
+    });
 }
 
 void MainPanelControl::moveItem(DockItem *sourceItem, DockItem *targetItem)
@@ -751,6 +790,30 @@ void MainPanelControl::handleDragDrop(DockItem *sourceItem, QPoint point)
         emit itemCountChanged();
 }
 
+void MainPanelControl::paintEvent(QPaintEvent *e)
+{
+    Q_UNUSED(e)
+    if(m_windowAreaLayout->count() > 0)
+    {
+        QPainter painter(this);
+        QColor color;
+        if (DGuiApplicationHelper::instance()->themeType() == DGuiApplicationHelper::LightType)
+        {
+            color = Qt::black;
+            painter.setOpacity(0.5);
+        } else {
+            color = Qt::white;
+            painter.setOpacity(0.1);
+        }
+        m_splitter->show();
+        painter.fillRect(m_splitter->geometry(), color);
+    }
+    else
+    {
+        m_splitter->hide();
+    }
+}
+
 void MainPanelControl::itemUpdated(DockItem *item)
 {
     item->parentWidget()->adjustSize();
@@ -759,12 +822,22 @@ void MainPanelControl::itemUpdated(DockItem *item)
 void MainPanelControl::resizeDockIcon()
 {
     int size = DockSettings::Instance().itemSize();
+
+    if (m_position == Dock::Position::Top || m_position == Dock::Position::Bottom) {
+        m_splitter->setFixedSize(SPLITER_SIZE, int(size * 0.6));
+    } else {
+        m_splitter->setFixedSize(int(size * 0.6), SPLITER_SIZE);
+    }
+
     QSize s(size, size);
     if(m_fixedAreaLayout->count() > 0)
     {
         m_fixedAreaLayout->itemAt(0)->widget()->setFixedSize(s);
     }
-    for (int i = 0; i < m_appAreaLayout->count(); ++ i) {
+
+    for (int i = 0; i < m_appAreaLayout->count(); ++ i)
         m_appAreaLayout->itemAt(i)->widget()->setFixedSize(s);
-    }
+
+    for(int i(0); i < m_windowAreaLayout->count(); ++i)
+        m_windowAreaLayout->itemAt(i)->widget()->setFixedSize(s);
 }
