@@ -23,7 +23,11 @@ class WindowItem : public DockItem
         void paintEvent(QPaintEvent *e) override;
         void mouseReleaseEvent(QMouseEvent *e) override;
         void resizeEvent(QResizeEvent *e) override;
+        void enterEvent(QEvent *e) override;
         void leaveEvent(QEvent *e) override;
+        void dragEnterEvent(QDragEnterEvent *e) override;
+        void dragMoveEvent(QDragMoveEvent *e) override;
+        void dropEvent(QDropEvent *e) override;
 
     private:
         void showPreview();

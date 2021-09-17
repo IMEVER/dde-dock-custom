@@ -76,7 +76,7 @@ private:
     void resizeDockIcon();
 public slots:
     void insertItem(const int index, DockItem *item);
-    void removeItem(DockItem *item);
+    void removeItem(DockItem *item, bool animation = true);
     void itemUpdated(DockItem *item);
 
 private:

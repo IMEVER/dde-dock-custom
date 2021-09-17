@@ -47,10 +47,18 @@ public:
     LauncherItem* getLauncherItem();
     MergeMode getDockMergeMode();
     void saveDockMergeMode(MergeMode mode);
+    bool isEnableHoverScaleAnimation();
+    bool isEnableInOutAnimation();
+    bool isEnableDragAnimation();
+    bool isEnableHoverHighlight();
+    void setHoverScaleAnimation(bool enable);
+    void setInOutAnimation(bool enable);
+    void setDragAnimation(bool enable);
+    void setHoverHighlight(bool enable);
 
 signals:
     void itemInserted(const int index, DockItem *item) const;
-    void itemRemoved(DockItem *item) const;
+    void itemRemoved(DockItem *item, bool animation = true) const;
     void itemUpdated(DockItem *item) const;
     void requestWindowAutoHide(const bool autoHide) const;
     void requestRefershWindowVisible() const;
@@ -67,7 +75,7 @@ private:
     explicit DockItemManager(QObject *parent = nullptr);
     void appItemAdded(const QDBusObjectPath &path, const int index);
     void appItemRemoved(const QString &appId);
-    void appItemRemoved(AppItem *appItem);
+    void appItemRemoved(AppItem *appItem, bool animation = true);
     void loadDirAppData();
 
 private:

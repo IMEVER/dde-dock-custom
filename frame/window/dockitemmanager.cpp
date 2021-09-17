@@ -38,7 +38,7 @@ DockItemManager::DockItemManager(QObject *parent)
     // 应用信号
     connect(m_appInter, &DBusDock::EntryAdded, this, &DockItemManager::appItemAdded);
     connect(m_appInter, &DBusDock::EntryRemoved, this, static_cast<void (DockItemManager::*)(const QString &)>(&DockItemManager::appItemRemoved), Qt::QueuedConnection);
-    connect(m_appInter, &DBusDock::ServiceRestarted, this, &DockItemManager::reloadAppItems);
+    connect(m_appInter, &DBusDock::ServiceRestarted, this, [ this ] { QTimer::singleShot(500, [ this ] { reloadAppItems(); }); });
 
     // 刷新图标
     QMetaObject::invokeMethod(this, "refershItemsIcon", Qt::QueuedConnection);
@@ -74,6 +74,46 @@ void DockItemManager::saveDockMergeMode(MergeMode mode)
         m_qsettings->sync();
         emit mergeModeChanged(mode);
     }
+}
+
+bool DockItemManager::isEnableHoverScaleAnimation()
+{
+    return m_qsettings->value("animation/hover", true).toBool();
+}
+
+bool DockItemManager::isEnableInOutAnimation()
+{
+    return m_qsettings->value("animation/inout", true).toBool();
+}
+
+bool DockItemManager::isEnableDragAnimation()
+{
+    return m_qsettings->value("animation/drag", true).toBool();
+}
+
+bool DockItemManager::isEnableHoverHighlight()
+{
+    return m_qsettings->value("animation/highlight", true).toBool();
+}
+
+void DockItemManager::setHoverScaleAnimation(bool enable)
+{
+    m_qsettings->setValue("animation/hover", enable);
+}
+
+void DockItemManager::setInOutAnimation(bool enable)
+{
+    m_qsettings->setValue("animation/inout", enable);
+}
+
+void DockItemManager::setDragAnimation(bool enable)
+{
+    m_qsettings->setValue("animation/drag", enable);
+}
+
+void DockItemManager::setHoverHighlight(bool enable)
+{
+    m_qsettings->setValue("animation/highlight", enable);
 }
 
 const QList<QPointer<DockItem>> DockItemManager::itemList()
@@ -131,8 +171,6 @@ void DockItemManager::itemAdded(const QString &appDesktop, int idx)
 
 void DockItemManager::appItemAdded(const QDBusObjectPath &path, const int index)
 {
-    int insertIndex = index != -1 ? index : m_itemList.count();
-
     AppItem *item = new AppItem(path);
 
     connect(item, &DockItem::requestRefreshWindowVisible, this, &DockItemManager::requestRefershWindowVisible, Qt::UniqueConnection);
@@ -143,26 +181,27 @@ void DockItemManager::appItemAdded(const QDBusObjectPath &path, const int index)
     connect(item, &AppItem::requestCancelPreview, m_appInter, &DBusDock::CancelPreviewWindow);
 
     connect(item, &AppItem::windowItemInserted, [this](WindowItem *item){ emit itemInserted(-1, item); });
-    connect(item, &AppItem::windowItemRemoved, [this](WindowItem *item){ emit itemRemoved(item); });
+    connect(item, &AppItem::windowItemRemoved, [this](WindowItem *item, bool animation){ emit itemRemoved(item, animation); });
 
-    item->fetchWindowInfos();
 
-    m_itemList.insert(insertIndex, item);
+    m_itemList.insert(index != -1 ? index : m_itemList.count(), item);
 
     for(auto dirItem : m_dirList)
     {
         if(dirItem->hasId(item->getDesktopFile()))
         {
             dirItem->addItem(item);
+            item->fetchWindowInfos();
 
-            if(index == -1 && dirItem->getIndex() == insertIndex)
-                emit itemInserted(insertIndex, dirItem);
+            if(index == -1 && dirItem->currentCount() == 1)
+                emit itemInserted(-1, dirItem);
 
             return;
         }
     }
 
-    emit itemInserted(insertIndex, item);
+    item->fetchWindowInfos();
+    emit itemInserted(index, item);
 }
 
 void DockItemManager::appItemRemoved(const QString &appId)
@@ -182,12 +221,21 @@ void DockItemManager::appItemRemoved(const QString &appId)
     }
 }
 
-void DockItemManager::appItemRemoved(AppItem *appItem)
+void DockItemManager::appItemRemoved(AppItem *appItem, bool animation)
 {
     m_itemList.removeOne(appItem);
 
-    emit itemRemoved(appItem);
-    QTimer::singleShot(500, [ appItem ] { appItem->deleteLater(); });;
+    if(appItem->getPlace() == DockItem::DirPlace)
+    {
+        appItem->getDirItem()->removeItem(appItem, false);
+    }
+    else
+    {
+        emit itemRemoved(appItem, animation);
+    }
+
+    appItem->removeWindowItem(animation);
+    QTimer::singleShot(animation ? 500 : 10, [ appItem ] { appItem->deleteLater(); });
 }
 
 void DockItemManager::reloadAppItems()
@@ -195,22 +243,24 @@ void DockItemManager::reloadAppItems()
     if(first)
     {
         emit itemInserted(0, launcherItem);
+        first = false;
+
     }
     else
     {
         while (!m_itemList.isEmpty())
-            appItemRemoved(qobject_cast<AppItem *>(m_itemList.first().data()));
+            appItemRemoved(qobject_cast<AppItem *>(m_itemList.first().data()), false);
+        m_itemList.clear();
 
         for(auto item : m_dirList)
         {
-            emit itemRemoved(item);
-            QTimer::singleShot(500, [ item] { item->deleteLater(); });
+            emit itemRemoved(item, false);
+            QTimer::singleShot(10, [ item ] { item->deleteLater(); });
         }
         m_dirList.clear();
     }
 
     loadDirAppData();
-
     QList<QDBusObjectPath> list = m_appInter->entries();
     for (auto path : list)
         appItemAdded(path, -1);
@@ -233,7 +283,7 @@ void DockItemManager::loadDirAppData()
     {
         DirItem *item = new DirItem(m_qsettings->value(QString("dir_%1/title").arg(count), "").toString());
         item->setIndex(m_qsettings->value(QString("dir_%1/index").arg(count), -1).toInt());
-        item->setIds(m_qsettings->value(QString("dir_%1/ids").arg(count), QStringList()).value<QStringList>());
+        item->setIds(m_qsettings->value(QString("dir_%1/ids").arg(count), QStringList()).value<QStringList>().toSet());
 
         m_dirList.append(item);
 
@@ -246,9 +296,8 @@ void DockItemManager::loadDirAppData()
 
 void DockItemManager::updateDirApp()
 {
-    m_qsettings->setFallbacksEnabled(false);
-    m_qsettings->clear();
-    int index = 0;
+    m_qsettings->setFallbacksEnabled(true);
+    int index = 0, originCount = m_qsettings->value("count", 0).toInt();
     for(auto itemDir : m_dirList)
     {
         QSet<QString> ids;
@@ -262,7 +311,11 @@ void DockItemManager::updateDirApp()
         m_qsettings->setValue(QString("dir_%1/title").arg(index), itemDir->getTitle());
         m_qsettings->setValue(QString("dir_%1/index").arg(index), itemDir->getIndex());
         m_qsettings->setValue(QString("dir_%1/ids").arg(index), QStringList(ids.values()));
+    }
 
+    while(index < originCount)
+    {
+        m_qsettings->remove(QString("dir_%1").arg(originCount--));
     }
 
     m_qsettings->setValue("count", index);

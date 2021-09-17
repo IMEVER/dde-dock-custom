@@ -21,6 +21,7 @@
 
 #include "dockitem.h"
 #include "../util/docksettings.h"
+#include "../window/dockitemmanager.h"
 
 #include <QMouseEvent>
 #include <QJsonObject>
@@ -74,20 +75,20 @@ DockItem::DockItem(QWidget *parent)
         int size = value.toInt();
         setFixedSize(size, size);
     });
-    connect(m_scaleLarger, &QVariantAnimation::finished, this, [this](){
+    // connect(m_scaleLarger, &QVariantAnimation::finished, this, [this](){
         // int size = DockSettings::Instance().dockWindowSize();
         // setFixedSize(QSize(size, size));
-    });
+    // });
 
     m_scaleSmaller->setDuration(300);
     m_scaleSmaller->setEasingCurve(QEasingCurve::Linear);
     connect(m_scaleSmaller, &QVariantAnimation::valueChanged, this, [this](const QVariant &value){
         setFixedSize(value.toInt(), value.toInt());
     });
-    connect(m_scaleSmaller, &QVariantAnimation::finished, this, [this](){
+    // connect(m_scaleSmaller, &QVariantAnimation::finished, this, [this](){
         // int size = DockSettings::Instance().itemSize();
         // setFixedSize(QSize(size, size));
-    });
+    // });
 
     setFixedSize(20, 20);
 }
@@ -170,12 +171,12 @@ void DockItem::enterEvent(QEvent *e)
 
     m_hover = true;
 
-    // if(itemType() != DockItem::Window)
+    if(DockItemManager::instance()->isEnableHoverHighlight())
         m_hoverEffect->setHighlighting(true);
 
     m_popupTipsDelayTimer->start();
 
-    if(getPlace() == DockPlace)
+    if(getPlace() == DockPlace && DockItemManager::instance()->isEnableHoverScaleAnimation())
     {
         if (m_scaleSmaller->state() == QVariantAnimation::Running)
         {
@@ -200,16 +201,15 @@ void DockItem::leaveEvent(QEvent *e)
 
     m_hover = false;
 
-    // if(itemType() != DockItem::Window)
+    if(DockItemManager::instance()->isEnableHoverHighlight())
         m_hoverEffect->setHighlighting(false);
 
     m_popupTipsDelayTimer->stop();
 
     // auto hide if popup is not model window
-    if (m_popupShown && !PopupWindow->model())
-        hidePopup();
+    hideNonModel();
 
-    if(getPlace() == DockPlace)
+    if(getPlace() == DockPlace && DockItemManager::instance()->isEnableHoverScaleAnimation())
     {
         if (m_scaleLarger->state() == QVariantAnimation::Running)
         {
@@ -265,10 +265,11 @@ void DockItem::showContextMenu()
         m_contextMenu.addAction(action);
     }
 
-    hidePopup();
+
+    // hideNonModel();
     emit requestWindowAutoHide(false);
 
-    m_contextMenu.popup(QCursor::pos());
+    m_contextMenu.exec(QCursor::pos());
 
     onContextMenuAccepted();
 }
@@ -281,7 +282,7 @@ void DockItem::menuActionClicked(QAction *action)
 void DockItem::onContextMenuAccepted()
 {
     emit requestRefreshWindowVisible();
-    if(getPlace() == DockPlace)
+    // if(getPlace() == DockPlace)
         emit requestWindowAutoHide(true);
 }
 
@@ -430,7 +431,7 @@ void DockItem::easeIn()
     if(m_scaleSmaller->state() == QVariantAnimation::Running)
         m_scaleSmaller->stop();
 
-    m_scaleLarger->setStartValue(5);
+    m_scaleLarger->setStartValue(0);
     m_scaleLarger->setEndValue(DockSettings::Instance().itemSize());
     m_scaleLarger->start();
 }

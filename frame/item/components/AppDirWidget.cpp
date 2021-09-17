@@ -37,10 +37,10 @@ AppDirWidget::AppDirWidget(QString title, QWidget *parent) : QWidget(parent)
 
     setLayout(vbox);
 
-    setFixedWidth(360);
+    // setFixedWidth(360);
     setMinimumHeight(120);
     setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
-    setContentsMargins(10, 5, 10, 5);
+    vbox->setContentsMargins(10, 5, 10, 5);
     hide();
 
     m_mouseLeaveTimer->setSingleShot(true);
@@ -69,7 +69,14 @@ void AppDirWidget::addAppItem(AppItem *item)
 
     connect(item, &AppItem::enterPreviewWindow, [ this ]{ m_mouseLeaveTimer->stop(); });
     connect(item, &AppItem::leavePreviewWindow, [ this ]{ checkMouseLeave(); });
-    update();
+    connect(item, &DockItem::requestWindowAutoHide, [ this ](bool hide) {
+        if(!hide) {
+            QTimer::singleShot(50, [ this ] { m_mouseLeaveTimer->stop(); });
+        } else {
+            m_mouseLeaveTimer->start();
+        }
+    });
+    m_Layout->update();
 }
 
 void AppDirWidget::removeAppItem(AppItem *item)
@@ -79,7 +86,8 @@ void AppDirWidget::removeAppItem(AppItem *item)
 
     disconnect(item, &AppItem::enterPreviewWindow, 0, 0);
     disconnect(item, &AppItem::leavePreviewWindow, 0, 0);
-    update();
+    disconnect(item, &DockItem::requestWindowAutoHide, 0, 0);
+    m_Layout->update();
 }
 
 void AppDirWidget::prepareHide()

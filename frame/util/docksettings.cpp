@@ -44,15 +44,6 @@ DockSettings::DockSettings(QWidget *parent)
     , m_dockWindowSize(32)
     , m_autoHide(true)
     , m_opacity(0.4)
-    , m_bottomPosAct("下", this)
-    , m_leftPosAct("左", this)
-    , m_rightPosAct("右", this)
-    , m_keepShownAct("一直显示", this)
-    , m_keepHiddenAct("一直隐藏", this)
-    , m_smartHideAct("智能隐藏", this)
-    , m_mergeNoneAct("从不合并", this)
-    , m_mergeDockAct("合并Dock", this)
-    , m_mergeAllAct("合并所有", this)
     , m_displayInter(new DisplayInter("com.deepin.daemon.Display", "/com/deepin/daemon/Display", QDBusConnection::sessionBus(), this))
     , m_itemManager(DockItemManager::instance(this))
     , m_isMouseMoveCause(false)
@@ -72,43 +63,6 @@ DockSettings::DockSettings(QWidget *parent)
     DockItem::setDockPosition(m_position);
     qApp->setProperty(PROP_POSITION, QVariant::fromValue(m_position));
 
-    //TODO add merge mode init
-
-    m_bottomPosAct.setCheckable(true);
-    m_leftPosAct.setCheckable(true);
-    m_rightPosAct.setCheckable(true);
-    m_keepShownAct.setCheckable(true);
-    m_keepHiddenAct.setCheckable(true);
-    m_smartHideAct.setCheckable(true);
-    m_mergeNoneAct.setCheckable(true);
-    m_mergeDockAct.setCheckable(true);
-    m_mergeAllAct.setCheckable(true);
-
-    QMenu *locationSubMenu = new QMenu(&m_settingsMenu);
-    locationSubMenu->addAction(&m_bottomPosAct);
-    locationSubMenu->addAction(&m_leftPosAct);
-    locationSubMenu->addAction(&m_rightPosAct);
-    QAction *locationSubMenuAct = new QAction("位置", this);
-    locationSubMenuAct->setMenu(locationSubMenu);
-
-    QMenu *statusSubMenu = new QMenu(&m_settingsMenu);
-    statusSubMenu->addAction(&m_keepShownAct);
-    statusSubMenu->addAction(&m_keepHiddenAct);
-    statusSubMenu->addAction(&m_smartHideAct);
-    QAction *statusSubMenuAct = new QAction("状态", this);
-    statusSubMenuAct->setMenu(statusSubMenu);
-
-    QMenu *mergeSubMenu = new QMenu("合并窗口", &m_settingsMenu);
-    mergeSubMenu->addAction(&m_mergeNoneAct);
-    mergeSubMenu->addAction(&m_mergeDockAct);
-    mergeSubMenu->addAction(&m_mergeAllAct);
-
-    m_settingsMenu.addAction(locationSubMenuAct);
-    m_settingsMenu.addAction(statusSubMenuAct);
-    m_settingsMenu.addMenu(mergeSubMenu);
-    m_settingsMenu.setTitle("设置");
-
-    connect(&m_settingsMenu, &QMenu::triggered, this, &DockSettings::menuActionClicked);
     connect(m_dockInter, &DBusDock::PositionChanged, this, &DockSettings::onPositionChanged);
     connect(m_dockInter, &DBusDock::HideModeChanged, this, &DockSettings::hideModeChanged, Qt::QueuedConnection);
     connect(m_dockInter, &DBusDock::HideStateChanged, this, &DockSettings::hideStateChanged);
@@ -128,7 +82,7 @@ DockSettings::DockSettings(QWidget *parent)
 
     DApplication *app = qobject_cast<DApplication *>(qApp);
     if (app) {
-        connect(app, &DApplication::iconThemeChanged, this, &DockSettings::gtkIconThemeChanged);
+        connect(app, &DApplication::iconThemeChanged, m_itemManager, &DockItemManager::refershItemsIcon);
     }
 
     calculateMultiScreensPos();
@@ -232,17 +186,92 @@ const QRect DockSettings::windowRect(const Position position, const bool hide)
 void DockSettings::showDockSettingsMenu()
 {
     m_autoHide = false;
-    m_bottomPosAct.setChecked(m_position == Bottom);
-    m_leftPosAct.setChecked(m_position == Left);
-    m_rightPosAct.setChecked(m_position == Right);
-    m_keepShownAct.setChecked(m_hideMode == KeepShowing);
-    m_keepHiddenAct.setChecked(m_hideMode == KeepHidden);
-    m_smartHideAct.setChecked(m_hideMode == SmartHide);
+    QMenu m_settingsMenu;
+
+    QMenu *locationSubMenu = m_settingsMenu.addMenu("位置");
+    QAction *m_bottomPosAct = locationSubMenu->addAction("下");
+    m_bottomPosAct->setCheckable(true);
+    m_bottomPosAct->setChecked(m_position == Bottom);
+    QAction *m_leftPosAct = locationSubMenu->addAction("左");
+    m_leftPosAct->setCheckable(true);
+    m_leftPosAct->setChecked(m_position == Left);
+    QAction *m_rightPosAct = locationSubMenu->addAction("右");
+    m_rightPosAct->setCheckable(true);
+    m_rightPosAct->setChecked(m_position == Right);
+
+    QMenu *statusSubMenu = m_settingsMenu.addMenu("状态");
+    QAction *m_keepShownAct = statusSubMenu->addAction("一直显示");
+    m_keepShownAct->setCheckable(true);
+    m_keepShownAct->setChecked(m_hideMode == KeepShowing);
+    QAction *m_keepHiddenAct = statusSubMenu->addAction("一直隐藏");
+    m_keepHiddenAct->setCheckable(true);
+    m_keepHiddenAct->setChecked(m_hideMode == KeepHidden);
+    QAction *m_smartHideAct = statusSubMenu->addAction("智能隐藏");
+    m_smartHideAct->setCheckable(true);
+    m_smartHideAct->setChecked(m_hideMode == SmartHide);
+
+    QMenu *animationSubMenu = m_settingsMenu.addMenu("动画");
+    QAction *m_hoverHighlightAct = animationSubMenu->addAction("悬停高亮");
+    m_hoverHighlightAct->setCheckable(true);
+    m_hoverHighlightAct->setChecked(DockItemManager::instance()->isEnableHoverHighlight());
+    QAction *m_inoutAct = animationSubMenu->addAction("淡入淡出");
+    m_inoutAct->setCheckable(true);
+    m_inoutAct->setChecked(DockItemManager::instance()->isEnableInOutAnimation());
+    QAction *m_hoverScaleAct = animationSubMenu->addAction("悬停缩放");
+    m_hoverScaleAct->setCheckable(true);
+    m_hoverScaleAct->setChecked(DockItemManager::instance()->isEnableHoverScaleAnimation());
+    QAction *m_dragAct = animationSubMenu->addAction("拖动动画");
+    m_dragAct->setCheckable(true);
+    m_dragAct->setChecked(DockItemManager::instance()->isEnableDragAnimation());
 
     MergeMode mode = m_itemManager->getDockMergeMode();
-    m_mergeNoneAct.setChecked(mode == MergeNone);
-    m_mergeDockAct.setChecked(mode == MergeDock);
-    m_mergeAllAct.setChecked(mode == MergeAll);
+    QMenu *mergeSubMenu = m_settingsMenu.addMenu("窗口");
+    QAction *m_mergeNoneAct = mergeSubMenu->addAction("从不合并");
+    m_mergeNoneAct->setCheckable(true);
+    m_mergeNoneAct->setChecked(mode == MergeNone);
+    QAction *m_mergeDockAct = mergeSubMenu->addAction("合并Dock");
+    m_mergeDockAct->setCheckable(true);
+    m_mergeDockAct->setChecked(mode == MergeDock);
+    QAction *m_mergeAllAct = mergeSubMenu->addAction("合并所有");
+    m_mergeAllAct->setCheckable(true);
+    m_mergeAllAct->setChecked(mode == MergeAll);
+
+    connect(&m_settingsMenu, &QMenu::triggered, [ = ](QAction *action){
+        if(action == m_bottomPosAct)
+            return m_dockInter->setPosition(Bottom);
+        if(action == m_leftPosAct)
+            return m_dockInter->setPosition(Left);
+        if(action == m_rightPosAct)
+            return m_dockInter->setPosition(Right);
+
+        if (action == m_keepShownAct)
+            return m_dockInter->setHideMode(KeepShowing);
+        if (action == m_keepHiddenAct)
+            return m_dockInter->setHideMode(KeepHidden);
+        if (action == m_smartHideAct)
+            return m_dockInter->setHideMode(SmartHide);
+
+        if(action == m_hoverHighlightAct)
+            return DockItemManager::instance()->setHoverHighlight(action->isChecked());
+        if(action == m_inoutAct)
+            return DockItemManager::instance()->setInOutAnimation(action->isChecked());
+        if(action == m_dragAct)
+            return DockItemManager::instance()->setDragAnimation(action->isChecked());
+        if(action == m_hoverScaleAct)
+        {
+            DockItemManager::instance()->setHoverScaleAnimation(action->isChecked());
+            return onWindowSizeChanged();
+        }
+
+        MergeMode mode = m_itemManager->getDockMergeMode();
+        if(action == m_mergeNoneAct)
+            mode = MergeNone;
+        else if(action == m_mergeAllAct)
+            mode = MergeAll;
+        else if(action == m_mergeDockAct)
+            mode = MergeDock;
+        m_itemManager->saveDockMergeMode(mode);
+    });
 
     m_settingsMenu.exec(QCursor::pos());
 
@@ -256,35 +285,6 @@ void DockSettings::setAutoHide(const bool autoHide)
 
     m_autoHide = autoHide;
     emit autoHideChanged(m_autoHide);
-}
-
-void DockSettings::menuActionClicked(QAction *action)
-{
-    Q_ASSERT(action);
-
-    calculateMultiScreensPos();
-    if (action == &m_bottomPosAct)
-        return m_dockInter->setPosition(Bottom);
-    if (action == &m_leftPosAct)
-        return m_dockInter->setPosition(Left);
-    if (action == &m_rightPosAct)
-        return m_dockInter->setPosition(Right);
-    if (action == &m_keepShownAct)
-        return m_dockInter->setHideMode(KeepShowing);
-    if (action == &m_keepHiddenAct)
-        return m_dockInter->setHideMode(KeepHidden);
-    if (action == &m_smartHideAct)
-        return m_dockInter->setHideMode(SmartHide);
-
-    MergeMode mode = m_itemManager->getDockMergeMode();
-    if(action == &m_mergeNoneAct)
-        mode = MergeNone;
-    else if(action == &m_mergeDockAct)
-        mode = MergeDock;
-    else if(action == &m_mergeAllAct)
-        mode = MergeAll;
-
-    m_itemManager->saveDockMergeMode(mode);
 }
 
 void DockSettings::onPositionChanged()
@@ -302,7 +302,7 @@ void DockSettings::onPositionChanged()
         DockItem::setDockPosition(nextPos);
         qApp->setProperty(PROP_POSITION, QVariant::fromValue(nextPos));
 
-        calculateWindowConfig();
+        setDockWindowSize();
 
         m_itemManager->refershItemsIcon();
     });
@@ -343,7 +343,7 @@ void DockSettings::primaryScreenChanged()
     }
     calculateMultiScreensPos();
     emit dataChanged();
-    calculateWindowConfig();
+    setDockWindowSize();
 
     // 主屏切换时，如果缩放比例不一样，需要刷新item的图标(bug:3176)
     m_itemManager->refershItemsIcon();
@@ -387,6 +387,19 @@ int DockSettings::itemCount()
     return count;
 }
 
+bool DockSettings::hasWindowItem()
+{
+    if(m_itemManager->getDockMergeMode() != Dock::MergeAll)
+    {
+        for(auto item : m_itemManager->itemList())
+        {
+            if(item->itemType() == DockItem::App && qobject_cast<AppItem *>(item)->windowCount() > 0)
+                return true;
+        }
+    }
+    return false;
+}
+
 int DockSettings::dockWindowSize()
 {
     return m_dockWindowSize;
@@ -397,34 +410,32 @@ int DockSettings::itemSize()
     return m_itemSize;
 }
 
-void DockSettings::calculateWindowConfig()
-{
-    setDockWindowSize(int(m_dockInter->windowSizeFashion()));
-}
-
 void DockSettings::setDockWindowSize(int size)
 {
-    m_dockWindowSize = size;
+    m_dockWindowSize = size == -1 ? m_dockInter->windowSizeFashion() : size;
     if (m_dockWindowSize > WINDOW_MAX_SIZE || m_dockWindowSize < WINDOW_MIN_SIZE) {
         m_dockWindowSize = DEFAULT_HEIGHT;
     }
     m_dockInter->setWindowSize(m_dockWindowSize);
 
     int count = itemCount(), length;
-    m_itemSize = m_dockWindowSize - 20;
+    const int splitterWidth = MODE_PADDING + (hasWindowItem() ? MODE_PADDING * 2 + 2 : 0);
+
+    m_itemSize = DockItemManager::instance()->isEnableHoverScaleAnimation() ? m_dockWindowSize * .8 : m_dockWindowSize - 2;
+
     switch (m_position) {
         case Top:
         case Bottom: {
             m_mainWindowSize.setHeight(m_dockWindowSize);
             length = primaryRect().width();
-            if (m_itemSize * count + MODE_PADDING * count > length * 0.9)
+            if ((m_itemSize + MODE_PADDING ) * count > length * 0.9)
             {
                 m_mainWindowSize.setWidth(length * 0.9);
-                m_itemSize = round(length * 0.9 / count - MODE_PADDING);
+                m_itemSize = round((length * 0.9 - splitterWidth) / count - MODE_PADDING);
             }
             else
             {
-                m_mainWindowSize.setWidth(m_itemSize * count + MODE_PADDING * (count + 4));
+                m_mainWindowSize.setWidth((m_itemSize + MODE_PADDING) * count + splitterWidth);
             }
             break;
         }
@@ -432,26 +443,20 @@ void DockSettings::setDockWindowSize(int size)
         case Right: {
             m_mainWindowSize.setWidth(m_dockWindowSize);
             length = primaryRect().height();
-            if (m_itemSize * count + MODE_PADDING * count > length * 0.9)
+            if ((m_itemSize + MODE_PADDING) * count > length * 0.9)
             {
                 m_mainWindowSize.setHeight(length * 0.9);
-                m_itemSize = round(length * 0.9 / count - MODE_PADDING);
+                m_itemSize = round((length * 0.9 - splitterWidth ) / count - MODE_PADDING);
             }
             else
             {
-                m_mainWindowSize.setHeight(m_itemSize * count + MODE_PADDING * (count + 4));
+                m_mainWindowSize.setHeight((m_itemSize + MODE_PADDING) * count + splitterWidth);
             }
 
             break;
         }
     }
     resetFrontendGeometry();
-}
-
-void DockSettings::gtkIconThemeChanged()
-{
-    qDebug() << Q_FUNC_INFO;
-    m_itemManager->refershItemsIcon();
 }
 
 qreal DockSettings::dockRatio() const
@@ -463,7 +468,7 @@ qreal DockSettings::dockRatio() const
 
 void DockSettings::onWindowSizeChanged()
 {
-    calculateWindowConfig();
+    setDockWindowSize();
     emit windowGeometryChanged();
 }
 
@@ -502,13 +507,8 @@ void DockSettings::calculateMultiScreensPos()
     }
 
     switch (m_monitors.size()) {
-    case 0:
-        break;
-    case 1: {
-        QList<Monitor*>screens = m_monitors.keys();
-        Monitor* s1 = screens.at(0);
-        s1->setDockPosition(Monitor::DockPosition(true, true, true, true));
-    }
+    case 1:
+        m_monitors.firstKey()->setDockPosition(Monitor::DockPosition(true, true, true, true));
         break;
     case 2:
         twoScreensCalPos();

@@ -25,14 +25,15 @@ public:
     QString getTitle();
     void setTitle(QString title);
 
-    void setIds(QStringList ids);
+    void setIds(QSet<QString> ids);
+    void addId(QString id);
     bool hasId(QString id);
 
     int getIndex();
     void setIndex(int index);
 
     void addItem(AppItem *appItem);
-    void removeItem(AppItem *appItem);
+    void removeItem(AppItem *appItem, bool removeId = true);
 
     void rerender(AppItem *appItem);
 
@@ -71,7 +72,7 @@ private:
     int m_index;
 
     QString m_title;
-    QList<QString> m_ids;
+    QSet<QString> m_ids;
 
     TipsWidget *m_dirTips;
     QList<AppItem *> m_appList;

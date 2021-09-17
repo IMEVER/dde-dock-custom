@@ -96,6 +96,12 @@ WindowItem::WindowItem(AppItem *appItem, WId wId, WindowInfo windowInfo, bool cl
     , m_closeable(closeable)
     , m_appPreview(nullptr)
 {
+    QTimer::singleShot(1000, [ this ] {
+        fetchSnapshot();
+        update();
+    });
+
+    update();
 }
 
 WindowItem::~WindowItem()
@@ -152,6 +158,12 @@ void WindowItem::mouseReleaseEvent(QMouseEvent *e)
 
 void WindowItem::resizeEvent(QResizeEvent *e)
 {
+    update();
+}
+
+void WindowItem::enterEvent(QEvent *e)
+{
+    DockItem::enterEvent(e);
     fetchSnapshot();
     update();
 }
@@ -163,6 +175,42 @@ void WindowItem::leaveEvent(QEvent *e)
     {
         m_appPreview->prepareHide();
     }
+}
+
+void WindowItem::dragEnterEvent(QDragEnterEvent *e)
+{
+    // ignore drag from panel
+    if (e->source()) {
+        return e->ignore();
+    }
+
+    // ignore request dock event
+    QString draggingMimeKey = e->mimeData()->formats().contains("RequestDock") ? "RequestDock" : "text/plain";
+    if (QMimeDatabase().mimeTypeForFile(e->mimeData()->data(draggingMimeKey)).name() == "application/x-desktop") {
+        return e->ignore();
+    }
+
+    e->accept();
+    hidePopup();
+}
+
+void WindowItem::dragMoveEvent(QDragMoveEvent *e)
+{
+    DockItem::dragMoveEvent(e);
+
+    if (!PopupWindow->isVisible())
+        showPreview();
+}
+
+void WindowItem::dropEvent(QDropEvent *e)
+{
+    QStringList uriList;
+    for (auto uri : e->mimeData()->urls()) {
+        uriList << uri.toEncoded();
+    }
+
+    qDebug() << "accept drop event with URIs: " << uriList;
+    m_appItem->handleDragDrop(QX11Info::getTimestamp(), uriList);
 }
 
 void WindowItem::showHoverTips()
@@ -186,9 +234,9 @@ void WindowItem::showPreview()
     connect(m_appPreview, &PreviewContainer::requestCheckWindows, m_appItem, &AppItem::check);
     connect(m_appPreview, &PreviewContainer::requestHidePopup, this, &AppItem::hidePopup);
 
-    connect(m_appPreview, &PreviewContainer::requestActivateWindow, [ = ]() { m_appPreview = nullptr; });
-    connect(m_appPreview, &PreviewContainer::requestCancelPreviewWindow, [ = ]() { m_appPreview = nullptr; });
-    connect(m_appPreview, &PreviewContainer::requestHidePopup, [ = ]() { m_appPreview = nullptr; });
+    connect(m_appPreview, &PreviewContainer::requestActivateWindow, [ = ] { m_appPreview = nullptr; });
+    connect(m_appPreview, &PreviewContainer::requestCancelPreviewWindow, [ = ] { m_appPreview = nullptr; });
+    connect(m_appPreview, &PreviewContainer::requestHidePopup, [ = ] { m_appPreview = nullptr; });
 
     showPopupWindow(m_appPreview, true);
 }

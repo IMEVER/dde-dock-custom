@@ -63,9 +63,14 @@ void DirItem::setTitle(QString title)
     m_title = title;
 }
 
-void DirItem::setIds(QStringList ids)
+void DirItem::setIds(QSet<QString> ids)
 {
     m_ids = ids;
+}
+
+void DirItem::addId(QString id)
+{
+    m_ids.insert(id);
 }
 
 bool DirItem::hasId(QString id)
@@ -88,16 +93,17 @@ void DirItem::addItem(AppItem *appItem)
     appItem->setFixedSize(QSize(DockSettings::Instance().dockWindowSize(), DockSettings::Instance().dockWindowSize()));
     m_appList.append(appItem);
     m_popupGrid->addAppItem(appItem);
-    m_ids.append(appItem->getDesktopFile());
+    m_ids.insert(appItem->getDesktopFile());
     appItem->setDirItem(this);
     update();
 }
 
-void DirItem::removeItem(AppItem *appItem)
+void DirItem::removeItem(AppItem *appItem, bool removeId)
 {
     m_appList.removeOne(appItem);
     m_popupGrid->removeAppItem(appItem);
-    m_ids.removeAll(appItem->getDesktopFile());
+    if(removeId)
+        m_ids.remove(appItem->getDesktopFile());
     appItem->removeDirItem();
     update();
 }
@@ -153,13 +159,15 @@ void DirItem::paintEvent(QPaintEvent *e)
 
     QPainter painter(this);
     // painter.setPen(QPen(Qt::darkYellow, 2));
-    painter.setPen(QPen(Qt::green, 2));
-    painter.setOpacity(.7);
+    painter.setPen(QPen(Qt::darkCyan, 2));
+    // painter.setOpacity(.7);
 
     QRect border = rect();
     QRect line(border.width() * .1, border.height() * .1, border.width() * .8, border.height() * .8);
 
     painter.drawRoundedRect(line, 10, 10, Qt::AbsoluteSize);
+
+    painter.setOpacity(.9);
 
     int padding = border.width() * .1 + 5;
     int spacing = 4;
@@ -216,7 +224,7 @@ void DirItem::mouseReleaseEvent(QMouseEvent *e)
         hidePopup();
         showDirPopupWindow();
     }
-    else
+    else if(e->button() != Qt::RightButton)
     {
         hideDirpopupWindow();
     }
@@ -269,9 +277,9 @@ void DirItem::showDirPopupWindow()
 
     const QPoint p = popupMarkPoint();
     if (!popup->isVisible())
-        QMetaObject::invokeMethod(popup, "show", Qt::QueuedConnection, Q_ARG(QPoint, p), Q_ARG(bool, false));
+        QMetaObject::invokeMethod(popup, "show", Qt::QueuedConnection, Q_ARG(QPoint, p), Q_ARG(bool, true));
     else
-        popup->show(p, false);
+        popup->show(p, true);
 
     connect(popup, &DockPopupWindow::accept, this, &DirItem::hideDirpopupWindow, Qt::UniqueConnection);
 }

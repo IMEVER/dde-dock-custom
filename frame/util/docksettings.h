@@ -65,8 +65,7 @@ public:
     inline const QRect frontendWindowRect() const { return m_frontendRect; }
     inline const QSize windowSize() const { return m_mainWindowSize; }
     inline const quint8 Opacity() const { return m_opacity * 255; }
-    void setDockWindowSize(int size);
-    void calculateWindowConfig();
+    void setDockWindowSize(int size = -1);
     int itemCount();
     int itemSize();
     int dockWindowSize();
@@ -96,7 +95,6 @@ public slots:
     void onWindowSizeChanged();
 
 private slots:
-    void menuActionClicked(QAction *action);
     void onPositionChanged();
     void hideModeChanged();
     void hideStateChanged();
@@ -110,7 +108,6 @@ private:
     DockSettings(DockSettings const &) = delete;
     DockSettings operator =(DockSettings const &) = delete;
 
-    void gtkIconThemeChanged();
     void checkService();
 
     void calculateMultiScreensPos();
@@ -120,6 +117,7 @@ private:
     void treeScreensCalPos();
     void combination(QList<Monitor*> &screens);
     void calculateRelativePos(Monitor *s1, Monitor *s2);
+    bool hasWindowItem();
 
 private:
     int m_dockWindowSize;
@@ -137,17 +135,6 @@ private:
     QRect m_frontendRect;
     QSize m_mainWindowSize;
     int m_itemSize;
-
-    QMenu m_settingsMenu;
-    QAction m_bottomPosAct;
-    QAction m_leftPosAct;
-    QAction m_rightPosAct;
-    QAction m_keepShownAct;
-    QAction m_keepHiddenAct;
-    QAction m_smartHideAct;
-    QAction m_mergeNoneAct;
-    QAction m_mergeDockAct;
-    QAction m_mergeAllAct;
 
     DisplayInter *m_displayInter;
     DockItemManager *m_itemManager;

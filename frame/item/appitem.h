@@ -63,7 +63,9 @@ public:
     void removeDirItem();
     void check();
     void fetchWindowInfos();
+    void removeWindowItem(bool animation = true);
     int windowCount() { return m_windowMap.size(); }
+    void handleDragDrop(uint timestamp, const QStringList &uris);
 
 signals:
     void requestActivateWindow(const WId wid) const;
@@ -75,7 +77,7 @@ signals:
     void leavePreviewWindow() const;
 
     void windowItemInserted(WindowItem *);
-    void windowItemRemoved(WindowItem *);
+    void windowItemRemoved(WindowItem *, bool animation = true);
 
 private:
     void moveEvent(QMoveEvent *e) override;

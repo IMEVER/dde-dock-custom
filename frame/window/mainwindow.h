@@ -74,7 +74,6 @@ private:
 
     void initComponents();
     void initConnections();
-    void resizeMainWindow();
     void resizeMainPanelWindow();
 
     void onRegionMonitorChanged(int x, int y, const QString &key);
@@ -110,7 +109,6 @@ private:
     DWindowManagerHelper *m_wmHelper;
     XEventMonitor *m_eventInter;
     QString m_registerKey;
-    QStringList m_registerKeys;
 
     QTimer *m_positionUpdateTimer;
     QTimer *m_expandDelayTimer;

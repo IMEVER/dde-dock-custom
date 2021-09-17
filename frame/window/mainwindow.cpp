@@ -269,7 +269,6 @@ void MainWindow::launch()
         m_launched = true;
         qApp->processEvents();
         QWidget::move(m_settings->windowRect(m_curDockPos).topLeft());
-        qDebug()<<"Window width: " << width() << ", height: " << height();
         setVisible(true);
         updatePanelVisible();
         resetPanelEnvironment(false);
@@ -410,7 +409,7 @@ void MainWindow::initConnections()
     connect(m_settings, &DockSettings::windowHideModeChanged, [this] { resetPanelEnvironment(true); });
     connect(m_settings, &DockSettings::windowHideModeChanged, m_leaveDelayTimer, static_cast<void (QTimer::*)()>(&QTimer::start));
     connect(m_settings, &DockSettings::windowVisibleChanged, this, &MainWindow::updatePanelVisible, Qt::QueuedConnection);
-    connect(&DockSettings::Instance(), &DockSettings::opacityChanged, this, &MainWindow::setMaskAlpha);
+    connect(m_settings, &DockSettings::opacityChanged, this, &MainWindow::setMaskAlpha);
 
     connect(m_positionUpdateTimer, &QTimer::timeout, this, &MainWindow::updateGeometry, Qt::QueuedConnection);
     connect(m_expandDelayTimer, &QTimer::timeout, this, &MainWindow::expand, Qt::QueuedConnection);
@@ -430,11 +429,11 @@ void MainWindow::initConnections()
     connect(DockItemManager::instance(), &DockItemManager::requestWindowAutoHide, m_settings, &DockSettings::setAutoHide);
 
     connect(m_mainPanel, &MainPanelControl::itemAdded, this, [this](const QString &appDesktop, int idx){
-        m_settings->calculateWindowConfig();
+        m_settings->setDockWindowSize();
     }, Qt::DirectConnection);
 
     connect(m_mainPanel, &MainPanelControl::itemMoved, this, [this](DockItem *sourceItem, DockItem *targetItem){
-        m_settings->calculateWindowConfig();
+        m_settings->setDockWindowSize();
     }, Qt::DirectConnection);
 
     connect(m_mainPanel, &MainPanelControl::itemMoved, DockItemManager::instance(), &DockItemManager::itemMoved, Qt::DirectConnection);
@@ -750,19 +749,8 @@ void MainWindow::adjustShadowMask()
 void MainWindow::setEffectEnabled(const bool enabled)
 {
     setMaskColor(AutoColor);
-    setMaskAlpha(DockSettings::Instance().Opacity());
+    setMaskAlpha(m_settings->Opacity());
     m_platformWindowHandle.setBorderWidth(enabled ? 1 : 0);
-}
-
-void MainWindow::resizeMainWindow()
-{
-    const Position position = m_curDockPos;
-    QSize size = m_settings->windowSize();
-    const QRect windowRect = m_settings->windowRect(position, false);
-    internalMove(windowRect.topLeft());
-    resizeMainPanelWindow();
-    QWidget::setFixedSize(size);
-
 }
 
 void MainWindow::resizeMainPanelWindow()
@@ -798,8 +786,11 @@ void MainWindow::onMainWindowSizeChanged(QPoint offset)
     }
 
     m_settings->setDockWindowSize(newWidth);
-    resizeMainWindow();
-    // m_settings->onWindowSizeChanged();
+
+    const QRect windowRect = m_settings->windowRect(m_curDockPos, false);
+    internalMove(windowRect.topLeft());
+    resizeMainPanelWindow();
+    QWidget::setFixedSize(m_settings->windowSize());
 }
 
 void MainWindow::onDragFinished()
@@ -886,7 +877,6 @@ void MainWindow::updateRegionMonitorWatch()
     }
     break;
     }
-    // qDebug()<<QString("Monitor: (%1, %2, %3, %4)").arg(x).arg(y).arg(w).arg(h);
     m_registerKey = m_eventInter->RegisterArea(x * scale, y * scale, w * scale, h * scale, flags);
 }
 

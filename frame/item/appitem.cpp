@@ -96,8 +96,6 @@ AppItem::AppItem(const QDBusObjectPath &entry, QWidget *parent)
 AppItem::~AppItem()
 {
     stopSwingEffect();
-
-    m_appNameTips->deleteLater();
 }
 
 const QString AppItem::appId() const
@@ -257,19 +255,24 @@ void AppItem::mouseReleaseEvent(QMouseEvent *e)
     if (e->button() == Qt::MiddleButton) {
         m_itemEntryInter->NewInstance(QX11Info::getTimestamp());
 
+        if(m_place == DockItem::DirPlace)
+            m_dirItem->hideDirpopupWindow();
+        else if (m_windowInfos.isEmpty())
         // play launch effect
-        if (m_windowInfos.isEmpty())
             playSwingEffect();
 
     } else if (e->button() == Qt::LeftButton) {
         m_itemEntryInter->Activate(QX11Info::getTimestamp());
 
+        if(m_place == DockItem::DirPlace)
+            m_dirItem->hideDirpopupWindow();
+        else if (m_windowInfos.isEmpty())
         // play launch effect
-        if (m_windowInfos.isEmpty())
             playSwingEffect();
     }
 
-    hidePopup();
+    // if(e->button() != Qt::RightButton)
+        // hidePopup();
 }
 
 void AppItem::mousePressEvent(QMouseEvent *e)
@@ -479,16 +482,7 @@ void AppItem::mergeModeChanged(MergeMode mode)
 {
     if(mode == MergeAll || (mode == MergeDock && m_place == DockPlace))
     {
-        while( !m_windowMap.isEmpty() )
-        {
-            WindowItem *windowItem = m_windowMap.take(m_windowMap.firstKey());
-
-            emit windowItemRemoved(windowItem);
-            QTimer::singleShot(500, [ windowItem ]{
-                //Just wait for ease out animation complete
-                windowItem->deleteLater();
-            });
-        }
+        removeWindowItem();
     }
     else if(mode == MergeNone || (mode == MergeDock && m_place == DirPlace))
     {
@@ -502,6 +496,20 @@ void AppItem::mergeModeChanged(MergeMode mode)
                 windowItem->fetchSnapshot();
             }
         }
+    }
+}
+
+void AppItem::removeWindowItem(bool animation)
+{
+    while( !m_windowMap.isEmpty() )
+    {
+        WindowItem *windowItem = m_windowMap.take(m_windowMap.firstKey());
+
+        emit windowItemRemoved(windowItem, animation);
+        QTimer::singleShot( animation ? 500 : 0, [ windowItem ]{
+            //Just wait for ease out animation complete
+            windowItem->deleteLater();
+        });
     }
 }
 
@@ -612,4 +620,9 @@ void AppItem::checkAttentionEffect()
         if (hasAttention())
             playSwingEffect();
     });
+}
+
+void AppItem::handleDragDrop(uint timestamp, const QStringList &uris)
+{
+    m_itemEntryInter->HandleDragDrop(timestamp, uris);
 }
