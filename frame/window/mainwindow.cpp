@@ -236,25 +236,32 @@ MainWindow::MainWindow(QWidget *parent) : DBlurEffectWidget(parent)
 
     });
 
-    connect(m_panelShowAni, &QVariantAnimation::finished, [ this ]() {
+    connect(m_panelShowAni, &QVariantAnimation::finished, [ this ] {
         const QRect windowRect = m_settings->windowRect(m_curDockPos, false);
         QWidget::move(windowRect.left(), windowRect.top());
         QWidget::setFixedSize(windowRect.size());
         resizeMainPanelWindow();
+
+        if(!m_registerKey.isEmpty())
+        {
+            m_eventInter->UnregisterArea(m_registerKey);
+            m_registerKey = nullptr;
+            disconnect(m_eventInter, &XEventMonitor::CursorInto, this, &MainWindow::onRegionMonitorChanged);
+        }
     });
 
-    connect(m_panelHideAni, &QVariantAnimation::finished, [ this ]() {
+    connect(m_panelHideAni, &QVariantAnimation::finished, [ this ] {
         m_mouseCauseDock = false;
         m_curDockPos = m_newDockPos;
         const QRect windowRect = m_settings->windowRect(m_curDockPos, true);
 
         QWidget::move(windowRect.left(), windowRect.top());
         QWidget::setFixedSize(windowRect.size());
-        if(m_settings->hideMode() != HideMode::KeepShowing)
-            setVisible(false);
-    });
 
-    // updateRegionMonitorWatch();
+        setVisible(false);
+        updateRegionMonitorWatch();
+        connect(m_eventInter, &XEventMonitor::CursorInto, this, &MainWindow::onRegionMonitorChanged);
+    });
 }
 
 MainWindow::~MainWindow()
@@ -265,7 +272,7 @@ MainWindow::~MainWindow()
 void MainWindow::launch()
 {
     setVisible(false);
-    QTimer::singleShot(400, this, [&] {
+    QTimer::singleShot(400, this, [ this ] {
         m_launched = true;
         qApp->processEvents();
         QWidget::move(m_settings->windowRect(m_curDockPos).topLeft());
@@ -444,7 +451,6 @@ void MainWindow::initConnections()
     connect(m_dragWidget, &DragWidget::dragPointOffset, this, &MainWindow::onMainWindowSizeChanged);
     connect(m_dragWidget, &DragWidget::dragFinished, this, &MainWindow::onDragFinished);
     connect(DGuiApplicationHelper::instance(), &DGuiApplicationHelper::themeTypeChanged, this, &MainWindow::themeTypeChanged);
-    connect(m_eventInter, &XEventMonitor::CursorMove, this, &MainWindow::onRegionMonitorChanged);
 }
 
 void MainWindow::positionChanged(const Position prevPos, const Position nextPos)
@@ -674,7 +680,6 @@ void MainWindow::resetPanelEnvironment(const bool visible, const bool resetPosit
         return;
 
     resizeMainPanelWindow();
-    updateRegionMonitorWatch();
     if (m_size != m_settings->windowSize()) {
         m_size = m_settings->windowSize();
         setStrutPartial();
@@ -684,14 +689,7 @@ void MainWindow::resetPanelEnvironment(const bool visible, const bool resetPosit
 void MainWindow::updatePanelVisible()
 {
     if (m_settings->hideMode() == KeepShowing) {
-        if (!m_registerKey.isEmpty()) {
-            m_eventInter->UnregisterArea(m_registerKey);
-        }
         return expand();
-    }
-
-    if (m_registerKey.isEmpty()) {
-        updateRegionMonitorWatch();
     }
 
     const Dock::HideState state = m_settings->hideState();
@@ -823,7 +821,7 @@ void MainWindow::themeTypeChanged(DGuiApplicationHelper::ColorType themeType)
 
 void MainWindow::onRegionMonitorChanged(int x, int y, const QString &key)
 {
-    if (m_settings->hideMode() == KeepShowing)
+    if (m_settings->hideMode() == KeepShowing || key != m_registerKey)
         return;
 
     if (!isVisible())
@@ -840,7 +838,7 @@ void MainWindow::updateRegionMonitorWatch()
         m_eventInter->UnregisterArea(m_registerKey);
     }
 
-    const int flags = Motion | Button | Key;
+    const int flags = Motion; // | Button | Key;
     bool isHide = m_settings->hideState() == Hide && !testAttribute(Qt::WA_UnderMouse);
     const QRect windowRect = m_settings->windowRect(m_curDockPos, isHide);
     const qreal scale = devicePixelRatioF();

@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
 {
     DApplication::setAttribute(Qt::AA_EnableHighDpiScaling, true);
     DGuiApplicationHelper::setUseInactiveColorGroup(false);
-    DApplication::loadDXcbPlugin();
+    // DApplication::loadDXcbPlugin();
     DApplication app(argc, argv);
 
     app.setOrganizationName("IMEVER");

@@ -96,12 +96,18 @@ WindowItem::WindowItem(AppItem *appItem, WId wId, WindowInfo windowInfo, bool cl
     , m_closeable(closeable)
     , m_appPreview(nullptr)
 {
-    QTimer::singleShot(1000, [ this ] {
-        fetchSnapshot();
-        update();
+    timer = new QTimer(this);
+    timer->setSingleShot(false);
+    timer->setInterval(10000);
+    connect(timer, &QTimer::timeout, [ this ]{
+        if(this->window()->isVisible())
+            fetchSnapshot();
     });
+    timer->start();
 
     update();
+
+    QTimer::singleShot(2000, this, &WindowItem::fetchSnapshot);
 }
 
 WindowItem::~WindowItem()
@@ -114,14 +120,15 @@ void WindowItem::paintEvent(QPaintEvent *e)
     DockItem::paintEvent(e);
     QPainter painter(this);
 
+    const QPixmap icon = m_appItem->appIcon();
+    const QRectF itemRect = rect();
+
     if(m_snapshot.isNull())
     {
         painter.setRenderHint(QPainter::Antialiasing, true);
         painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
 
-        const QPixmap icon = m_appItem->appIcon();
         const auto ratio = devicePixelRatioF();
-        const QRectF itemRect = rect();
         const QRectF iconRect = icon.rect();
         const qreal iconX = itemRect.center().x() - iconRect.center().x() / ratio;
         const qreal iconY = itemRect.center().y() - iconRect.center().y() / ratio;
@@ -129,6 +136,8 @@ void WindowItem::paintEvent(QPaintEvent *e)
         painter.drawPixmap(QPoint(iconX, iconY), icon);
         return;
     }
+
+    painter.save();
 
     const auto ratio = devicePixelRatioF();
 
@@ -144,6 +153,10 @@ void WindowItem::paintEvent(QPaintEvent *e)
     painter.scale(1 / ratio, 1 / ratio);
     painter.translate(QPoint(offset_x * ratio, offset_y * ratio));
     painter.drawRoundedRect(m_snapshotSrcRect, radius * ratio, radius * ratio);
+
+    painter.restore();
+    int smallIconSize = itemRect.width() / 3;
+    painter.drawPixmap(QPoint(itemRect.width() - smallIconSize - itemRect.width() * .1, itemRect.width() - smallIconSize - itemRect.width() * .1), icon.scaled(smallIconSize, smallIconSize));
 }
 
 void WindowItem::mouseReleaseEvent(QMouseEvent *e)
@@ -164,8 +177,9 @@ void WindowItem::resizeEvent(QResizeEvent *e)
 void WindowItem::enterEvent(QEvent *e)
 {
     DockItem::enterEvent(e);
+    timer->stop();
     fetchSnapshot();
-    update();
+    timer->start();
 }
 
 void WindowItem::leaveEvent(QEvent *e)
@@ -304,4 +318,6 @@ void WindowItem::fetchSnapshot()
     if (ximage) XDestroyImage(ximage);
     if (info) XFree(info);
     if (prop_to_return_gtk) XFree(prop_to_return_gtk);
+
+    update();
 }

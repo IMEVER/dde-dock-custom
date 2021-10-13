@@ -39,14 +39,13 @@ LauncherItem::LauncherItem(QWidget *parent)
     m_launcherInter->setSync(true, false);
 
     m_tips->setVisible(false);
-    m_tips->setObjectName("launcher");
     m_tips->setText("启动器");
 }
 
 void LauncherItem::refershIcon()
 {
     const int iconSize = qMin(width(), height());
-    m_icon = ImageUtil::getIcon("deepin-launcher", iconSize * 0.8, devicePixelRatioF());
+    m_icon = ImageUtil::getIcon("deepin-launcher", iconSize * 0.9, devicePixelRatioF());
     update();
 }
 

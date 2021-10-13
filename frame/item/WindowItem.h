@@ -41,6 +41,7 @@ class WindowItem : public DockItem
         QImage m_snapshot;
         QRectF m_snapshotSrcRect;
         PreviewContainer *m_appPreview;
+        QTimer *timer;
 };
 
 #endif

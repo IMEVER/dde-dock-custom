@@ -18,7 +18,7 @@ AppDirWidget::AppDirWidget(QString title, QWidget *parent) : QWidget(parent)
     m_TextField->setEnabled(false);
     m_TextField->clearFocus();
 
-    connect(m_TextField, &QLineEdit::editingFinished, [ this ](){
+    connect(m_TextField, &QLineEdit::editingFinished, [ this ]{
         QString title = m_TextField->text();
         if(!title.isEmpty())
         {
@@ -63,8 +63,6 @@ void AppDirWidget::addAppItem(AppItem *item)
     {
         m_row++;
         m_column = 0;
-
-        // setFixedHeight(60 * (m_row + 2));
     }
 
     connect(item, &AppItem::enterPreviewWindow, [ this ]{ m_mouseLeaveTimer->stop(); });
@@ -81,7 +79,38 @@ void AppDirWidget::addAppItem(AppItem *item)
 
 void AppDirWidget::removeAppItem(AppItem *item)
 {
-    m_Layout->removeWidget(item);
+    bool bingo = false;
+    int row=0, column=0;
+    while (row < m_row && column < 4)
+    {
+        if(bingo)
+        {
+            if(row < m_row || (row == m_row && column <= m_column))
+            {
+                m_Layout->addItem(m_Layout->itemAtPosition(row, column), column == 0 ? row - 1 : row, column == 0 ? 3 : column - 1);
+            }
+        }
+        else if(m_Layout->itemAtPosition(row, column)->widget() == item)
+        {
+            m_Layout->removeWidget(item);
+            bingo = true;
+        }
+
+        column ++;
+        if(column == 4)
+        {
+            row++;
+            column = 0;
+        }
+    }
+
+    if(bingo)
+    {
+        m_column = m_column == 0 ? 3 : m_column -1;
+        if(m_column == 3)
+            m_row--;
+    }
+
     item->removeEventFilter(this);
 
     disconnect(item, &AppItem::enterPreviewWindow, 0, 0);

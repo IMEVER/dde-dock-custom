@@ -90,6 +90,9 @@ void DirItem::setIndex(int index)
 
 void DirItem::addItem(AppItem *appItem)
 {
+    if(m_appList.contains(appItem))
+        return;
+        
     appItem->setFixedSize(QSize(DockSettings::Instance().dockWindowSize(), DockSettings::Instance().dockWindowSize()));
     m_appList.append(appItem);
     m_popupGrid->addAppItem(appItem);

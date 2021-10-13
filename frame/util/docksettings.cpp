@@ -419,7 +419,7 @@ void DockSettings::setDockWindowSize(int size)
     m_dockInter->setWindowSize(m_dockWindowSize);
 
     int count = itemCount(), length;
-    const int splitterWidth = MODE_PADDING + (hasWindowItem() ? MODE_PADDING * 2 + 2 : 0);
+    const int splitterWidth = hasWindowItem() ? MODE_PADDING * 2 + 2 : 0;
 
     m_itemSize = DockItemManager::instance()->isEnableHoverScaleAnimation() ? m_dockWindowSize * .8 : m_dockWindowSize - 2;
 
@@ -435,7 +435,7 @@ void DockSettings::setDockWindowSize(int size)
             }
             else
             {
-                m_mainWindowSize.setWidth((m_itemSize + MODE_PADDING) * count + splitterWidth);
+                m_mainWindowSize.setWidth((m_itemSize + MODE_PADDING) * count - MODE_PADDING + splitterWidth);
             }
             break;
         }
@@ -450,7 +450,7 @@ void DockSettings::setDockWindowSize(int size)
             }
             else
             {
-                m_mainWindowSize.setHeight((m_itemSize + MODE_PADDING) * count + splitterWidth);
+                m_mainWindowSize.setHeight((m_itemSize + MODE_PADDING) * count - MODE_PADDING + splitterWidth);
             }
 
             break;

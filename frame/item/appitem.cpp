@@ -234,14 +234,7 @@ void AppItem::paintEvent(QPaintEvent *e)
                 painter.drawPixmap(p, pixmap);
         }
 
-    if (m_swingEffectView != nullptr)
-        return;
-
-    // icon
-    if (m_appIcon.isNull())
-        return;
-
-    painter.drawPixmap(appIconPosition(), m_appIcon);
+    painter.drawPixmap(appIconPosition(), m_appIcon.isNull() ? QPixmap(":/icons/resources/application-x-desktop.svg") : m_appIcon);
 }
 
 void AppItem::mouseReleaseEvent(QMouseEvent *e)
@@ -255,20 +248,18 @@ void AppItem::mouseReleaseEvent(QMouseEvent *e)
     if (e->button() == Qt::MiddleButton) {
         m_itemEntryInter->NewInstance(QX11Info::getTimestamp());
 
-        if(m_place == DockItem::DirPlace)
-            m_dirItem->hideDirpopupWindow();
-        else if (m_windowInfos.isEmpty())
-        // play launch effect
+        if (m_windowInfos.isEmpty())
             playSwingEffect();
+        if(m_place == DockItem::DirPlace)
+            QTimer::singleShot(1000, [ this ] { m_dirItem->hideDirpopupWindow(); });
 
     } else if (e->button() == Qt::LeftButton) {
         m_itemEntryInter->Activate(QX11Info::getTimestamp());
 
-        if(m_place == DockItem::DirPlace)
-            m_dirItem->hideDirpopupWindow();
-        else if (m_windowInfos.isEmpty())
-        // play launch effect
+        if (m_windowInfos.isEmpty())
             playSwingEffect();
+        if(m_place == DockItem::DirPlace)
+            QTimer::singleShot(1000, [ this ] { m_dirItem->hideDirpopupWindow(); });
     }
 
     // if(e->button() != Qt::RightButton)
