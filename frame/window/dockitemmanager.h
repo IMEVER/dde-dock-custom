@@ -38,7 +38,7 @@ class DockItemManager : public QObject
     Q_OBJECT
 
 public:
-    static DockItemManager *instance(QObject *parent = nullptr);
+    static DockItemManager *instance();
 
     const QList<QPointer<DockItem> > itemList();
     const QList<QPointer<DirItem>> dirList();
@@ -55,6 +55,8 @@ public:
     void setInOutAnimation(bool enable);
     void setDragAnimation(bool enable);
     void setHoverHighlight(bool enable);
+    bool hasWindowItem();
+    int itemSize();
 
 signals:
     void itemInserted(const int index, DockItem *item) const;
@@ -63,6 +65,7 @@ signals:
     void requestWindowAutoHide(const bool autoHide) const;
     void requestRefershWindowVisible() const;
     void mergeModeChanged(MergeMode mode);
+    void itemCountChanged();
 
 public slots:
     void reloadAppItems();
@@ -72,7 +75,7 @@ public slots:
     void updateDirApp();
 
 private:
-    explicit DockItemManager(QObject *parent = nullptr);
+    explicit DockItemManager();
     void appItemAdded(const QDBusObjectPath &path, const int index);
     void appItemRemoved(const QString &appId);
     void appItemRemoved(AppItem *appItem, bool animation = true);
@@ -81,8 +84,6 @@ private:
 private:
     DBusDock *m_appInter;
     QSettings *m_qsettings;
-
-    static DockItemManager *INSTANCE;
 
     LauncherItem *launcherItem;
 

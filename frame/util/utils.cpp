@@ -19,7 +19,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "imageutil.h"
+#include "util/utils.h"
 
 #include <QIcon>
 #include <QPainter>
@@ -29,7 +29,7 @@
 #include <QImageReader>
 #include <QApplication>
 
-const QPixmap ImageUtil::loadSvg(const QString &iconName, const QString &localPath, const int size, const qreal ratio)
+const QPixmap Utils::loadSvg(const QString &iconName, const QString &localPath, const int size, const qreal ratio)
 {
     QIcon icon = QIcon::fromTheme(iconName);
     if (!icon.isNull()) {
@@ -52,7 +52,7 @@ const QPixmap ImageUtil::loadSvg(const QString &iconName, const QString &localPa
     return pixmap;
 }
 
-const QPixmap ImageUtil::loadSvg(const QString &iconName, const QSize size, const qreal ratio)
+const QPixmap Utils::loadSvg(const QString &iconName, const QSize size, const qreal ratio)
 {
     QIcon icon = QIcon::fromTheme(iconName);
     if (!icon.isNull()) {
@@ -60,9 +60,10 @@ const QPixmap ImageUtil::loadSvg(const QString &iconName, const QSize size, cons
         pixmap.setDevicePixelRatio(ratio);
         return pixmap;
     }
+    return QPixmap();
 }
 
-const QPixmap ImageUtil::lighterEffect(const QPixmap pixmap, const int delta)
+const QPixmap Utils::lighterEffect(const QPixmap pixmap, const int delta)
 {
     QImage image = pixmap.toImage();
 
@@ -92,7 +93,7 @@ const QPixmap ImageUtil::lighterEffect(const QPixmap pixmap, const int delta)
     return QPixmap::fromImage(image);
 }
 
-const QPixmap ImageUtil::getIcon(const QString iconName, const int size, const qreal ratio)
+const QPixmap Utils::getIcon(const QString iconName, const int size, const qreal ratio)
     {
         QPixmap pixmap;
         QString key;
@@ -161,7 +162,7 @@ const QPixmap ImageUtil::getIcon(const QString iconName, const int size, const q
     }
 
 
-QPixmap ImageUtil::renderSVG(const QString &path, const QSize &size, const qreal devicePixelRatio) {
+QPixmap Utils::renderSVG(const QString &path, const QSize &size, const qreal devicePixelRatio) {
         QImageReader reader;
         QPixmap pixmap;
         reader.setFileName(path);
@@ -177,7 +178,7 @@ QPixmap ImageUtil::renderSVG(const QString &path, const QSize &size, const qreal
         return pixmap;
     }
 
-QScreen * ImageUtil::screenAt(const QPoint &point) {
+QScreen * Utils::screenAt(const QPoint &point) {
         for (QScreen *screen : qApp->screens()) {
             const QRect r { screen->geometry() };
             const QRect rect { r.topLeft(), r.size() * screen->devicePixelRatio() };
@@ -189,7 +190,7 @@ QScreen * ImageUtil::screenAt(const QPoint &point) {
         return nullptr;
     }
 
-QScreen * ImageUtil::screenAtByScaled(const QPoint &point) {
+QScreen * Utils::screenAtByScaled(const QPoint &point) {
         for (QScreen *screen : qApp->screens()) {
             if (screen->geometry().contains(point)) {
                 return screen;
@@ -198,3 +199,98 @@ QScreen * ImageUtil::screenAtByScaled(const QPoint &point) {
 
         return nullptr;
     }
+
+/**
+ * @brief SettingsPtr 根据给定信息返回一个QGSettings指针
+ * @param schema_id The id of the schema
+ * @param path If non-empty, specifies the path for a relocatable schema
+ * @param parent 创建指针的付对象
+ * @return
+ */
+QGSettings *Utils::SettingsPtr(const QString &schema_id, const QByteArray &path, QObject *parent) {
+    if (QGSettings::isSchemaInstalled(schema_id.toUtf8())) {
+        QGSettings *settings = new QGSettings(schema_id.toUtf8(), path, parent);
+        return settings;
+    }
+    qDebug() << "Cannot find gsettings, schema_id:" << schema_id;
+    return nullptr;
+}
+
+/**
+ * @brief SettingsPtr 根据给定信息返回一个QGSettings指针
+ * @param module 传入QGSettings构造函数时，会添加"com.deepin.dde.dock.module."前缀
+ * @param path If non-empty, specifies the path for a relocatable schema
+ * @param parent 创建指针的付对象
+ * @return
+ */
+const QGSettings *Utils::ModuleSettingsPtr(const QString &module, const QByteArray &path, QObject *parent) {
+    return Utils::SettingsPtr("com.deepin.dde.dock.module." + module, path, parent);
+}
+
+/* convert 'some-key' to 'someKey' or 'SomeKey'.
+ * the second form is needed for appending to 'set' for 'setSomeKey'
+ */
+QString Utils::qtify_name(const char *name)
+{
+    bool next_cap = false;
+    QString result;
+
+    while (*name) {
+        if (*name == '-') {
+            next_cap = true;
+        } else if (next_cap) {
+            result.append(QChar(*name).toUpper().toLatin1());
+            next_cap = false;
+        } else {
+            result.append(*name);
+        }
+
+        name++;
+    }
+
+    return result;
+}
+
+/**
+ * @brief SettingValue 根据给定信息返回获取的值
+ * @param schema_id The id of the schema
+ * @param path If non-empty, specifies the path for a relocatable schema
+ * @param key 对应信息的key值
+ * @param fallback 如果找不到信息，返回此默认值
+ * @return
+ */
+const QVariant Utils::SettingValue(const QString &schema_id, const QByteArray &path, const QString &key, const QVariant &fallback){
+    const QGSettings *settings = Utils::SettingsPtr(schema_id, path);
+
+    if (settings && ((settings->keys().contains(key)) || settings->keys().contains(Utils::qtify_name(key.toUtf8().data())))) {
+        QVariant v = settings->get(key);
+        delete settings;
+        return v;
+    } else{
+        qDebug() << "Cannot find gsettings, schema_id:" << schema_id
+                 << " path:" << path << " key:" << key
+                 << "Use fallback value:" << fallback;
+        // 如果settings->keys()不包含key则会存在内存泄露，所以需要释放
+        if (settings)
+            delete settings;
+
+        return fallback;
+    }
+}
+
+bool Utils::SettingSaveValue(const QString &schema_id, const QByteArray &path, const QString &key, const QVariant &value ){
+    QGSettings *settings = Utils::SettingsPtr(schema_id, path);
+
+    if (settings && ((settings->keys().contains(key)) || settings->keys().contains(Utils::qtify_name(key.toUtf8().data())))) {
+        settings->set(key, value);
+        delete settings;
+        return true;
+    } else{
+        qDebug() << "Cannot find gsettings, schema_id:" << schema_id
+                 << " path:" << path << " key:" << key;
+        if (settings)
+            delete settings;
+
+        return false;
+    }
+}

@@ -21,15 +21,10 @@
 
 #include "dockitemmanager.h"
 #include "../item/appitem.h"
-#include "../util/docksettings.h"
 
 #include <QSet>
 
-DockItemManager *DockItemManager::INSTANCE = nullptr;
-bool first = true;
-
-DockItemManager::DockItemManager(QObject *parent)
-    : QObject(parent)
+DockItemManager::DockItemManager() : QObject()
     , m_appInter(new DBusDock("com.deepin.dde.daemon.Dock", "/com/deepin/dde/daemon/Dock", QDBusConnection::sessionBus(), this))
     , m_qsettings(new QSettings(QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation) + "/setting.ini", QSettings::IniFormat))
     , launcherItem(new LauncherItem)
@@ -45,12 +40,11 @@ DockItemManager::DockItemManager(QObject *parent)
 }
 
 
-DockItemManager *DockItemManager::instance(QObject *parent)
+DockItemManager *DockItemManager::instance()
 {
-    if (!INSTANCE)
-        INSTANCE = new DockItemManager(parent);
+    static DockItemManager INSTANCE;
 
-    return INSTANCE;
+    return &INSTANCE;
 }
 
 LauncherItem * DockItemManager::getLauncherItem()
@@ -114,6 +108,24 @@ void DockItemManager::setDragAnimation(bool enable)
 void DockItemManager::setHoverHighlight(bool enable)
 {
     m_qsettings->setValue("animation/highlight", enable);
+}
+
+bool DockItemManager::hasWindowItem()
+{
+    if(getDockMergeMode() != Dock::MergeAll)
+    {
+        for(auto item : m_itemList)
+        {
+            if(item->itemType() == DockItem::App && qobject_cast<AppItem *>(item)->windowCount() > 0)
+                return true;
+        }
+    }
+    return false;
+}
+
+int DockItemManager::itemSize()
+{
+    return m_appInter->windowSizeFashion();
 }
 
 const QList<QPointer<DockItem>> DockItemManager::itemList()
@@ -180,8 +192,14 @@ void DockItemManager::appItemAdded(const QDBusObjectPath &path, const int index)
     connect(item, &AppItem::requestPreviewWindow, m_appInter, &DBusDock::PreviewWindow);
     connect(item, &AppItem::requestCancelPreview, m_appInter, &DBusDock::CancelPreviewWindow);
 
-    connect(item, &AppItem::windowItemInserted, [this](WindowItem *item){ emit itemInserted(-1, item); });
-    connect(item, &AppItem::windowItemRemoved, [this](WindowItem *item, bool animation){ emit itemRemoved(item, animation); });
+    connect(item, &AppItem::windowItemInserted, [this](WindowItem *item){
+        emit itemInserted(-1, item);
+        emit itemCountChanged();
+    });
+    connect(item, &AppItem::windowItemRemoved, [this](WindowItem *item, bool animation){
+        emit itemRemoved(item, animation);
+        emit itemCountChanged();
+    });
 
 
     m_itemList.insert(index != -1 ? index : m_itemList.count(), item);
@@ -194,7 +212,10 @@ void DockItemManager::appItemAdded(const QDBusObjectPath &path, const int index)
             item->fetchWindowInfos();
 
             if(index == -1 && dirItem->currentCount() == 1)
+            {
                 emit itemInserted(-1, dirItem);
+                emit itemCountChanged();
+            }
 
             return;
         }
@@ -202,21 +223,21 @@ void DockItemManager::appItemAdded(const QDBusObjectPath &path, const int index)
 
     item->fetchWindowInfos();
     emit itemInserted(index, item);
+
+    if(index > -1)
+        emit itemCountChanged();
 }
 
 void DockItemManager::appItemRemoved(const QString &appId)
 {
     for (int i(0); i < m_itemList.size(); ++i) {
-        if (m_itemList[i]->itemType() != DockItem::App)
-            continue;
-
-        AppItem *app = static_cast<AppItem *>(m_itemList[i].data());
-        if (!app) {
-            continue;
-        }
-        if (!app->isValid() || app->appId() == appId) {
-            appItemRemoved(app);
-            break;
+        if(AppItem *app = static_cast<AppItem *>(m_itemList[i].data()))
+        {
+            if (app->itemType() == DockItem::App && (!app->isValid() || app->appId() == appId)) {
+                appItemRemoved(app);
+                emit itemCountChanged();
+                break;
+            }
         }
     }
 }
@@ -240,6 +261,7 @@ void DockItemManager::appItemRemoved(AppItem *appItem, bool animation)
 
 void DockItemManager::reloadAppItems()
 {
+    static bool first = true;
     if(first)
     {
         emit itemInserted(0, launcherItem);
@@ -268,12 +290,15 @@ void DockItemManager::reloadAppItems()
     for(auto dirItem : m_dirList)
         if(!dirItem->parentWidget() && !dirItem->isEmpty())
             emit itemInserted(dirItem->getIndex(), dirItem);
+
+    emit itemCountChanged();
 }
 
 void DockItemManager::addDirApp(DirItem *dirItem)
 {
     m_dirList.append(dirItem);
     connect(dirItem, &DockItem::requestWindowAutoHide, this, &DockItemManager::requestWindowAutoHide, Qt::UniqueConnection);
+    emit itemCountChanged();
 }
 
 void DockItemManager::loadDirAppData()

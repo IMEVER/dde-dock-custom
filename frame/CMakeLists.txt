@@ -7,6 +7,7 @@ configure_file(environments.h.in environments.h @ONLY)
 # Sources files
 file(GLOB_RECURSE SRCS "*.h" "*.cpp")
 
+
 # Find the library
 find_package(PkgConfig REQUIRED)
 find_package(Qt5Widgets REQUIRED)
@@ -21,6 +22,9 @@ find_package(KF5WindowSystem REQUIRED)
 pkg_check_modules(XCB_EWMH REQUIRED xcb-ewmh x11)
 pkg_check_modules(DFrameworkDBus REQUIRED dframeworkdbus)
 pkg_check_modules(DtkGUI REQUIRED dtkgui)
+pkg_check_modules(QGSettings REQUIRED gsettings-qt)
+
+qt5_add_dbus_adaptor(SRCS dbus/com.deepin.dde.Dock.xml window/mainwindow.h MainWindow dbusdockadaptors DBusDockAdaptors)
 
 # driver-manager
 add_executable(${BIN_NAME} ${SRCS} item/item.qrc frame.qrc)
@@ -30,6 +34,7 @@ target_include_directories(${BIN_NAME} PUBLIC ${DtkWidget_INCLUDE_DIRS}
                                               ${Qt5Gui_PRIVATE_INCLUDE_DIRS}
                                               ${PROJECT_BINARY_DIR}
                                               ${DtkGUI_INCLUDE_DIRS}
+                                              ${QGSettings_INCLUDE_DIRS}
                                               ${KF5WindowSystem_INCLUDE_DIRS}
                                               ${Qt5Svg_INCLUDE_DIRS}
                                               )
@@ -43,6 +48,7 @@ target_link_libraries(${BIN_NAME} PRIVATE
     ${Qt5X11Extras_LIBRARIES}
     ${Qt5DBus_LIBRARIES}
     ${DtkGUI_LIBRARIES}
+    ${QGSettings_LIBRARIES}
     ${Qt5Svg_LIBRARIES}
     KF5::WindowSystem
     xdo

@@ -21,7 +21,6 @@
 
 #include "mainpanelcontrol.h"
 #include "../item/dockitem.h"
-#include "../util/docksettings.h"
 #include "../item/placeholderitem.h"
 #include "../item/components/appdrag.h"
 #include "../item/appitem.h"
@@ -40,6 +39,7 @@
 #include <DWindowManagerHelper>
 
 #define SPLITER_SIZE 2
+#define MODE_PADDING    5
 
 DWIDGET_USE_NAMESPACE
 
@@ -62,6 +62,7 @@ MainPanelControl::MainPanelControl(QWidget *parent) : QWidget(parent)
     setMouseTracking(true);
 
     m_splitter->setFixedSize(0, 0);
+    m_splitter->setObjectName("分隔符");
     m_appAreaWidget->installEventFilter(this);
 }
 
@@ -137,7 +138,7 @@ void MainPanelControl::updateMainPanelLayout()
 
 void MainPanelControl::addFixedAreaItem(int index, QWidget *wdg)
 {
-    wdg->setFixedSize(DockSettings::Instance().itemSize(), DockSettings::Instance().itemSize());
+    wdg->setFixedSize(DockItemManager::instance()->itemSize(), DockItemManager::instance()->itemSize());
     m_fixedAreaLayout->insertWidget(index, wdg);
 }
 
@@ -172,11 +173,11 @@ void MainPanelControl::resizeEvent(QResizeEvent *event)
 
 void MainPanelControl::setPositonValue(Dock::Position position)
 {
-    if (m_position == position)
-        return;
-
-    m_position = position;
-    updateMainPanelLayout();
+    if (m_position != position)
+    {
+        m_position = position;
+        updateMainPanelLayout();
+    }
 }
 
 void MainPanelControl::insertItem(int index, DockItem *item)
@@ -521,7 +522,7 @@ void MainPanelControl::dropTargetItem(DockItem *sourceItem, QPoint point)
                 continue;
         }
 
-            const int width = DockSettings::Instance().itemSize();
+            const int width = DockItemManager::instance()->itemSize();
             qreal ratio = 1;
 
             if(m_position == Top || m_position == Bottom)
@@ -762,7 +763,7 @@ void MainPanelControl::handleDragDrop(DockItem *sourceItem, QPoint point)
     else
     {
         int afterIndex = m_appAreaLayout->indexOf(sourceItem);
-        sourceItem->setFixedSize(DockSettings::Instance().itemSize(), DockSettings::Instance().itemSize());
+        sourceItem->setFixedSize(DockItemManager::instance()->itemSize(), DockItemManager::instance()->itemSize());
 
         if(afterIndex == -1)
         {
@@ -902,13 +903,19 @@ void MainPanelControl::itemUpdated(DockItem *item)
 
 void MainPanelControl::resizeDockIcon()
 {
-    const int size = DockSettings::Instance().itemSize();
+    // const int size =  DockItemManager::instance()->itemSize();
+    int size;
 
-    if (m_position == Dock::Position::Top || m_position == Dock::Position::Bottom) {
+    if (m_position == Dock::Position::Bottom) {
+        size = DockItemManager::instance()->isEnableHoverScaleAnimation() ? height() * .8 : height() - 2;
+        size = qMax(size, 0);
         m_splitter->setFixedSize(SPLITER_SIZE, int(size * 0.6));
     } else {
+        size = DockItemManager::instance()->isEnableHoverScaleAnimation() ? width() * .8 : width() - 2;
+        size = qMax(size, 0);
         m_splitter->setFixedSize(int(size * 0.6), SPLITER_SIZE);
     }
+
 
     QSize s(size, size);
     if(m_fixedAreaLayout->count() > 0)

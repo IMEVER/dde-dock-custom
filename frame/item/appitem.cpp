@@ -22,7 +22,7 @@
 
 #include "appitem.h"
 
-#include "util/imageutil.h"
+#include "util/utils.h"
 #include "xcb/xcb_misc.h"
 #include "components/appswingeffectbuilder.h"
 #include "components/appspreviewprovider.h"
@@ -86,7 +86,7 @@ AppItem::AppItem(const QDBusObjectPath &entry, QWidget *parent)
     connect(m_updateIconGeometryTimer, &QTimer::timeout, this, &AppItem::updateWindowIconGeometries, Qt::QueuedConnection);
     connect(m_retryObtainIconTimer, &QTimer::timeout, this, &AppItem::refershIcon, Qt::QueuedConnection);
 
-    connect(DGuiApplicationHelper::instance(), &DGuiApplicationHelper::themeTypeChanged, [ = ](DGuiApplicationHelper::ColorType type){ m_themeType = type; });
+    connect(DGuiApplicationHelper::instance(), &DGuiApplicationHelper::themeTypeChanged, [ this ](DGuiApplicationHelper::ColorType type){ m_themeType = type; });
 
     connect(DockItemManager::instance(), &DockItemManager::mergeModeChanged, this, &AppItem::mergeModeChanged);
 
@@ -512,7 +512,7 @@ void AppItem::refershIcon()
     const QString icon = m_itemEntryInter->icon();
     const int iconSize = qMin(width(), height());
 
-    m_appIcon = ImageUtil::getIcon(icon, iconSize * 0.85, devicePixelRatioF());
+    m_appIcon = Utils::getIcon(icon, iconSize * 0.85, devicePixelRatioF());
 
     if (m_appIcon.isNull()) {
         if (m_retryTimes < 5) {

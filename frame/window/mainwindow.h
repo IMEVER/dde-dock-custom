@@ -23,7 +23,6 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
-#include "xcb/xcb_misc.h"
 #include "../interfaces/constants.h"
 
 #include <com_deepin_api_xeventmonitor.h>
@@ -36,95 +35,51 @@
 
 DWIDGET_USE_NAMESPACE
 
-using XEventMonitor = ::com::deepin::api::XEventMonitor;
 using namespace Dock;
 
-class DockSettings;
 class DragWidget;
-class MainPanel;
 class MainPanelControl;
-class QTimer;
+class MultiScreenWorker;
+class MenuWorker;
+
 class MainWindow : public DBlurEffectWidget
 {
     Q_OBJECT
 
-    enum Flag{
-        Motion = 1 << 0,
-        Button = 1 << 1,
-        Key    = 1 << 2
-    };
-
 public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
-    void setEffectEnabled(const bool enabled);
-
-    friend class MainPanel;
+    void updateDragCursor();
+    MainPanelControl *panel();
     friend class MainPanelControl;
 
 public slots:
     void launch();
+    void resizeDock(int offset, bool dragging);
+    void compositeChanged();
 
-private:
-    using QWidget::show;
-    void mousePressEvent(QMouseEvent *e);
-    void enterEvent(QEvent *e);
-    void leaveEvent(QEvent *e);
-    void dragEnterEvent(QDragEnterEvent *e);
+protected:
+    void mousePressEvent(QMouseEvent *e) override;
 
     void initComponents();
     void initConnections();
-    void resizeMainPanelWindow();
-
-    void onRegionMonitorChanged(int x, int y, const QString &key);
-    void updateRegionMonitorWatch();
-
-signals:
-    void panelGeometryChanged();
 
 private slots:
-    void positionChanged(const Position prevPos, const Position nextPos);
-    void updateGeometry();
-    void clearStrutPartial();
-    void setStrutPartial();
-    void compositeChanged();
-    void internalMove(const QPoint &p);
-
-    void expand();
-    void narrow(const Position prevPos);
-    void resetPanelEnvironment(const bool visible, const bool resetPosition = true);
-    void updatePanelVisible();
-
-    void adjustShadowMask();
 
     void onMainWindowSizeChanged(QPoint offset);
-    void onDragFinished();
+    void resetDragWindow();
     void themeTypeChanged(DGuiApplicationHelper::ColorType themeType);
 
 private:
     bool m_launched;
     MainPanelControl *m_mainPanel;
+    DWindowManagerHelper *m_wmHelper;
+    MultiScreenWorker *m_multiScreenWorker;
+    MenuWorker *m_menuWorker;
 
     DPlatformWindowHandle m_platformWindowHandle;
-    DWindowManagerHelper *m_wmHelper;
-    XEventMonitor *m_eventInter;
-    QString m_registerKey;
-
-    QTimer *m_positionUpdateTimer;
-    QTimer *m_expandDelayTimer;
-    QTimer *m_leaveDelayTimer;
-    QTimer *m_shadowMaskOptimizeTimer;
-    QVariantAnimation *m_panelShowAni;
-    QVariantAnimation *m_panelHideAni;
-
-    XcbMisc *m_xcbMisc;
-    DockSettings *m_settings;
-
-    QSize m_size;
     DragWidget *m_dragWidget;
-    Position m_curDockPos;
-    Position m_newDockPos;
-    bool m_mouseCauseDock;
+    QTimer *m_timer;
 };
 
 #endif // MAINWINDOW_H

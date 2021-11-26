@@ -2,8 +2,7 @@
 
 #include "components/appsnapshot.h"
 #include "components/appspreviewprovider.h"
-#include "../util/docksettings.h"
-#include "../util/XUtils.h"
+#include "util/XUtils.h"
 
 #include <QX11Info>
 #include <X11/Xlib.h>

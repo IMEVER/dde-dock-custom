@@ -21,7 +21,7 @@
 
 #include "launcheritem.h"
 
-#include "util/imageutil.h"
+#include "util/utils.h"
 
 #include <QPainter>
 #include <QProcess>
@@ -36,6 +36,7 @@ LauncherItem::LauncherItem(QWidget *parent)
     , m_launcherInter(new LauncherInter("com.deepin.dde.Launcher", "/com/deepin/dde/Launcher", QDBusConnection::sessionBus(), this))
     , m_tips(new TipsWidget(this))
 {
+    setObjectName("启动器");
     m_launcherInter->setSync(true, false);
 
     m_tips->setVisible(false);
@@ -45,7 +46,7 @@ LauncherItem::LauncherItem(QWidget *parent)
 void LauncherItem::refershIcon()
 {
     const int iconSize = qMin(width(), height());
-    m_icon = ImageUtil::getIcon("deepin-launcher", iconSize * 0.9, devicePixelRatioF());
+    m_icon = Utils::getIcon("deepin-launcher", iconSize * 0.9, devicePixelRatioF());
     update();
 }
 

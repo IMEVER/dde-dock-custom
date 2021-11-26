@@ -20,7 +20,6 @@
  */
 
 #include "dockitem.h"
-#include "../util/docksettings.h"
 #include "../window/dockitemmanager.h"
 
 #include <QMouseEvent>
@@ -185,7 +184,7 @@ void DockItem::enterEvent(QEvent *e)
 
         if (m_scaleLarger->state() == QVariantAnimation::Stopped)
         {
-            int originSize = DockSettings::Instance().dockWindowSize();
+            int originSize = DockItemManager::instance()->itemSize();
             m_scaleLarger->setStartValue(size().width());
             m_scaleLarger->setEndValue(originSize);
             m_scaleLarger->start();
@@ -218,7 +217,7 @@ void DockItem::leaveEvent(QEvent *e)
 
         if (m_scaleSmaller->state() == QVariantAnimation::Stopped)
         {
-            int originSize = DockSettings::Instance().itemSize();
+            int originSize = DockItemManager::instance()->itemSize();
             m_scaleSmaller->setStartValue(size().width());
             m_scaleSmaller->setEndValue(originSize);
             m_scaleSmaller->start();
@@ -432,7 +431,7 @@ void DockItem::easeIn()
         m_scaleSmaller->stop();
 
     m_scaleLarger->setStartValue(0);
-    m_scaleLarger->setEndValue(DockSettings::Instance().itemSize());
+    m_scaleLarger->setEndValue(DockItemManager::instance()->itemSize());
     m_scaleLarger->start();
 }
 

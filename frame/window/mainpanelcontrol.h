@@ -74,6 +74,7 @@ private:
     void moveItem(DockItem *sourceItem, DockItem *targetItem);
     void handleDragMove(QDragMoveEvent *e, bool isFilter);
     void resizeDockIcon();
+    
 public slots:
     void insertItem(const int index, DockItem *item);
     void removeItem(DockItem *item, bool animation = true);

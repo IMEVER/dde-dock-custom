@@ -21,7 +21,7 @@
 
 #include "window/mainwindow.h"
 #include "window/dockitemmanager.h"
-#include "dbus/dbusdockadaptors.h"
+#include "dbusdockadaptors.h"
 #include <QDir>
 #include <DApplication>
 #include <DLog>
@@ -98,7 +98,7 @@ int main(int argc, char *argv[])
     QDBusConnection::sessionBus().registerService("com.deepin.dde.Dock");
     QDBusConnection::sessionBus().registerObject("/com/deepin/dde/Dock", "com.deepin.dde.Dock", &mw);
 
-    QTimer::singleShot(1, &mw, &MainWindow::launch);
+    QTimer::singleShot(100, &mw, &MainWindow::launch);
 
     return app.exec();
 }

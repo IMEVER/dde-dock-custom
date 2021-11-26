@@ -25,8 +25,10 @@
 #include <QPixmap>
 #include <QSvgRenderer>
 #include <QScreen>
+#include <QGSettings>
+#include <QVariant>
 
-class ImageUtil
+class Utils
 {
 public:
     static const QPixmap loadSvg(const QString &iconName, const QString &localPath, const int size, const qreal ratio);
@@ -36,6 +38,11 @@ public:
     static QPixmap renderSVG(const QString &path, const QSize &size, const qreal devicePixelRatio);
     static QScreen *screenAt(const QPoint &point);
     static QScreen *screenAtByScaled(const QPoint &point);
+    static QGSettings *SettingsPtr(const QString &schema_id, const QByteArray &path = QByteArray(), QObject *parent = nullptr);
+    static QString qtify_name(const char *name);
+    static const QGSettings *ModuleSettingsPtr(const QString &module, const QByteArray &path = QByteArray(), QObject *parent = nullptr);
+    static const QVariant SettingValue(const QString &schema_id, const QByteArray &path = QByteArray(), const QString &key = QString(), const QVariant &fallback = QVariant());
+    static bool SettingSaveValue(const QString &schema_id, const QByteArray &path, const QString &key, const QVariant &value );
 };
 
 #endif // IMAGEUTIL_H

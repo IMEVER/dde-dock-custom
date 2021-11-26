@@ -1,6 +1,5 @@
 #include "diritem.h"
-
-#include "../util/docksettings.h"
+#include "window/dockitemmanager.h"
 
 #include <QPen>
 
@@ -10,7 +9,6 @@ DirItem::DirItem(QString title, QWidget *parent) : DockItem(parent)
 , m_index(0)
 , m_dirTips(new TipsWidget(this))
 {
-
     if (dirPopupWindow.isNull()) {
         DockPopupWindow *arrowRectangle = new DockPopupWindow(nullptr);
         arrowRectangle->setWindowFlags(Qt::X11BypassWindowManagerHint | Qt::WindowStaysOnTopHint);
@@ -28,6 +26,8 @@ DirItem::DirItem(QString title, QWidget *parent) : DockItem(parent)
     setAcceptDrops(true);
 
     m_title = title.isNull() ? "集合" : title;
+
+    setObjectName(m_title);
 
     m_dirTips->setText(m_title);
     m_dirTips->hide();
@@ -92,8 +92,8 @@ void DirItem::addItem(AppItem *appItem)
 {
     if(m_appList.contains(appItem))
         return;
-        
-    appItem->setFixedSize(QSize(DockSettings::Instance().dockWindowSize(), DockSettings::Instance().dockWindowSize()));
+
+    appItem->setFixedSize(QSize(DockItemManager::instance()->itemSize(), DockItemManager::instance()->itemSize()));
     m_appList.append(appItem);
     m_popupGrid->addAppItem(appItem);
     m_ids.insert(appItem->getDesktopFile());

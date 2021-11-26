@@ -29,8 +29,6 @@ namespace Dock {
 #define DOCK_PLUGIN_MIME    "dock/plugin"
 #define DOCK_PLUGIN_API_VERSION    "1.2.2"
 
-#define PROP_DISPLAY_MODE   "DisplayMode"
-
 #define PLUGIN_BACKGROUND_MAX_SIZE 40
 #define PLUGIN_BACKGROUND_MIN_SIZE 20
 
@@ -55,7 +53,6 @@ enum DisplayMode {
 //    Classic     = 2,
 };
 
-#define PROP_HIDE_MODE      "HideMode"
 ///
 /// \brief The HideMode enum
 /// spec dock hide behavior
@@ -66,7 +63,6 @@ enum HideMode {
     SmartHide       = 3,
 };
 
-#define PROP_POSITION       "Position"
 ///
 /// \brief The Position enum
 /// spec dock position, dock always placed at primary screen,
@@ -79,7 +75,6 @@ enum Position {
     Left        = 3,
 };
 
-#define PROP_HIDE_STATE     "HideState"
 ///
 /// \brief The HideState enum
 /// spec current dock should hide or shown.
