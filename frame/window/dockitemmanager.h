@@ -44,7 +44,6 @@ public:
     const QList<QPointer<DirItem>> dirList();
     void addDirApp(DirItem *dirItem);
     bool appIsOnDock(const QString &appDesktop) const;
-    LauncherItem* getLauncherItem();
     MergeMode getDockMergeMode();
     void saveDockMergeMode(MergeMode mode);
     bool isEnableHoverScaleAnimation();

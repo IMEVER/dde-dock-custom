@@ -7,7 +7,6 @@ configure_file(environments.h.in environments.h @ONLY)
 # Sources files
 file(GLOB_RECURSE SRCS "*.h" "*.cpp")
 
-
 # Find the library
 find_package(PkgConfig REQUIRED)
 find_package(Qt5Widgets REQUIRED)
@@ -25,6 +24,9 @@ pkg_check_modules(DtkGUI REQUIRED dtkgui)
 pkg_check_modules(QGSettings REQUIRED gsettings-qt)
 
 qt5_add_dbus_adaptor(SRCS dbus/com.deepin.dde.Dock.xml window/mainwindow.h MainWindow dbusdockadaptors DBusDockAdaptors)
+set_source_files_properties(dbus/me.imever.dde.toppanel.xml PROPERTIES CLASSNAME TopPanelInterface NO_NAMESPACE true)
+# set_source_file_property(dbus/me.imever.dde.toppanel.xml )
+qt5_add_dbus_interface(SRCS dbus/me.imever.dde.toppanel.xml TopPanelInterface )
 
 # driver-manager
 add_executable(${BIN_NAME} ${SRCS} item/item.qrc frame.qrc)

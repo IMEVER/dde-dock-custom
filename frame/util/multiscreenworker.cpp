@@ -1271,39 +1271,37 @@ void MultiScreenWorker::tryToShowDock(int eventX, int eventY)
 
 int MultiScreenWorker::itemCount()
 {
-    int count = DockItemManager::instance()->itemList().count() + 1;
+    int count = DockItemManager::instance()->itemList().count() + 1 + 1;
     for(auto item : DockItemManager::instance()->dirList())
-    {
         count = count - item->currentCount() + 1;
-    }
+
 
     for(auto item : DockItemManager::instance()->itemList())
-    {
         if(item->itemType() == DockItem::App)
             count += qobject_cast<AppItem *>(item)->windowCount();
-    }
 
     return count;
 }
 
 void MultiScreenWorker::updateDockRect(QRect &dockRect, QRect screenRect, Position position, qreal ratio, int dockSize, int count)
 {
-    const int splitterWidth = DockItemManager::instance()->hasWindowItem() ? MODE_PADDING * 2 + 2 : 0;
+    const int splitterWidth = (DockItemManager::instance()->hasWindowItem() ? MODE_PADDING + 2 : 0) + (MODE_PADDING + 2);
     int m_itemSize = DockItemManager::instance()->isEnableHoverScaleAnimation() ? dockSize * .8 : dockSize - 2;
     int length;
 
     switch (position)
     {
+    case Top:
     case Bottom:
             length = screenRect.width() / ratio;
             if ((m_itemSize + MODE_PADDING ) * count > length * 0.9)
             {
-                dockRect.setWidth(length * 0.9);
+                dockRect.setWidth(length * 0.9 + MODE_PADDING);
                 m_itemSize = round((length * 0.9 - splitterWidth) / count - MODE_PADDING);
             }
             else
             {
-                dockRect.setWidth((m_itemSize + MODE_PADDING) * count - MODE_PADDING + splitterWidth);
+                dockRect.setWidth((m_itemSize + MODE_PADDING) * count + splitterWidth);
             }
             dockRect.moveLeft(screenRect.left() + (screenRect.width() / ratio - dockRect.width()) / 2);
         break;
@@ -1312,16 +1310,13 @@ void MultiScreenWorker::updateDockRect(QRect &dockRect, QRect screenRect, Positi
             length = screenRect.height() / ratio;
             if ((m_itemSize + MODE_PADDING) * count > length * 0.9)
             {
-                dockRect.setHeight(length * 0.9);
+                dockRect.setHeight(length * 0.9 + MODE_PADDING);
                 m_itemSize = round((length * 0.9 - splitterWidth ) / count - MODE_PADDING);
             }
             else
             {
-                dockRect.setHeight((m_itemSize + MODE_PADDING) * count - MODE_PADDING + splitterWidth);
+                dockRect.setHeight((m_itemSize + MODE_PADDING) * count + splitterWidth);
             }
             dockRect.moveTop(screenRect.y() + (screenRect.height() / ratio - dockRect.height()) / 2);
-    case Top:
-    default:
-        break;
     }
 }

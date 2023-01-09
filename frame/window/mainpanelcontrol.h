@@ -46,6 +46,7 @@ public:
     void removeAppAreaItem(QWidget *wdg);
     void addWindowAreaItem(int index, QWidget *wdg);
     void removeWindowAreaItem(QWidget *wdg);
+    void addLastAreaItem(int index, QWidget *wdg);
     void setPositonValue(Position position);
 
 signals:
@@ -74,7 +75,7 @@ private:
     void moveItem(DockItem *sourceItem, DockItem *targetItem);
     void handleDragMove(QDragMoveEvent *e, bool isFilter);
     void resizeDockIcon();
-    
+
 public slots:
     void insertItem(const int index, DockItem *item);
     void removeItem(DockItem *item, bool animation = true);
@@ -89,7 +90,12 @@ private:
 
     QWidget *m_windowAreaWidget;
     QBoxLayout *m_windowAreaLayout;
+
+    QWidget *m_lastAreaWidget;
+    QBoxLayout *m_lastAreaLayout;
+
     QLabel *m_splitter;
+    QLabel *m_splitter2;
 
     Position m_position;
     QPointer<PlaceholderItem> m_placeholderItem;

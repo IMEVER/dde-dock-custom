@@ -306,6 +306,9 @@ void AppItem::dragEnterEvent(QDragEnterEvent *e)
         return e->ignore();
     }
 
+    if(e->mimeData()->hasUrls() == false)
+        return e->ignore();
+
     e->accept();
     hidePopup();
 }

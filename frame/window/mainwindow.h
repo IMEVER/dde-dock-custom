@@ -24,6 +24,7 @@
 #define MAINWINDOW_H
 
 #include "../interfaces/constants.h"
+#include "TopPanelInterface.h"
 
 #include <com_deepin_api_xeventmonitor.h>
 #include <DPlatformWindowHandle>
@@ -57,6 +58,10 @@ public slots:
     void launch();
     void resizeDock(int offset, bool dragging);
     void compositeChanged();
+    QStringList GetLoadedPlugins();
+    QString getPluginKey(QString pluginName);
+    bool getPluginVisible(QString pluginName);
+    void setPluginVisible(QString pluginName, bool visible);
 
 protected:
     void mousePressEvent(QMouseEvent *e) override;
@@ -70,6 +75,10 @@ private slots:
     void resetDragWindow();
     void themeTypeChanged(DGuiApplicationHelper::ColorType themeType);
 
+signals:
+    void pluginVisibleChanged(QString pluginName, bool visible);
+    void geometryChanged(QRect rect);
+
 private:
     bool m_launched;
     MainPanelControl *m_mainPanel;
@@ -80,6 +89,7 @@ private:
     DPlatformWindowHandle m_platformWindowHandle;
     DragWidget *m_dragWidget;
     QTimer *m_timer;
+    TopPanelInterface *m_topPanelInterface;
 };
 
 #endif // MAINWINDOW_H

@@ -61,7 +61,8 @@ void RegisterDdeSession()
 int main(int argc, char *argv[])
 {
     DApplication::setAttribute(Qt::AA_EnableHighDpiScaling, true);
-    DGuiApplicationHelper::setUseInactiveColorGroup(false);
+    DGuiApplicationHelper::setAttribute(DGuiApplicationHelper::UseInactiveColorGroup, false);
+    // DGuiApplicationHelper::setUseInactiveColorGroup(false);
     // DApplication::loadDXcbPlugin();
     DApplication app(argc, argv);
 

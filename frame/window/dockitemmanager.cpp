@@ -21,6 +21,7 @@
 
 #include "dockitemmanager.h"
 #include "../item/appitem.h"
+#include "../item/pluginitem.h"
 
 #include <QSet>
 
@@ -36,20 +37,14 @@ DockItemManager::DockItemManager() : QObject()
     connect(m_appInter, &DBusDock::ServiceRestarted, this, [ this ] { QTimer::singleShot(500, [ this ] { reloadAppItems(); }); });
 
     // 刷新图标
-    QMetaObject::invokeMethod(this, "refershItemsIcon", Qt::QueuedConnection);
+    // QMetaObject::invokeMethod(this, "refershItemsIcon", Qt::QueuedConnection);
 }
 
 
 DockItemManager *DockItemManager::instance()
 {
     static DockItemManager INSTANCE;
-
     return &INSTANCE;
-}
-
-LauncherItem * DockItemManager::getLauncherItem()
-{
-    return launcherItem;
 }
 
 MergeMode DockItemManager::getDockMergeMode()
@@ -265,8 +260,8 @@ void DockItemManager::reloadAppItems()
     if(first)
     {
         emit itemInserted(0, launcherItem);
+        emit itemInserted(0, new PluginItem);
         first = false;
-
     }
     else
     {

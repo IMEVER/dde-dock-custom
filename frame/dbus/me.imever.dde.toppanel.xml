@@ -1,12 +1,7 @@
-<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN" "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
-<node>
-  <interface name="com.deepin.dde.Dock">
-  <property access="read" type="(iiii)" name="geometry">
-  <annotation name="org.qtproject.QtDBus.QtTypeName" value="QRect" />
-  </property>
-    <method name="resizeDock">
-      <arg name="offset" type="i" direction="in"/>
-      <arg name="dragging" type="b" direction="in"/>
+<interface name="me.imever.dde.TopPanel">
+    <method name="ActivateWindow"></method>
+    <method name="ToggleMenu">
+        <arg name="id" type="i" direction="in"></arg>
     </method>
     <method name="GetLoadedPlugins">
         <arg name="list" type="as" direction="out"/>
@@ -27,9 +22,4 @@
         <arg type="s"/>
         <arg type="b"/>
     </signal>
-   <signal name="geometryChanged">
-    <arg name="geometry" type="(iiii)"/>
-    <annotation name="org.qtproject.QtDBus.QtTypeName.Out0" value="QRect" />
-   </signal>
-   </interface>
-</node>
+</interface>

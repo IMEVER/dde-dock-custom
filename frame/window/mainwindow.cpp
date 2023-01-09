@@ -113,6 +113,7 @@ MainWindow::MainWindow(QWidget *parent) : DBlurEffectWidget(parent)
     , m_platformWindowHandle(this)
     , m_dragWidget(new DragWidget(this))
     , m_timer(new QTimer(this))
+    , m_topPanelInterface(new TopPanelInterface("me.imever.dde.TopPanel", "/me/imever/dde/TopPanel", QDBusConnection::sessionBus(), this))
 {
     setMouseTracking(true);
     setAcceptDrops(true);
@@ -243,6 +244,7 @@ void MainWindow::initConnections()
 
             m_multiScreenWorker->requestNotifyWindowManager();
             m_multiScreenWorker->onRequestUpdateRegionMonitor();
+            emit geometryChanged(geometry());
      });
 
     connect(DGuiApplicationHelper::instance(), &DGuiApplicationHelper::themeTypeChanged, this, &MainWindow::themeTypeChanged);
@@ -253,6 +255,7 @@ void MainWindow::initConnections()
     connect(m_multiScreenWorker, &MultiScreenWorker::opacityChanged, this, &MainWindow::setMaskAlpha, Qt::QueuedConnection);
     connect(m_multiScreenWorker, &MultiScreenWorker::requestUpdateFrontendGeometry, this, &MainWindow::resetDragWindow);
     // connect(m_multiScreenWorker, &MultiScreenWorker::requestUpdateDockEntry, DockItemManager::instance(), &DockItemManager::requestUpdateDockItem);
+    connect(m_topPanelInterface, &TopPanelInterface::pluginVisibleChanged, this, &MainWindow::pluginVisibleChanged);
 }
 
 void MainWindow::updateDragCursor()
@@ -330,27 +333,36 @@ void MainWindow::resizeDock(int offset, bool dragging)
 {
     qApp->setProperty(DRAG_STATE, dragging);
 
-    const QRect &rect = m_multiScreenWorker->getDockShowMinGeometry(m_multiScreenWorker->deskScreen());
+    offset = qBound(MAINWINDOW_MIN_SIZE, offset, MAINWINDOW_MAX_SIZE);
+
+    if(qApp->property(DRAG_STATE).toBool())
+        m_multiScreenWorker->setWindowSize(offset);
+
+    // const QRect &rect = m_multiScreenWorker->getDockShowMinGeometry(m_multiScreenWorker->deskScreen());
+    const QRect &rect = m_multiScreenWorker->dockRect(m_multiScreenWorker->deskScreen()
+                                                      , m_multiScreenWorker->position()
+                                                      , HideMode::KeepShowing);
+
     QRect newRect;
     switch (m_multiScreenWorker->position()) {
     case Bottom: {
         newRect.setX(rect.x());
-        newRect.setY(rect.y() + rect.height() - qBound(MAINWINDOW_MIN_SIZE, offset, MAINWINDOW_MAX_SIZE));
+        newRect.setY(rect.y() + rect.height() - offset);
         newRect.setWidth(rect.width());
-        newRect.setHeight(qBound(MAINWINDOW_MIN_SIZE, offset, MAINWINDOW_MAX_SIZE));
+        newRect.setHeight(offset);
     }
         break;
     case Left: {
         newRect.setX(rect.x());
         newRect.setY(rect.y());
-        newRect.setWidth(qBound(MAINWINDOW_MIN_SIZE, offset, MAINWINDOW_MAX_SIZE));
+        newRect.setWidth(offset);
         newRect.setHeight(rect.height());
     }
         break;
     case Right: {
-        newRect.setX(rect.x() + rect.width() - qBound(MAINWINDOW_MIN_SIZE, offset, MAINWINDOW_MAX_SIZE));
+        newRect.setX(rect.x() + rect.width() - offset);
         newRect.setY(rect.y());
-        newRect.setWidth(qBound(MAINWINDOW_MIN_SIZE, offset, MAINWINDOW_MAX_SIZE));
+        newRect.setWidth(offset);
         newRect.setHeight(rect.height());
     }
         break;
@@ -374,6 +386,22 @@ void MainWindow::themeTypeChanged(DGuiApplicationHelper::ColorType themeType)
         else
             m_platformWindowHandle.setBorderColor(QColor(QColor::Invalid));
     }
+}
+
+QStringList MainWindow::GetLoadedPlugins() {
+    return m_topPanelInterface->GetLoadedPlugins();
+}
+
+QString MainWindow::getPluginKey(QString pluginName) {
+    return m_topPanelInterface->getPluginKey(pluginName);
+}
+
+bool MainWindow::getPluginVisible(QString pluginName) {
+    return m_topPanelInterface->getPluginVisible(pluginName);
+}
+
+void MainWindow::setPluginVisible(QString pluginName, bool visible) {
+    m_topPanelInterface->setPluginVisible(pluginName, visible);
 }
 
 #include "mainwindow.moc"

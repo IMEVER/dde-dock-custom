@@ -51,7 +51,10 @@ MainPanelControl::MainPanelControl(QWidget *parent) : QWidget(parent)
     , m_appAreaLayout(new QBoxLayout(QBoxLayout::LeftToRight))
     , m_windowAreaWidget(new QWidget(this))
     , m_windowAreaLayout(new QBoxLayout(QBoxLayout::LeftToRight))
+    , m_lastAreaWidget(new QWidget(this))
+    , m_lastAreaLayout(new QBoxLayout(QBoxLayout::LeftToRight))
     , m_splitter(new QLabel(this))
+    , m_splitter2(new QLabel(this))
     , m_position(Position::Bottom)
     , m_placeholderItem(nullptr)
     , m_appDragWidget(nullptr)
@@ -62,13 +65,10 @@ MainPanelControl::MainPanelControl(QWidget *parent) : QWidget(parent)
     setMouseTracking(true);
 
     m_splitter->setFixedSize(0, 0);
-    m_splitter->setObjectName("分隔符");
     m_appAreaWidget->installEventFilter(this);
 }
 
-MainPanelControl::~MainPanelControl()
-{
-}
+MainPanelControl::~MainPanelControl(){}
 
 void MainPanelControl::init()
 {
@@ -78,8 +78,10 @@ void MainPanelControl::init()
     m_mainPanelLayout->addStretch(1);
     m_mainPanelLayout->addWidget(m_fixedAreaWidget);
     m_mainPanelLayout->addWidget(m_appAreaWidget);
-    m_mainPanelLayout->addWidget(m_splitter);
+    m_mainPanelLayout->addWidget(m_splitter, 0, Qt::AlignCenter);
     m_mainPanelLayout->addWidget(m_windowAreaWidget);
+    m_mainPanelLayout->addWidget(m_splitter2, 0, Qt::AlignCenter);
+    m_mainPanelLayout->addWidget(m_lastAreaWidget);
     m_mainPanelLayout->addStretch(1);
 
     m_mainPanelLayout->setMargin(0);
@@ -98,14 +100,19 @@ void MainPanelControl::init()
     m_appAreaLayout->setSpacing(MODE_PADDING);
     m_appAreaLayout->setAlignment(Qt::AlignCenter);
 
-
     m_windowAreaWidget->setLayout(m_windowAreaLayout);
     m_windowAreaLayout->setMargin(0);
     m_windowAreaLayout->setContentsMargins(0, 0, 0, 0);
     m_windowAreaLayout->setSpacing(MODE_PADDING);
     m_windowAreaLayout->setAlignment(Qt::AlignCenter);
 
-    m_mainPanelLayout->setAlignment(m_splitter, Qt::AlignCenter);
+    m_lastAreaWidget->setLayout(m_lastAreaLayout);
+    m_lastAreaLayout->setMargin(0);
+    m_lastAreaLayout->setContentsMargins(0, 0, 0, 0);
+    m_lastAreaLayout->setSpacing(MODE_PADDING);
+    m_lastAreaLayout->setAlignment(Qt::AlignCenter);
+
+    // m_mainPanelLayout->setAlignment(m_splitter, Qt::AlignCenter);
 }
 
 void MainPanelControl::updateMainPanelLayout()
@@ -120,6 +127,8 @@ void MainPanelControl::updateMainPanelLayout()
             m_appAreaLayout->setDirection(QBoxLayout::LeftToRight);
             m_windowAreaWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
             m_windowAreaLayout->setDirection(QBoxLayout::LeftToRight);
+            m_lastAreaWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+            m_lastAreaLayout->setDirection(QBoxLayout::LeftToRight);
 
             break;
         case Position::Right:
@@ -131,6 +140,8 @@ void MainPanelControl::updateMainPanelLayout()
             m_appAreaLayout->setDirection(QBoxLayout::TopToBottom);
             m_windowAreaWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
             m_windowAreaLayout->setDirection(QBoxLayout::TopToBottom);
+            m_lastAreaWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+            m_lastAreaLayout->setDirection(QBoxLayout::TopToBottom);
             break;
     }
     resizeDockIcon();
@@ -161,6 +172,12 @@ void MainPanelControl::addWindowAreaItem(int index, QWidget *wdg)
 void MainPanelControl::removeWindowAreaItem(QWidget *wdg)
 {
     m_appAreaLayout->removeWidget(wdg);
+}
+
+void MainPanelControl::addLastAreaItem(int index, QWidget *wdg)
+{
+    wdg->setFixedSize(DockItemManager::instance()->itemSize(), DockItemManager::instance()->itemSize());
+    m_lastAreaLayout->insertWidget(index, wdg);
 }
 
 void MainPanelControl::resizeEvent(QResizeEvent *event)
@@ -200,6 +217,9 @@ void MainPanelControl::insertItem(int index, DockItem *item)
             break;
         case DockItem::Window:
             addWindowAreaItem(index, item);
+            break;
+        case DockItem::Plugins:
+            addLastAreaItem(index, item);
             break;
         default:
             break;
@@ -254,15 +274,6 @@ void MainPanelControl::dragLeaveEvent(QDragLeaveEvent *e)
 {
     Q_UNUSED(e);
     if (m_placeholderItem) {
-        const QRect r(static_cast<QWidget *>(parent())->pos(), size());
-        const QPoint p(QCursor::pos());
-
-        // remove margins to fix a touch screen bug:
-        // the mouse point position will stay on this rect's margins after
-        // drag move to the edge of screen
-        if (r.marginsRemoved(QMargins(1, 10, 1, 1)).contains(p))
-            return;
-
         removeAppAreaItem(m_placeholderItem);
         m_placeholderItem->deleteLater();
     }
@@ -314,9 +325,8 @@ void MainPanelControl::dropEvent(QDropEvent *e)
         m_placeholderItem->deleteLater();
         QTimer::singleShot(1000, [ this ]{ emit dirAppChanged(); });
     }
-    else
-    {
-        DockItem *source = qobject_cast<DockItem *>(e->source());
+    else if(DockItem *source = qobject_cast<DockItem *>(e->source())) {
+
         handleDragDrop(source, m_appAreaWidget->mapFromParent(e->pos()));
     }
 }
@@ -362,9 +372,9 @@ void MainPanelControl::dragMoveEvent(QDragMoveEvent *e)
     }
 
     // 拖app到dock上
-    const char *RequestDockKey = "RequestDock";
-    const char *RequestDockKeyFallback = "text/plain";
-    const char *DesktopMimeType = "application/x-desktop";
+    static const char *RequestDockKey = "RequestDock";
+    static const char *RequestDockKeyFallback = "text/plain";
+    static const char *DesktopMimeType = "application/x-desktop";
     auto DragmineData = e->mimeData();
 
     m_draggingMimeKey = DragmineData->formats().contains(RequestDockKey) ? RequestDockKey : RequestDockKeyFallback;
@@ -372,18 +382,13 @@ void MainPanelControl::dragMoveEvent(QDragMoveEvent *e)
     // dragging item is NOT a desktop file
     if (QMimeDatabase().mimeTypeForFile(DragmineData->data(m_draggingMimeKey)).name() != DesktopMimeType) {
         m_draggingMimeKey.clear();
-        e->setAccepted(false);
-        qDebug() << "dragging item is NOT a desktop file";
+        e->setAccepted(DragmineData->hasUrls());
         return;
     }
 
     //如果当前从桌面拖拽的的app是trash，则不能放入app任务栏中
-    QString str = "file://";
-    //启动器
-    QString str_t = "";
-
-    str.append(QStandardPaths::locate(QStandardPaths::DesktopLocation, "dde-trash.desktop"));
-    str_t.append(QStandardPaths::locate(QStandardPaths::ApplicationsLocation, "dde-trash.desktop"));
+    static const QString str = "file://" + QStandardPaths::locate(QStandardPaths::DesktopLocation, "dde-trash.desktop");
+    static const QString str_t = QStandardPaths::locate(QStandardPaths::ApplicationsLocation, "dde-trash.desktop");
 
     if ((str == DragmineData->data(m_draggingMimeKey)) || (str_t == DragmineData->data(m_draggingMimeKey))) {
         e->setAccepted(false);
@@ -403,13 +408,13 @@ bool MainPanelControl::eventFilter(QObject *watched, QEvent *event)
     if (m_appDragWidget && watched == static_cast<QGraphicsView *>(m_appDragWidget)->viewport()) {
         QDropEvent *e = static_cast<QDropEvent *>(event);
         bool isContains = rect().contains(mapFromGlobal(m_appDragWidget->mapToGlobal(e->pos())));
+        // bool isContains = m_appAreaWidget->rect().contains(mapFromGlobal(m_appDragWidget->mapToGlobal(e->pos())));
         if (isContains) {
             if (event->type() == QEvent::DragMove) {
                 handleDragMove(static_cast<QDragMoveEvent *>(event), true);
             } else if (event->type() == QEvent::Drop) {
                 m_appDragWidget->hide();
-                DockItem *item = qobject_cast<DockItem *>(e->source());
-                if(item)
+                if(DockItem *item = qobject_cast<DockItem *>(e->source()))
                     handleDragDrop(item, m_appAreaWidget->mapFromGlobal(m_appDragWidget->mapToGlobal(e->pos())));
                 return true;
             }
@@ -875,25 +880,27 @@ void MainPanelControl::handleDragDrop(DockItem *sourceItem, QPoint point)
 void MainPanelControl::paintEvent(QPaintEvent *e)
 {
     Q_UNUSED(e)
+    QPainter painter(this);
+    QColor color;
+    if (DGuiApplicationHelper::instance()->themeType() == DGuiApplicationHelper::LightType)
+    {
+        color = Qt::black;
+        painter.setOpacity(0.5);
+    } else {
+        color = Qt::white;
+        painter.setOpacity(0.1);
+    }
+
     if(m_windowAreaLayout->count() > 0)
     {
-        QPainter painter(this);
-        QColor color;
-        if (DGuiApplicationHelper::instance()->themeType() == DGuiApplicationHelper::LightType)
-        {
-            color = Qt::black;
-            painter.setOpacity(0.5);
-        } else {
-            color = Qt::white;
-            painter.setOpacity(0.1);
-        }
         m_splitter->show();
         painter.fillRect(m_splitter->geometry(), color);
     }
     else
-    {
         m_splitter->hide();
-    }
+
+    m_splitter2->show();
+    painter.fillRect(m_splitter2->geometry(), color);
 }
 
 void MainPanelControl::itemUpdated(DockItem *item)
@@ -903,29 +910,30 @@ void MainPanelControl::itemUpdated(DockItem *item)
 
 void MainPanelControl::resizeDockIcon()
 {
-    // const int size =  DockItemManager::instance()->itemSize();
     int size;
 
     if (m_position == Dock::Position::Bottom) {
         size = DockItemManager::instance()->isEnableHoverScaleAnimation() ? height() * .8 : height() - 2;
         size = qMax(size, 0);
         m_splitter->setFixedSize(SPLITER_SIZE, int(size * 0.6));
+        m_splitter2->setFixedSize(SPLITER_SIZE, int(size * 0.6));
     } else {
         size = DockItemManager::instance()->isEnableHoverScaleAnimation() ? width() * .8 : width() - 2;
         size = qMax(size, 0);
         m_splitter->setFixedSize(int(size * 0.6), SPLITER_SIZE);
+        m_splitter2->setFixedSize(int(size * 0.6), SPLITER_SIZE);
     }
-
 
     QSize s(size, size);
     if(m_fixedAreaLayout->count() > 0)
-    {
         m_fixedAreaLayout->itemAt(0)->widget()->setFixedSize(s);
-    }
 
     for (int i = 0; i < m_appAreaLayout->count(); ++ i)
         m_appAreaLayout->itemAt(i)->widget()->setFixedSize(s);
 
     for(int i(0); i < m_windowAreaLayout->count(); ++i)
         m_windowAreaLayout->itemAt(i)->widget()->setFixedSize(s);
+
+    for(int i(0); i < m_lastAreaLayout->count(); ++i)
+        m_lastAreaLayout->itemAt(i)->widget()->setFixedSize(s);
 }
