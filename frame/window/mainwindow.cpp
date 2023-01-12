@@ -27,6 +27,7 @@
 #include "util/multiscreenworker.h"
 #include "util/menuworker.h"
 
+#include <DWindowManagerHelper>
 #include <DPlatformWindowHandle>
 #include <DPlatformTheme>
 #include <QDebug>
@@ -35,89 +36,16 @@
 #include <QX11Info>
 #include <qpa/qplatformwindow.h>
 
-#include <X11/X.h>
-#include <X11/Xutil.h>
-
 #define MAINWINDOW_MAX_SIZE       DOCK_MAX_SIZE
 #define MAINWINDOW_MIN_SIZE       (40)
-#define DRAG_AREA_SIZE (5)
-#define DRAG_STATE "DRAG_STATE"
-
-class DragWidget : public QWidget
-{
-        Q_OBJECT
-    private:
-        bool m_dragStatus;
-        QPoint m_resizePoint;
-
-    public:
-        DragWidget(QWidget *parent) : QWidget(parent)
-        {
-            m_dragStatus = false;
-        }
-
-    signals:
-        void dragPointOffset(QPoint);
-        void dragStarted();
-        void dragFinished();
-
-    private:
-        void mousePressEvent(QMouseEvent *event) override
-        {
-            if (event->button() == Qt::LeftButton) {
-                m_resizePoint = event->globalPos();
-                m_dragStatus = true;
-                emit dragStarted();
-                this->grabMouse();
-            }
-        }
-
-        void mouseMoveEvent(QMouseEvent *event) override
-        {
-            if (m_dragStatus) {
-                QPoint offset = QPoint(QCursor::pos() - m_resizePoint);
-                m_resizePoint = QCursor::pos();
-                emit dragPointOffset(offset);
-            }
-        }
-
-        void mouseReleaseEvent(QMouseEvent *event) override
-        {
-            if (m_dragStatus)
-            {
-                m_dragStatus =  false;
-                releaseMouse();
-                emit dragFinished();
-            }
-        }
-
-        void enterEvent(QEvent *) override
-        {
-            if (QApplication::overrideCursor() && QApplication::overrideCursor()->shape() != cursor()) {
-                QApplication::setOverrideCursor(cursor());
-            }
-        }
-
-        void leaveEvent(QEvent *) override
-        {
-            QApplication::restoreOverrideCursor();
-        }
-};
 
 MainWindow::MainWindow(QWidget *parent) : DBlurEffectWidget(parent)
-    , m_launched(false)
     , m_mainPanel(new MainPanelControl(this))
-    , m_wmHelper(DWindowManagerHelper::instance())
-    , m_multiScreenWorker(new MultiScreenWorker(this, m_wmHelper->hasComposite()))
+    , m_multiScreenWorker(new MultiScreenWorker(this, DWindowManagerHelper::instance()->hasComposite()))
     , m_menuWorker(new MenuWorker(m_multiScreenWorker->dockInter(), this))
     , m_platformWindowHandle(this)
-    , m_dragWidget(new DragWidget(this))
-    , m_timer(new QTimer(this))
     , m_topPanelInterface(new TopPanelInterface("me.imever.dde.TopPanel", "/me/imever/dde/TopPanel", QDBusConnection::sessionBus(), this))
 {
-    setMouseTracking(true);
-    setAcceptDrops(true);
-
     DPlatformWindowHandle::enableDXcbForWindow(this, true);
     m_platformWindowHandle.setEnableBlurWindow(true);
     m_platformWindowHandle.setTranslucentBackground(true);
@@ -126,17 +54,8 @@ MainWindow::MainWindow(QWidget *parent) : DBlurEffectWidget(parent)
     m_platformWindowHandle.setShadowColor(QColor(0, 0, 0, 0.3 * 255));
 
     XcbMisc::instance()->set_window_type(winId(), XcbMisc::Dock);
-    initComponents();
     initConnections();
-
     DockItemManager::instance()->reloadAppItems();
-
-    m_dragWidget->setMouseTracking(true);
-    m_dragWidget->setFocusPolicy(Qt::NoFocus);
-}
-
-MainWindow::~MainWindow()
-{
 }
 
 MainPanelControl *MainWindow::panel()
@@ -148,55 +67,49 @@ void MainWindow::launch()
 {
     setVisible(false);
     QTimer::singleShot(400, this, [ this ] {
-        m_launched = true;
         setVisible(true);
+        setMaskColor(AutoColor);
+        setMaskAlpha(m_multiScreenWorker->opacity());
+
+        const bool composite = DWindowManagerHelper::instance()->hasComposite();
+        int radius = composite ? DGuiApplicationHelper::instance()->systemTheme()->windowRadius(3) : 3;
+
+        if(composite) {
+            DGuiApplicationHelper::ColorType themeType = DGuiApplicationHelper::instance()->themeType();
+            if (themeType == DGuiApplicationHelper::DarkType)
+                m_platformWindowHandle.setBorderColor(QColor(0, 0, 0, 255 * 0.3));
+            else
+                m_platformWindowHandle.setBorderColor(QColor(QColor::Invalid));
+        }
+
+        m_platformWindowHandle.setBorderWidth(composite ? 1 : 0);
+        m_platformWindowHandle.setWindowRadius(radius);
+        m_multiScreenWorker->setComposite(composite);
         m_multiScreenWorker->initShow();
     });
 }
 
-void MainWindow::mousePressEvent(QMouseEvent *e)
-{
-    e->ignore();
-    if (e->button() == Qt::RightButton) {
-        QTimer::singleShot(10, this, [this]{
-            m_menuWorker->showDockSettingsMenu();
-        });
-    }
-}
-
-void MainWindow::initComponents()
-{
-    m_timer->setSingleShot(true);
-    m_timer->setInterval(100);
-
-    QTimer::singleShot(1, this, &MainWindow::compositeChanged);
-    themeTypeChanged(DGuiApplicationHelper::instance()->themeType());
-}
-
-void MainWindow::compositeChanged()
-{
-    const bool composite = m_wmHelper->hasComposite();
-
-    setMaskColor(AutoColor);
-    setMaskAlpha(m_multiScreenWorker->opacity());
-    m_platformWindowHandle.setBorderWidth(composite ? 1 : 0);
-    m_multiScreenWorker->setComposite(composite);
-
-    m_timer->start();
-}
-
 void MainWindow::initConnections()
 {
-    // connect(m_wmHelper, &DWindowManagerHelper::hasCompositeChanged, this, &MainWindow::compositeChanged, Qt::QueuedConnection);
-    connect(m_wmHelper, &DWindowManagerHelper::hasCompositeChanged, m_timer, static_cast<void (QTimer::*)()>(&QTimer::start));
-    connect(&m_platformWindowHandle, &DPlatformWindowHandle::frameMarginsChanged, m_timer, static_cast<void (QTimer::*)()>(&QTimer::start));
-    connect(&m_platformWindowHandle, &DPlatformWindowHandle::windowRadiusChanged, m_timer, static_cast<void (QTimer::*)()>(&QTimer::start));
-    connect(m_timer, &QTimer::timeout, this, [this]{
-        if (m_launched && !m_timer->isActive())
-        {
-            int radius = m_wmHelper->hasComposite() ? DGuiApplicationHelper::instance()->systemTheme()->windowRadius(3) : 3;
-            m_platformWindowHandle.setWindowRadius(radius);
+    connect(DWindowManagerHelper::instance(), &DWindowManagerHelper::hasCompositeChanged, this, [this]{
+        const bool composite = DWindowManagerHelper::instance()->hasComposite();
+        setMaskColor(AutoColor);
+        setMaskAlpha(m_multiScreenWorker->opacity());
+        m_platformWindowHandle.setBorderWidth(composite ? 1 : 0);
+        m_multiScreenWorker->setComposite(composite);
+    });
+    // connect(&m_platformWindowHandle, &DPlatformWindowHandle::frameMarginsChanged, m_timer, static_cast<void (QTimer::*)()>(&QTimer::start));
+    connect(DGuiApplicationHelper::instance(), &DGuiApplicationHelper::themeTypeChanged, this, [this](DGuiApplicationHelper::ColorType themeType){
+        if (DWindowManagerHelper::instance()->hasComposite()) {
+            if (themeType == DGuiApplicationHelper::DarkType)
+                m_platformWindowHandle.setBorderColor(QColor(0, 0, 0, 255 * 0.3));
+            else
+                m_platformWindowHandle.setBorderColor(QColor(QColor::Invalid));
         }
+    });
+    connect(&m_platformWindowHandle, &DPlatformWindowHandle::windowRadiusChanged, this, [this]{
+        int radius = DWindowManagerHelper::instance()->hasComposite() ? DGuiApplicationHelper::instance()->systemTheme()->windowRadius(3) : 3;
+        m_platformWindowHandle.setWindowRadius(radius);
     });
 
     connect(DockItemManager::instance(), &DockItemManager::itemInserted, m_mainPanel, &MainPanelControl::insertItem, Qt::DirectConnection);
@@ -211,11 +124,8 @@ void MainWindow::initConnections()
     connect(m_mainPanel, &MainPanelControl::itemCountChanged, m_multiScreenWorker, &MultiScreenWorker::updateDisplay);
     connect(m_mainPanel, &MainPanelControl::dirAppChanged, DockItemManager::instance(), &DockItemManager::updateDirApp);
 
-    connect(m_dragWidget, &DragWidget::dragStarted, this, []{ qApp->setProperty(DRAG_STATE, true); });
-    connect(m_dragWidget, &DragWidget::dragFinished, this, []{ qApp->setProperty(DRAG_STATE, false); });
-
-    connect(m_dragWidget, &DragWidget::dragPointOffset, this, &MainWindow::onMainWindowSizeChanged);
-    connect(m_dragWidget, &DragWidget::dragFinished, this, [this]{
+    connect(m_mainPanel, &MainPanelControl::requestResizeDockSize, this, &MainWindow::resizeDock);
+    connect(m_mainPanel, &MainPanelControl::requestResizeDockSizeFinished, this, [this]{
             QRect rect = m_multiScreenWorker->dockRect(m_multiScreenWorker->deskScreen()
                                                     , m_multiScreenWorker->position()
                                                     , HideMode::KeepShowing);
@@ -238,7 +148,7 @@ void MainWindow::initConnections()
 
             // 通知窗管和后端更新数据
             m_multiScreenWorker->updateDaemonDockSize(dockSize);                                // 1.先更新任务栏高度
-            onMainWindowSizeChanged(QPoint(0, 0));
+            // onMainWindowSizeChanged(QPoint(0, 0));
 
             m_multiScreenWorker->requestUpdateFrontendGeometry();                               // 2.再更新任务栏位置,保证先1再2
 
@@ -247,104 +157,34 @@ void MainWindow::initConnections()
             emit geometryChanged(geometry());
      });
 
-    connect(DGuiApplicationHelper::instance(), &DGuiApplicationHelper::themeTypeChanged, this, &MainWindow::themeTypeChanged);
 
+    connect(m_mainPanel, &MainPanelControl::requestConttextMenu, m_menuWorker, &MenuWorker::showDockSettingsMenu);
     connect(m_menuWorker, &MenuWorker::autoHideChanged, m_multiScreenWorker, &MultiScreenWorker::onAutoHideChanged);
     connect(m_menuWorker, &MenuWorker::updatePanelGeometry, m_multiScreenWorker, &MultiScreenWorker::updateDisplay);
 
     connect(m_multiScreenWorker, &MultiScreenWorker::opacityChanged, this, &MainWindow::setMaskAlpha, Qt::QueuedConnection);
-    connect(m_multiScreenWorker, &MultiScreenWorker::requestUpdateFrontendGeometry, this, &MainWindow::resetDragWindow);
     // connect(m_multiScreenWorker, &MultiScreenWorker::requestUpdateDockEntry, DockItemManager::instance(), &DockItemManager::requestUpdateDockItem);
     connect(m_topPanelInterface, &TopPanelInterface::pluginVisibleChanged, this, &MainWindow::pluginVisibleChanged);
 }
 
-void MainWindow::updateDragCursor()
-{
-    if (Bottom == m_multiScreenWorker->position()) {
-        m_dragWidget->setCursor(Qt::SizeVerCursor);
-    } else {
-        m_dragWidget->setCursor(Qt::SizeHorCursor);
-    }
-}
-
-void MainWindow::onMainWindowSizeChanged(QPoint offset)
-{
-    const QRect &rect = m_multiScreenWorker->dockRect(m_multiScreenWorker->deskScreen()
-                                                      , m_multiScreenWorker->position()
-                                                      , HideMode::KeepShowing);
-    QRect newRect;
-    switch (m_multiScreenWorker->position()) {
-    case Bottom: {
-        newRect.setX(rect.x());
-        newRect.setY(rect.y() + rect.height() - qBound(MAINWINDOW_MIN_SIZE, rect.height() - offset.y(), MAINWINDOW_MAX_SIZE));
-        newRect.setWidth(rect.width());
-        newRect.setHeight(qBound(MAINWINDOW_MIN_SIZE, rect.height() - offset.y(), MAINWINDOW_MAX_SIZE));
-    }
-        break;
-    case Left: {
-        newRect.setX(rect.x());
-        newRect.setY(rect.y());
-        newRect.setWidth(qBound(MAINWINDOW_MIN_SIZE, rect.width() + offset.x(), MAINWINDOW_MAX_SIZE));
-        newRect.setHeight(rect.height());
-    }
-        break;
-    case Right: {
-        newRect.setX(rect.x() + rect.width() - qBound(MAINWINDOW_MIN_SIZE, rect.width() - offset.x(), MAINWINDOW_MAX_SIZE));
-        newRect.setY(rect.y());
-        newRect.setWidth(qBound(MAINWINDOW_MIN_SIZE, rect.width() - offset.x(), MAINWINDOW_MAX_SIZE));
-        newRect.setHeight(rect.height());
-    }
-        break;
-        case Top: break;
-    }
-
-    // 更新界面大小
-    m_mainPanel->setFixedSize(newRect.size());
-    setFixedSize(newRect.size());
-    move(newRect.topLeft());
-
-    if(qApp->property(DRAG_STATE).toBool())
-        m_multiScreenWorker->setWindowSize(m_multiScreenWorker->position() == Bottom ? newRect.height() : newRect.width());
-}
-
-void MainWindow::resetDragWindow()
-{
-    if(width() > 0 && height() > 0)
-    {
-        switch (m_multiScreenWorker->position()) {
-        case Dock::Bottom:
-            m_dragWidget->setGeometry(0, 0, width(), DRAG_AREA_SIZE);
-            break;
-        case Dock::Left:
-            m_dragWidget->setGeometry(width() - DRAG_AREA_SIZE, 0, DRAG_AREA_SIZE, height());
-            break;
-        case Dock::Right:
-            m_dragWidget->setGeometry(0, 0, DRAG_AREA_SIZE, height());
-            break;
-        case Top: break;
-        }
-
-        updateDragCursor();
-        m_timer->start();
-    }
-}
-
 void MainWindow::resizeDock(int offset, bool dragging)
 {
-    qApp->setProperty(DRAG_STATE, dragging);
-
     offset = qBound(MAINWINDOW_MIN_SIZE, offset, MAINWINDOW_MAX_SIZE);
 
-    if(qApp->property(DRAG_STATE).toBool())
+    const Position pos = m_multiScreenWorker->position();
+    if(((pos == Bottom ||pos == Top) && offset == height()) || ((pos == Left ||pos == Right) && offset == width()))
+        return;
+
+    if(dragging)
         m_multiScreenWorker->setWindowSize(offset);
 
     // const QRect &rect = m_multiScreenWorker->getDockShowMinGeometry(m_multiScreenWorker->deskScreen());
     const QRect &rect = m_multiScreenWorker->dockRect(m_multiScreenWorker->deskScreen()
-                                                      , m_multiScreenWorker->position()
+                                                      , pos
                                                       , HideMode::KeepShowing);
 
     QRect newRect;
-    switch (m_multiScreenWorker->position()) {
+    switch (pos) {
     case Bottom: {
         newRect.setX(rect.x());
         newRect.setY(rect.y() + rect.height() - offset);
@@ -374,18 +214,8 @@ void MainWindow::resizeDock(int offset, bool dragging)
     setFixedSize(newRect.size());
     move(newRect.topLeft());
 
-    if (!dragging)
-        resetDragWindow();
-}
-
-void MainWindow::themeTypeChanged(DGuiApplicationHelper::ColorType themeType)
-{
-    if (m_wmHelper->hasComposite()) {
-        if (themeType == DGuiApplicationHelper::DarkType)
-            m_platformWindowHandle.setBorderColor(QColor(0, 0, 0, 255 * 0.3));
-        else
-            m_platformWindowHandle.setBorderColor(QColor(QColor::Invalid));
-    }
+    if(!dragging)
+        emit m_mainPanel->requestResizeDockSizeFinished();
 }
 
 QStringList MainWindow::GetLoadedPlugins() {
@@ -404,4 +234,3 @@ void MainWindow::setPluginVisible(QString pluginName, bool visible) {
     m_topPanelInterface->setPluginVisible(pluginName, visible);
 }
 
-#include "mainwindow.moc"

@@ -31,13 +31,9 @@ DockItemManager::DockItemManager() : QObject()
     , launcherItem(new LauncherItem)
 {
     m_qsettings->setIniCodec(QTextCodec::codecForName("UTF-8"));
-    // 应用信号
     connect(m_appInter, &DBusDock::EntryAdded, this, &DockItemManager::appItemAdded);
     connect(m_appInter, &DBusDock::EntryRemoved, this, static_cast<void (DockItemManager::*)(const QString &)>(&DockItemManager::appItemRemoved), Qt::QueuedConnection);
     connect(m_appInter, &DBusDock::ServiceRestarted, this, [ this ] { QTimer::singleShot(500, [ this ] { reloadAppItems(); }); });
-
-    // 刷新图标
-    // QMetaObject::invokeMethod(this, "refershItemsIcon", Qt::QueuedConnection);
 }
 
 

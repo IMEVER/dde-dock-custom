@@ -29,9 +29,13 @@ class WindowItem : public DockItem
         void dragMoveEvent(QDragMoveEvent *e) override;
         void dropEvent(QDropEvent *e) override;
 
+        void invokedMenuItem(const QString &itemId, const bool checked) Q_DECL_OVERRIDE;
+        const QString contextMenu() const Q_DECL_OVERRIDE;
+
     private:
         void showPreview();
         void showHoverTips() override;
+        void closeWindow();
 
     private:
         AppItem *m_appItem;

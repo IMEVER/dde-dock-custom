@@ -98,10 +98,7 @@ WindowItem::WindowItem(AppItem *appItem, WId wId, WindowInfo windowInfo, bool cl
     timer = new QTimer(this);
     timer->setSingleShot(false);
     timer->setInterval(10000);
-    connect(timer, &QTimer::timeout, [ this ]{
-        if(this->window()->isVisible())
-            fetchSnapshot();
-    });
+    connect(timer, &QTimer::timeout, this, &WindowItem::fetchSnapshot);
     timer->start();
 
     update();
@@ -160,11 +157,14 @@ void WindowItem::paintEvent(QPaintEvent *e)
 
 void WindowItem::mouseReleaseEvent(QMouseEvent *e)
 {
-    if(XUtils::getFocusWindowId() != m_WId)
-        m_appItem->requestActivateWindow(m_WId);
-    else
-        KWindowSystem::minimizeWindow(m_WId);
-
+    if(e->button() == Qt::LeftButton) {
+        if(XUtils::getFocusWindowId() != m_WId)
+            m_appItem->requestActivateWindow(m_WId);
+        else
+            KWindowSystem::minimizeWindow(m_WId);
+    } else if(e->button() == Qt::MiddleButton) {
+        closeWindow();
+    }
     hidePopup();
 }
 
@@ -226,10 +226,28 @@ void WindowItem::dropEvent(QDropEvent *e)
     m_appItem->handleDragDrop(QX11Info::getTimestamp(), uriList);
 }
 
+void WindowItem::closeWindow() {
+    if(!m_closeable) return;
+
+    const auto display = QX11Info::display();
+
+    XEvent e;
+
+    memset(&e, 0, sizeof(e));
+    e.xclient.type = ClientMessage;
+    e.xclient.window = m_WId;
+    e.xclient.message_type = XInternAtom(display, "WM_PROTOCOLS", true);
+    e.xclient.format = 32;
+    e.xclient.data.l[0] = XInternAtom(display, "WM_DELETE_WINDOW", false);
+    e.xclient.data.l[1] = CurrentTime;
+
+    XSendEvent(display, m_WId, false, NoEventMask, &e);
+    XFlush(display);
+}
+
 void WindowItem::showHoverTips()
 {
     return showPreview();
-    // DockItem::showHoverTips();
 }
 
 void WindowItem::showPreview()
@@ -256,6 +274,8 @@ void WindowItem::showPreview()
 
 void WindowItem::fetchSnapshot()
 {
+    if(this->window()->isVisible() == false) return;
+
     QImage qimage;
     SHMInfo *info = nullptr;
     uchar *image_data = nullptr;
@@ -319,4 +339,52 @@ void WindowItem::fetchSnapshot()
     if (prop_to_return_gtk) XFree(prop_to_return_gtk);
 
     update();
+}
+
+void WindowItem::invokedMenuItem(const QString &itemId, const bool checked) {
+    if(itemId == "close")
+        closeWindow();
+    else if(itemId == "max") {
+        if(XUtils::checkIfWinMaximum(m_WId))
+            XUtils::unmaximizeWindow(m_WId);
+        else
+            XUtils::maximizeWindow(m_WId);
+        XUtils::checkIfWinMaximum(m_WId);
+    } else if(itemId == "min")
+        KWindowSystem::minimizeWindow(m_WId);
+    else if(itemId == "active")
+        m_appItem->requestActivateWindow(m_WId);
+}
+
+const QString WindowItem::contextMenu() const {
+    QJsonObject menu;
+    QJsonArray items;
+
+    QJsonObject item;
+    item.insert("itemText", "激活窗口");
+    item.insert("itemId", "active");
+    item.insert("isActive", XUtils::getFocusWindowId() != m_WId);
+    items.append(item);
+
+    const bool isMax = XUtils::checkIfWinMaximum(m_WId);
+    QJsonObject maxItem;
+    maxItem.insert("itemText", isMax ? "还原窗口" : "最大化窗口");
+    maxItem.insert("itemId", "max");
+    maxItem.insert("isActive", true);
+    items.append(maxItem);
+
+    QJsonObject minItem;
+    minItem.insert("itemText", "最小化窗口");
+    minItem.insert("itemId", "min");
+    minItem.insert("isActive", XUtils::checkIfWinMinimun(m_WId) == false);
+    items.append(minItem);
+
+    QJsonObject closeItem;
+    closeItem.insert("itemText", "关闭窗口");
+    closeItem.insert("itemId", "close");
+    closeItem.insert("isActive", m_closeable ? true : false);
+    items.append(closeItem);
+
+    menu.insert("items", items);
+    return QJsonDocument(menu).toJson();
 }

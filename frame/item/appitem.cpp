@@ -39,20 +39,7 @@
 #include <DGuiApplicationHelper>
 
 AppItem::AppItem(const QDBusObjectPath &entry, QWidget *parent)
-    : DockItem(parent)
-    , m_appNameTips(new TipsWidget(this))
-    , m_appPreviewTips(nullptr)
-    , m_itemEntryInter(new DockEntryInter("com.deepin.dde.daemon.Dock", entry.path(), QDBusConnection::sessionBus(), this))
-    , m_swingEffectView(nullptr)
-    , m_itemAnimation(nullptr)
-    , m_retryTimes(0)
-    , m_lastclickTimes(0)
-    , m_appIcon(QPixmap())
-    , m_updateIconGeometryTimer(new QTimer(this))
-    , m_retryObtainIconTimer(new QTimer(this))
-    , m_smallWatcher(new QFutureWatcher<QPixmap>(this))
-    , m_largeWatcher(new QFutureWatcher<QPixmap>(this))
-    , m_dirItem(nullptr)
+    : DockItem(parent), m_appNameTips(new TipsWidget(this)), m_appPreviewTips(nullptr), m_itemEntryInter(new DockEntryInter("com.deepin.dde.daemon.Dock", entry.path(), QDBusConnection::sessionBus(), this)), m_swingEffectView(nullptr), m_itemAnimation(nullptr), m_retryTimes(0), m_lastclickTimes(0), m_appIcon(QPixmap()), m_updateIconGeometryTimer(new QTimer(this)), m_retryObtainIconTimer(new QTimer(this)), m_smallWatcher(new QFutureWatcher<QPixmap>(this)), m_largeWatcher(new QFutureWatcher<QPixmap>(this)), m_dirItem(nullptr)
 {
     // setWindowFlags(Qt::ToolTip);
     QHBoxLayout *centralLayout = new QHBoxLayout;
@@ -79,14 +66,29 @@ AppItem::AppItem(const QDBusObjectPath &entry, QWidget *parent)
     m_retryObtainIconTimer->setSingleShot(true);
 
     connect(m_itemEntryInter, &DockEntryInter::IsActiveChanged, this, &AppItem::activeChanged);
-    connect(m_itemEntryInter, &DockEntryInter::IsActiveChanged, this, static_cast<void (AppItem::*)()>(&AppItem::update));
     connect(m_itemEntryInter, &DockEntryInter::WindowInfosChanged, this, &AppItem::updateWindowInfos, Qt::QueuedConnection);
     connect(m_itemEntryInter, &DockEntryInter::IconChanged, this, &AppItem::refershIcon);
 
     connect(m_updateIconGeometryTimer, &QTimer::timeout, this, &AppItem::updateWindowIconGeometries, Qt::QueuedConnection);
     connect(m_retryObtainIconTimer, &QTimer::timeout, this, &AppItem::refershIcon, Qt::QueuedConnection);
 
-    connect(DGuiApplicationHelper::instance(), &DGuiApplicationHelper::themeTypeChanged, [ this ](DGuiApplicationHelper::ColorType type){ m_themeType = type; });
+    auto themeChanged = [this](DGuiApplicationHelper::ColorType type)
+    {
+        if (DGuiApplicationHelper::DarkType == type)
+        {
+            m_horizontalIndicator = QPixmap(":/indicator/resources/indicator_dark.svg");
+            m_verticalIndicator = QPixmap(":/indicator/resources/indicator_dark_ver.svg");
+        }
+        else
+        {
+            m_horizontalIndicator = QPixmap(":/indicator/resources/indicator.svg");
+            m_verticalIndicator = QPixmap(":/indicator/resources/indicator_ver.svg");
+        }
+    };
+    connect(DGuiApplicationHelper::instance(), &DGuiApplicationHelper::themeTypeChanged, themeChanged);
+    themeChanged(DGuiApplicationHelper::instance()->themeType());
+    m_activeHorizontalIndicator = QPixmap(":/indicator/resources/indicator_active.svg");
+    m_activeVerticalIndicator = QPixmap(":/indicator/resources/indicator_active_ver.svg");
 
     connect(DockItemManager::instance(), &DockItemManager::mergeModeChanged, this, &AppItem::mergeModeChanged);
 
@@ -123,7 +125,7 @@ void AppItem::setDirItem(DirItem *dirItem)
     m_dirItem = dirItem;
     m_place = DirPlace;
 
-    if(DockItemManager::instance()->getDockMergeMode() == MergeDock)
+    if (DockItemManager::instance()->getDockMergeMode() == MergeDock)
         mergeModeChanged(DockItemManager::instance()->getDockMergeMode());
 }
 
@@ -132,7 +134,7 @@ void AppItem::removeDirItem()
     m_dirItem = nullptr;
     m_place = DockPlace;
 
-    if(DockItemManager::instance()->getDockMergeMode() == MergeDock)
+    if (DockItemManager::instance()->getDockMergeMode() == MergeDock)
         mergeModeChanged(DockItemManager::instance()->getDockMergeMode());
 }
 
@@ -176,63 +178,55 @@ void AppItem::paintEvent(QPaintEvent *e)
 
     const QRectF itemRect = rect();
 
-        if (!m_windowInfos.isEmpty()) {
-            QPoint p;
-            QPixmap pixmap;
-            QPixmap activePixmap;
-            if (DGuiApplicationHelper::DarkType == m_themeType) {
-                m_horizontalIndicator = QPixmap(":/indicator/resources/indicator_dark.svg");
-                m_verticalIndicator = QPixmap(":/indicator/resources/indicator_dark_ver.svg");
-            } else {
-                m_horizontalIndicator = QPixmap(":/indicator/resources/indicator.svg");
-                m_verticalIndicator = QPixmap(":/indicator/resources/indicator_ver.svg");
-            }
-            m_activeHorizontalIndicator = QPixmap(":/indicator/resources/indicator_active.svg");
-            m_activeVerticalIndicator = QPixmap(":/indicator/resources/indicator_active_ver.svg");
+    if (!m_windowInfos.isEmpty())
+    {
+        QPoint p;
+        QPixmap pixmap;
+        QPixmap activePixmap;
 
-            if(getPlace() == DockPlace)
+        if (getPlace() == DockPlace)
+        {
+            switch (DockPosition)
             {
-                switch (DockPosition) {
-                case Top:
-                    pixmap = m_horizontalIndicator;
-                    activePixmap = m_activeHorizontalIndicator;
-                    p.setX((itemRect.width() - pixmap.width()) / 2);
-                    p.setY(1);
-                    break;
-                case Bottom:
-                    pixmap = m_horizontalIndicator;
-                    activePixmap = m_activeHorizontalIndicator;
-                    p.setX((itemRect.width() - pixmap.width()) / 2);
-                    p.setY(itemRect.height() - pixmap.height() - 1);
-                    break;
-                case Left:
-                    pixmap = m_verticalIndicator;
-                    activePixmap = m_activeVerticalIndicator;
-                    p.setX(1);
-                    p.setY((itemRect.height() - pixmap.height()) / 2);
-                    break;
-                case Right:
-                    pixmap = m_verticalIndicator;
-                    activePixmap = m_activeVerticalIndicator;
-                    p.setX(itemRect.width() - pixmap.width() - 1);
-                    p.setY((itemRect.height() - pixmap.height()) / 2);
-                    break;
-                }
-            }
-            else
-            {
+            case Top:
+                pixmap = m_horizontalIndicator;
+                activePixmap = m_activeHorizontalIndicator;
+                p.setX((itemRect.width() - pixmap.width()) / 2);
+                p.setY(1);
+                break;
+            case Bottom:
                 pixmap = m_horizontalIndicator;
                 activePixmap = m_activeHorizontalIndicator;
                 p.setX((itemRect.width() - pixmap.width()) / 2);
                 p.setY(itemRect.height() - pixmap.height() - 1);
+                break;
+            case Left:
+                pixmap = m_verticalIndicator;
+                activePixmap = m_activeVerticalIndicator;
+                p.setX(1);
+                p.setY((itemRect.height() - pixmap.height()) / 2);
+                break;
+            case Right:
+                pixmap = m_verticalIndicator;
+                activePixmap = m_activeVerticalIndicator;
+                p.setX(itemRect.width() - pixmap.width() - 1);
+                p.setY((itemRect.height() - pixmap.height()) / 2);
+                break;
             }
-
-
-            if (m_active)
-                painter.drawPixmap(p, activePixmap);
-            else
-                painter.drawPixmap(p, pixmap);
         }
+        else
+        {
+            pixmap = m_horizontalIndicator;
+            activePixmap = m_activeHorizontalIndicator;
+            p.setX((itemRect.width() - pixmap.width()) / 2);
+            p.setY(itemRect.height() - pixmap.height() - 1);
+        }
+
+        if (m_active)
+            painter.drawPixmap(p, activePixmap);
+        else
+            painter.drawPixmap(p, pixmap);
+    }
 
     painter.drawPixmap(appIconPosition(), m_appIcon.isNull() ? QPixmap(":/icons/resources/application-x-desktop.svg") : m_appIcon);
 }
@@ -245,32 +239,36 @@ void AppItem::mouseReleaseEvent(QMouseEvent *e)
 
     m_lastclickTimes = curTimestamp;
 
-    if (e->button() == Qt::MiddleButton) {
+    if (e->button() == Qt::MiddleButton)
+    {
         m_itemEntryInter->NewInstance(QX11Info::getTimestamp());
 
         if (m_windowInfos.isEmpty())
             playSwingEffect();
-        if(m_place == DockItem::DirPlace)
-            QTimer::singleShot(1000, [ this ] { m_dirItem->hideDirpopupWindow(); });
-
-    } else if (e->button() == Qt::LeftButton) {
+        if (m_place == DockItem::DirPlace)
+            QTimer::singleShot(1000, [this]
+                               { m_dirItem->hideDirpopupWindow(); });
+    }
+    else if (e->button() == Qt::LeftButton)
+    {
         m_itemEntryInter->Activate(QX11Info::getTimestamp());
 
         if (m_windowInfos.isEmpty())
             playSwingEffect();
-        if(m_place == DockItem::DirPlace)
-            QTimer::singleShot(1000, [ this ] { m_dirItem->hideDirpopupWindow(); });
+        if (m_place == DockItem::DirPlace)
+            QTimer::singleShot(1000, [this]
+                               { m_dirItem->hideDirpopupWindow(); });
     }
 
     // if(e->button() != Qt::RightButton)
-        // hidePopup();
+    // hidePopup();
 }
 
 void AppItem::mousePressEvent(QMouseEvent *e)
 {
     m_updateIconGeometryTimer->stop();
 
-    if(getPlace() == DockPlace)
+    if (getPlace() == DockPlace)
         hidePopup();
 
     // context menu will handle in DockItem
@@ -281,7 +279,8 @@ void AppItem::wheelEvent(QWheelEvent *e)
 {
     QWidget::wheelEvent(e);
 
-    if (qAbs(e->angleDelta().y()) > 20) {
+    if (qAbs(e->angleDelta().y()) > 20)
+    {
         m_itemEntryInter->PresentWindows();
     }
 }
@@ -296,17 +295,17 @@ void AppItem::resizeEvent(QResizeEvent *e)
 void AppItem::dragEnterEvent(QDragEnterEvent *e)
 {
     // ignore drag from panel
-    if (e->source()) {
+    if (e->source())
         return e->ignore();
-    }
 
     // ignore request dock event
     QString draggingMimeKey = e->mimeData()->formats().contains("RequestDock") ? "RequestDock" : "text/plain";
-    if (QMimeDatabase().mimeTypeForFile(e->mimeData()->data(draggingMimeKey)).name() == "application/x-desktop") {
+    if (QMimeDatabase().mimeTypeForFile(e->mimeData()->data(draggingMimeKey)).name() == "application/x-desktop")
+    {
         return e->ignore();
     }
 
-    if(e->mimeData()->hasUrls() == false)
+    if (e->mimeData()->hasUrls() == false)
         return e->ignore();
 
     e->accept();
@@ -327,9 +326,8 @@ void AppItem::dragMoveEvent(QDragMoveEvent *e)
 void AppItem::dropEvent(QDropEvent *e)
 {
     QStringList uriList;
-    for (auto uri : e->mimeData()->urls()) {
+    for (auto uri : e->mimeData()->urls())
         uriList << uri.toEncoded();
-    }
 
     qDebug() << "accept drop event with URIs: " << uriList;
     m_itemEntryInter->HandleDragDrop(QX11Info::getTimestamp(), uriList);
@@ -339,8 +337,10 @@ void AppItem::leaveEvent(QEvent *e)
 {
     DockItem::leaveEvent(e);
 
-    if (m_appPreviewTips) {
-        if (m_appPreviewTips->isVisible()) {
+    if (m_appPreviewTips)
+    {
+        if (m_appPreviewTips->isVisible())
+        {
             m_appPreviewTips->prepareHide();
         }
     }
@@ -374,11 +374,14 @@ const QString AppItem::contextMenu() const
 
 QWidget *AppItem::popupTips()
 {
-    if (!m_windowInfos.isEmpty()) {
+    if (!m_windowInfos.isEmpty())
+    {
         const quint32 currentWindow = m_itemEntryInter->currentWindow();
         Q_ASSERT(m_windowInfos.contains(currentWindow));
         m_appNameTips->setText(m_windowInfos[currentWindow].title);
-    } else {
+    }
+    else
+    {
         m_appNameTips->setText(m_itemEntryInter->name());
     }
 
@@ -387,7 +390,7 @@ QWidget *AppItem::popupTips()
 
 const QPoint AppItem::popupMarkPoint()
 {
-    if(getPlace() == DockItem::DirPlace)
+    if (getPlace() == DockItem::DirPlace)
     {
         return m_dirItem->popupDirMarkPoint();
     }
@@ -424,25 +427,25 @@ void AppItem::fetchWindowInfos()
 void AppItem::updateWindowInfos(const WindowInfoMap &info)
 {
     m_windowInfos = info;
-    if (m_appPreviewTips) m_appPreviewTips->setWindowInfos(m_windowInfos, m_itemEntryInter->GetAllowedCloseWindows().value());
+    if (m_appPreviewTips)
+        m_appPreviewTips->setWindowInfos(m_windowInfos, m_itemEntryInter->GetAllowedCloseWindows().value());
     m_updateIconGeometryTimer->start();
 
     // process attention effect
-    if (hasAttention()) {
+    if (hasAttention())
         playSwingEffect();
-    } else {
+    else
         stopSwingEffect();
-    }
 
     update();
 
-    if(DockItemManager::instance()->getDockMergeMode() == MergeAll)
+    if (DockItemManager::instance()->getDockMergeMode() == MergeAll)
         return;
 
-    if(DockItemManager::instance()->getDockMergeMode() == MergeDock && m_place == DockPlace)
+    if (DockItemManager::instance()->getDockMergeMode() == MergeDock && m_place == DockPlace)
         return;
 
-    for(auto it(m_windowMap.begin()); it != m_windowMap.end(); )
+    for (auto it(m_windowMap.begin()); it != m_windowMap.end();)
     {
         if (!m_windowInfos.keys().contains(it.key()))
         {
@@ -450,9 +453,7 @@ void AppItem::updateWindowInfos(const WindowInfoMap &info)
             it = m_windowMap.erase(it);
 
             emit windowItemRemoved(windowItem);
-            QTimer::singleShot(500, [ windowItem ]{
-                windowItem->deleteLater();
-            });
+            QTimer::singleShot(500, windowItem, &WindowItem::deleteLater);
         }
         else
         {
@@ -460,9 +461,9 @@ void AppItem::updateWindowInfos(const WindowInfoMap &info)
         }
     }
 
-    for(auto it(m_windowInfos.cbegin()); it != m_windowInfos.cend(); it++)
+    for (auto it(m_windowInfos.cbegin()); it != m_windowInfos.cend(); it++)
     {
-        if(!m_windowMap.contains(it.key()))
+        if (!m_windowMap.contains(it.key()))
         {
             WindowItem *windowItem = new WindowItem(this, it.key(), it.value(), m_itemEntryInter->GetAllowedCloseWindows().value().contains(it.key()));
             m_windowMap.insert(it.key(), windowItem);
@@ -474,15 +475,15 @@ void AppItem::updateWindowInfos(const WindowInfoMap &info)
 
 void AppItem::mergeModeChanged(MergeMode mode)
 {
-    if(mode == MergeAll || (mode == MergeDock && m_place == DockPlace))
+    if (mode == MergeAll || (mode == MergeDock && m_place == DockPlace))
     {
         removeWindowItem();
     }
-    else if(mode == MergeNone || (mode == MergeDock && m_place == DirPlace))
+    else if (mode == MergeNone || (mode == MergeDock && m_place == DirPlace))
     {
-        for(auto it(m_windowInfos.cbegin()); it != m_windowInfos.cend(); it++)
+        for (auto it(m_windowInfos.cbegin()); it != m_windowInfos.cend(); it++)
         {
-            if(!m_windowMap.contains(it.key()))
+            if (!m_windowMap.contains(it.key()))
             {
                 WindowItem *windowItem = new WindowItem(this, it.key(), it.value(), m_itemEntryInter->GetAllowedCloseWindows().value().contains(it.key()));
                 m_windowMap.insert(it.key(), windowItem);
@@ -495,15 +496,11 @@ void AppItem::mergeModeChanged(MergeMode mode)
 
 void AppItem::removeWindowItem(bool animation)
 {
-    while( !m_windowMap.isEmpty() )
+    while (!m_windowMap.isEmpty())
     {
         WindowItem *windowItem = m_windowMap.take(m_windowMap.firstKey());
-
         emit windowItemRemoved(windowItem, animation);
-        QTimer::singleShot( animation ? 500 : 0, [ windowItem ]{
-            //Just wait for ease out animation complete
-            windowItem->deleteLater();
-        });
+        QTimer::singleShot(animation ? 500 : 0, windowItem, &WindowItem::deleteLater);
     }
 }
 
@@ -517,14 +514,18 @@ void AppItem::refershIcon()
 
     m_appIcon = Utils::getIcon(icon, iconSize * 0.85, devicePixelRatioF());
 
-    if (m_appIcon.isNull()) {
-        if (m_retryTimes < 5) {
+    if (m_appIcon.isNull())
+    {
+        if (m_retryTimes < 5)
+        {
             m_retryTimes++;
             qDebug() << m_itemEntryInter->name() << "obtain app icon(" << icon << ")failed, retry times:" << m_retryTimes;
             m_retryObtainIconTimer->start();
         }
         return;
-    } else if (m_retryTimes > 0) {
+    }
+    else if (m_retryTimes > 0)
+    {
         // reset times
         m_retryTimes = 0;
     }
@@ -537,6 +538,7 @@ void AppItem::refershIcon()
 void AppItem::activeChanged()
 {
     m_active = !m_active;
+    update();
 }
 
 void AppItem::showPreview()
@@ -555,9 +557,12 @@ void AppItem::showPreview()
     connect(m_appPreviewTips, &PreviewContainer::requestHidePopup, this, &AppItem::leavePreviewWindow);
     connect(m_appPreviewTips, &PreviewContainer::enterPreviewWindow, this, &AppItem::enterPreviewWindow);
 
-    connect(m_appPreviewTips, &PreviewContainer::requestActivateWindow, [ = ]() { m_appPreviewTips = nullptr; });
-    connect(m_appPreviewTips, &PreviewContainer::requestCancelPreviewWindow, [ = ]() { m_appPreviewTips = nullptr; });
-    connect(m_appPreviewTips, &PreviewContainer::requestHidePopup, [ = ]() { m_appPreviewTips = nullptr; });
+    connect(m_appPreviewTips, &PreviewContainer::requestActivateWindow, [=]()
+            { m_appPreviewTips = nullptr; });
+    connect(m_appPreviewTips, &PreviewContainer::requestCancelPreviewWindow, [=]()
+            { m_appPreviewTips = nullptr; });
+    connect(m_appPreviewTips, &PreviewContainer::requestHidePopup, [=]()
+            { m_appPreviewTips = nullptr; });
 
     showPopupWindow(m_appPreviewTips, true);
 }
@@ -575,22 +580,21 @@ void AppItem::playSwingEffect()
 
     stopSwingEffect();
 
-    QPair<QGraphicsView *, QGraphicsItemAnimation *> pair =  SwingEffect(
-                                                                 this, m_appIcon, rect(), devicePixelRatioF());
+    QPair<QGraphicsView *, QGraphicsItemAnimation *> pair = SwingEffect(this, m_appIcon, rect(), devicePixelRatioF());
 
     m_swingEffectView = pair.first;
     m_itemAnimation = pair.second;
 
     QTimeLine *tl = m_itemAnimation->timeLine();
-    connect(tl, &QTimeLine::stateChanged, [ = ](QTimeLine::State newState) {
+    connect(tl, &QTimeLine::stateChanged, [=](QTimeLine::State newState)
+            {
         if (newState == QTimeLine::NotRunning) {
             m_swingEffectView->hide();
             layout()->removeWidget(m_swingEffectView);
             m_swingEffectView = nullptr;
             m_itemAnimation = nullptr;
             checkAttentionEffect();
-        }
-    });
+        } });
 
     layout()->addWidget(m_swingEffectView);
     tl->start();
@@ -610,10 +614,10 @@ void AppItem::stopSwingEffect()
 
 void AppItem::checkAttentionEffect()
 {
-    QTimer::singleShot(1000, this, [ = ] {
+    QTimer::singleShot(1000, this, [=]
+                       {
         if (hasAttention())
-            playSwingEffect();
-    });
+            playSwingEffect(); });
 }
 
 void AppItem::handleDragDrop(uint timestamp, const QStringList &uris)

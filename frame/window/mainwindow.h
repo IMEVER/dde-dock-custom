@@ -28,7 +28,6 @@
 
 #include <com_deepin_api_xeventmonitor.h>
 #include <DPlatformWindowHandle>
-#include <DWindowManagerHelper>
 #include <DBlurEffectWidget>
 #include <DGuiApplicationHelper>
 
@@ -38,7 +37,6 @@ DWIDGET_USE_NAMESPACE
 
 using namespace Dock;
 
-class DragWidget;
 class MainPanelControl;
 class MultiScreenWorker;
 class MenuWorker;
@@ -49,46 +47,31 @@ class MainWindow : public DBlurEffectWidget
 
 public:
     explicit MainWindow(QWidget *parent = nullptr);
-    ~MainWindow();
-    void updateDragCursor();
     MainPanelControl *panel();
     friend class MainPanelControl;
 
 public slots:
     void launch();
+    
     void resizeDock(int offset, bool dragging);
-    void compositeChanged();
     QStringList GetLoadedPlugins();
     QString getPluginKey(QString pluginName);
     bool getPluginVisible(QString pluginName);
     void setPluginVisible(QString pluginName, bool visible);
 
 protected:
-    void mousePressEvent(QMouseEvent *e) override;
-
-    void initComponents();
     void initConnections();
-
-private slots:
-
-    void onMainWindowSizeChanged(QPoint offset);
-    void resetDragWindow();
-    void themeTypeChanged(DGuiApplicationHelper::ColorType themeType);
 
 signals:
     void pluginVisibleChanged(QString pluginName, bool visible);
     void geometryChanged(QRect rect);
 
 private:
-    bool m_launched;
     MainPanelControl *m_mainPanel;
-    DWindowManagerHelper *m_wmHelper;
     MultiScreenWorker *m_multiScreenWorker;
     MenuWorker *m_menuWorker;
 
     DPlatformWindowHandle m_platformWindowHandle;
-    DragWidget *m_dragWidget;
-    QTimer *m_timer;
     TopPanelInterface *m_topPanelInterface;
 };
 

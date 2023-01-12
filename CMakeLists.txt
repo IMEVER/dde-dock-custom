@@ -37,7 +37,7 @@ if (${EXIT_CODE} EQUAL 0)
     endif()
 endif()
 
-file(GLOB INTERFACES "interfaces/*.h")
+# file(GLOB INTERFACES "interfaces/*.h")
 
 add_subdirectory("frame")
 
@@ -47,22 +47,22 @@ if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 endif ()
 
 ## qm files
-file(GLOB QM_FILES "translations/*.qm")
-install(FILES ${QM_FILES} DESTINATION share/dde-dock/translations)
+# file(GLOB QM_FILES "translations/*.qm")
+# install(FILES ${QM_FILES} DESTINATION share/dde-dock/translations)
 
-## dev files
-install(FILES ${INTERFACES}
-        DESTINATION include/dde-dock)
+# ## dev files
+# install(FILES ${INTERFACES}
+#         DESTINATION include/dde-dock)
 
-install(FILES "dde-dock.pc"
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
+# install(FILES "dde-dock.pc"
+#         DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 
-install(FILES "cmake/DdeDock/DdeDockConfig.cmake"
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/DdeDock)
+# install(FILES "cmake/DdeDock/DdeDockConfig.cmake"
+#         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/DdeDock)
 
-## services files
-install(FILES frame/com.deepin.dde.Dock.service
-        DESTINATION share/dbus-1/services)
+# ## services files
+# install(FILES frame/com.deepin.dde.Dock.service
+#         DESTINATION share/dbus-1/services)
 
-install(FILES gschema/com.deepin.dde.dock.module.gschema.xml
-        DESTINATION share/glib-2.0/schemas)
+# install(FILES gschema/com.deepin.dde.dock.module.gschema.xml
+#         DESTINATION share/glib-2.0/schemas)

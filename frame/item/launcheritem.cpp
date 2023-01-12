@@ -82,12 +82,8 @@ void LauncherItem::mousePressEvent(QMouseEvent *e)
 
 void LauncherItem::mouseReleaseEvent(QMouseEvent *e)
 {
-    if (e->button() != Qt::LeftButton)
-        return;
-
-    if (!m_launcherInter->IsVisible()) {
+    if (e->button() == Qt::LeftButton && !m_launcherInter->IsVisible())
         m_launcherInter->Show();
-    }
 }
 
 QWidget *LauncherItem::popupTips()

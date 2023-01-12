@@ -22,6 +22,7 @@
 #include "appdragwidget.h"
 
 #include "../appitem.h"
+#include "../diritem.h"
 
 class AppGraphicsObject : public QGraphicsObject
 {
@@ -115,7 +116,7 @@ void AppDragWidget::dragEnterEvent(QDragEnterEvent *event)
 
 void AppDragWidget::dragMoveEvent(QDragMoveEvent *event)
 {
-    if (isRemoveAble()) {
+    if (isRemoveAble() && qobject_cast<AppItem *>(event->source())) {
         m_object->setOpacity(0.5);
         m_animOpacity->setStartValue(0.5);
     } else {
@@ -128,12 +129,13 @@ void AppDragWidget::dropEvent(QDropEvent *event)
 {
     m_followMouseTimer->stop();
 
-    if (isRemoveAble()) {
+    AppItem *appItem = qobject_cast<AppItem *>(event->source());
+
+    if (isRemoveAble() && appItem) {
         showRemoveAnimation();
-        AppItem *appItem = static_cast<AppItem *>(event->source());
         appItem->undock();
     } else {
-        showGoBackAnimation();;
+        showGoBackAnimation();
     }
 }
 

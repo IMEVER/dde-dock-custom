@@ -127,10 +127,6 @@ private:
     QString m_id;
     QString m_desktopFile;
     QPixmap m_appIcon;
-    QPixmap m_horizontalIndicator;
-    QPixmap m_verticalIndicator;
-    QPixmap m_activeHorizontalIndicator;
-    QPixmap m_activeVerticalIndicator;
 
     QTimer *m_updateIconGeometryTimer;
     QTimer *m_retryObtainIconTimer;
@@ -138,10 +134,14 @@ private:
     QFutureWatcher<QPixmap> *m_smallWatcher;
     QFutureWatcher<QPixmap> *m_largeWatcher;
 
-    DGuiApplicationHelper::ColorType m_themeType;
     Place m_place = DockPlace;
     DirItem *m_dirItem;
     QMap<WId, WindowItem *> m_windowMap;
+
+    QPixmap m_horizontalIndicator;
+    QPixmap m_verticalIndicator;
+    QPixmap m_activeHorizontalIndicator;
+    QPixmap m_activeVerticalIndicator;
 };
 
 #endif // APPITEM_H

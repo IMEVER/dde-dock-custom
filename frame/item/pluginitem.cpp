@@ -8,6 +8,7 @@
 #include <QApplication>
 #include <QDir>
 #include <QStandardPaths>
+#include <DDesktopServices>
 
 DCORE_USE_NAMESPACE
 
@@ -64,29 +65,29 @@ void PluginItem::mousePressEvent(QMouseEvent *e)
 
 void PluginItem::dragEnterEvent(QDragEnterEvent *e)
 {
-    // ignore drag from panel
-    if (e->source())
-        return e->ignore();
+    if(e->mimeData()->hasUrls()) {
+        bool canDelete = true;
+        for(auto url : e->mimeData()->urls()) {
+            canDelete = url.isLocalFile();
+            if(canDelete) canDelete = QFileInfo(url.toLocalFile()).isWritable();
+            if(!canDelete) break;
+        }
 
-    // ignore request dock event
-    QString draggingMimeKey = e->mimeData()->formats().contains("RequestDock") ? "RequestDock" : "text/plain";
-    if (QMimeDatabase().mimeTypeForFile(e->mimeData()->data(draggingMimeKey)).name() == "application/x-desktop") {
-        return e->ignore();
+        if(canDelete) {
+            e->setDropAction(Qt::MoveAction);
+            e->accept();
+            hidePopup();
+            return e->accept();
+        }
     }
 
-    if(e->mimeData()->hasUrls() == false)
-        return e->ignore();
-
-    e->setDropAction(Qt::MoveAction);
-    e->accept();
-    hidePopup();
+    return e->ignore();
 }
 
 void PluginItem::dropEvent(QDropEvent *e)
 {
-    for (auto url : e->mimeData()->urls()) {
-        if(url.isLocalFile()) QFile(url.toLocalFile()).moveToTrash();
-    }
+    foreach (auto url, e->mimeData()->urls())
+        QFile(url.toLocalFile()).moveToTrash();
 
     refershIcon();
 }
@@ -107,6 +108,7 @@ void PluginItem::invokedMenuItem(const QString &itemId, const bool checked) {
         QDir dir(QDir::homePath() + "/.local/share/Trash/");
         dir.mkdir("files");
         dir.mkdir("info");
+        DDesktopServices::playSystemSoundEffect(DDesktopServices::SSE_EmptyTrash);
         refershIcon();
     }
 }

@@ -84,6 +84,10 @@ AppSnapshot::AppSnapshot(const WId wid, QWidget *parent)
     QTimer::singleShot(1, this, &AppSnapshot::compositeChanged);
 }
 
+void AppSnapshot::setCloseAble(const bool value) {
+    m_closeAble = value;
+}
+
 void AppSnapshot::closeWindow() const
 {
     const auto display = QX11Info::display();
@@ -199,7 +203,7 @@ void AppSnapshot::enterEvent(QEvent *e)
     QWidget::enterEvent(e);
 
     if (!m_wmHelper->hasComposite()) {
-        m_closeBtn2D->setVisible(true);
+        m_closeBtn2D->setVisible(m_closeAble);
     } else {
         emit entered(wid());
     }

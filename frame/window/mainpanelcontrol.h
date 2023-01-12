@@ -49,49 +49,43 @@ public:
     void addLastAreaItem(int index, QWidget *wdg);
     void setPositonValue(Position position);
 
-signals:
-    void itemMoved(DockItem *sourceItem, DockItem *targetItem);
-    void itemAdded(const QString &appDesktop, int idx);
-    void itemCountChanged();
-    void dirAppChanged();
+protected:
+    void resizeEvent(QResizeEvent *event) override;
+    bool eventFilter(QObject *watched, QEvent *event) override;
+    void paintEvent(QPaintEvent *e) override;
 
 private:
-    void resizeEvent(QResizeEvent *event) override;
-
     void init();
     void updateAppAreaSonWidgetSize();
     void updateMainPanelLayout();
-
-    void paintEvent(QPaintEvent *e) override;
-    void dragMoveEvent(QDragMoveEvent *e) override;
-    void dragEnterEvent(QDragEnterEvent *e) override;
-    void dragLeaveEvent(QDragLeaveEvent *e) override;
-    void dropEvent(QDropEvent *) override;
-    bool eventFilter(QObject *watched, QEvent *event) override;
 
     void startDrag(DockItem *);
     void dropTargetItem(DockItem *sourceItem, QPoint point);
     void handleDragDrop(DockItem *sourceItem, QPoint point);
     void moveItem(DockItem *sourceItem, DockItem *targetItem);
-    void handleDragMove(QDragMoveEvent *e, bool isFilter);
     void resizeDockIcon();
+    inline bool isHorizontal() const { return m_position == Bottom || m_position == Top; }
 
 public slots:
     void insertItem(const int index, DockItem *item);
     void removeItem(DockItem *item, bool animation = true);
     void itemUpdated(DockItem *item);
 
+signals:
+    void itemMoved(DockItem *sourceItem, DockItem *targetItem);
+    void itemAdded(const QString &appDesktop, int idx);
+    void itemCountChanged();
+    void dirAppChanged();
+    void requestConttextMenu();
+    void requestResizeDockSize(int offset, bool dragging);
+    void requestResizeDockSizeFinished();
+
 private:
     QBoxLayout *m_mainPanelLayout;
-    QWidget *m_fixedAreaWidget;
     QWidget *m_appAreaWidget;
     QBoxLayout *m_fixedAreaLayout;
     QBoxLayout *m_appAreaLayout;
-
-    QWidget *m_windowAreaWidget;
     QBoxLayout *m_windowAreaLayout;
-
-    QWidget *m_lastAreaWidget;
     QBoxLayout *m_lastAreaLayout;
 
     QLabel *m_splitter;
@@ -101,7 +95,6 @@ private:
     QPointer<PlaceholderItem> m_placeholderItem;
     QString m_draggingMimeKey;
     AppDragWidget *m_appDragWidget;
-    QPoint m_mousePressPos;
     int beforeIndex = -1;
 };
 
