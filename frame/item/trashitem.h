@@ -1,15 +1,15 @@
-#ifndef PLUGINITEM_H
-#define PLUGINITEM_H
+#ifndef TRASHITEM_H
+#define TRASHITEM_H
 
 #include "dockitem.h"
 #include "tipswidget.h"
 
-class PluginItem : public DockItem
+class TrashItem : public DockItem
 {
     Q_OBJECT
 
 public:
-    explicit PluginItem(QWidget *parent = nullptr);
+    explicit TrashItem(QWidget *parent = nullptr);
 
     inline ItemType itemType() const override {return Plugins;}
     void refershIcon() override;
@@ -31,4 +31,4 @@ private:
     TipsWidget *m_tips;
 };
 
-#endif // PLUGINITEM_H
+#endif // TRASHITEM_H

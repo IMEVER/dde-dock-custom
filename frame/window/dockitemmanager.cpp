@@ -21,7 +21,7 @@
 
 #include "dockitemmanager.h"
 #include "../item/appitem.h"
-#include "../item/pluginitem.h"
+#include "../item/trashitem.h"
 
 #include <QSet>
 
@@ -31,7 +31,7 @@ DockItemManager::DockItemManager() : QObject()
     , launcherItem(new LauncherItem)
 {
     m_qsettings->setIniCodec(QTextCodec::codecForName("UTF-8"));
-    connect(m_appInter, &DBusDock::EntryAdded, this, &DockItemManager::appItemAdded);
+    connect(m_appInter, &DBusDock::EntryAdded, this, [this](const QDBusObjectPath &path, int index){ appItemAdded(path, index);});
     connect(m_appInter, &DBusDock::EntryRemoved, this, static_cast<void (DockItemManager::*)(const QString &)>(&DockItemManager::appItemRemoved), Qt::QueuedConnection);
     connect(m_appInter, &DBusDock::ServiceRestarted, this, [ this ] { QTimer::singleShot(500, [ this ] { reloadAppItems(); }); });
 }
@@ -45,8 +45,8 @@ DockItemManager *DockItemManager::instance()
 
 MergeMode DockItemManager::getDockMergeMode()
 {
-    int i = m_qsettings->value("mergeMode", MergeAll).toInt();
-    if(i < 0 || i > 2)
+    int i = m_qsettings->value("mergeMode", MergeDock).toInt();
+    if(i < 0 || i > 1)
         i = 0;
     return MergeMode(i);
 }
@@ -103,14 +103,10 @@ void DockItemManager::setHoverHighlight(bool enable)
 
 bool DockItemManager::hasWindowItem()
 {
-    if(getDockMergeMode() != Dock::MergeAll)
-    {
-        for(auto item : m_itemList)
-        {
-            if(item->itemType() == DockItem::App && qobject_cast<AppItem *>(item)->windowCount() > 0)
-                return true;
-        }
-    }
+    for(auto item : m_itemList)
+        if(item->itemType() == DockItem::App && qobject_cast<AppItem *>(item)->windowCount() > 0)
+            return true;
+
     return false;
 }
 
@@ -172,9 +168,9 @@ void DockItemManager::itemAdded(const QString &appDesktop, int idx)
     m_appInter->RequestDock(appDesktop, idx);
 }
 
-void DockItemManager::appItemAdded(const QDBusObjectPath &path, const int index)
+void DockItemManager::appItemAdded(const QDBusObjectPath &path, const int index, const bool updateFrame)
 {
-    AppItem *item = new AppItem(path);
+    AppItem *item = new AppItem(path.path());
 
     connect(item, &DockItem::requestRefreshWindowVisible, this, &DockItemManager::requestRefershWindowVisible, Qt::UniqueConnection);
     connect(item, &DockItem::requestWindowAutoHide, this, &DockItemManager::requestWindowAutoHide, Qt::UniqueConnection);
@@ -205,9 +201,9 @@ void DockItemManager::appItemAdded(const QDBusObjectPath &path, const int index)
             if(index == -1 && dirItem->currentCount() == 1)
             {
                 emit itemInserted(-1, dirItem);
-                emit itemCountChanged();
+                if(updateFrame)
+                    emit itemCountChanged();
             }
-
             return;
         }
     }
@@ -215,7 +211,7 @@ void DockItemManager::appItemAdded(const QDBusObjectPath &path, const int index)
     item->fetchWindowInfos();
     emit itemInserted(index, item);
 
-    if(index > -1)
+    if(updateFrame)
         emit itemCountChanged();
 }
 
@@ -256,7 +252,7 @@ void DockItemManager::reloadAppItems()
     if(first)
     {
         emit itemInserted(0, launcherItem);
-        emit itemInserted(0, new PluginItem);
+        emit itemInserted(0, new TrashItem);
         first = false;
     }
     else
@@ -274,9 +270,8 @@ void DockItemManager::reloadAppItems()
     }
 
     loadDirAppData();
-    QList<QDBusObjectPath> list = m_appInter->entries();
-    for (auto path : list)
-        appItemAdded(path, -1);
+    for (auto &path : m_appInter->entries())
+        appItemAdded(path, -1, false);
 
     for(auto dirItem : m_dirList)
         if(!dirItem->parentWidget() && !dirItem->isEmpty())
@@ -299,7 +294,8 @@ void DockItemManager::loadDirAppData()
     {
         DirItem *item = new DirItem(m_qsettings->value(QString("dir_%1/title").arg(count), "").toString());
         item->setIndex(m_qsettings->value(QString("dir_%1/index").arg(count), -1).toInt());
-        item->setIds(m_qsettings->value(QString("dir_%1/ids").arg(count), QStringList()).value<QStringList>().toSet());
+        QStringList desktopFiles = m_qsettings->value(QString("dir_%1/ids").arg(count), QStringList()).value<QStringList>();
+        item->setIds(QSet<QString>(desktopFiles.begin(), desktopFiles.end()));
 
         m_dirList.append(item);
 

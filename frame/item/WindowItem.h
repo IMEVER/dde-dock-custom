@@ -21,7 +21,10 @@ class WindowItem : public DockItem
 
     protected:
         void paintEvent(QPaintEvent *e) override;
+        void mousePressEvent(QMouseEvent *e) override;
         void mouseReleaseEvent(QMouseEvent *e) override;
+        void wheelEvent(QWheelEvent *e) override;
+        void moveEvent(QMoveEvent *e) override;
         void resizeEvent(QResizeEvent *e) override;
         void enterEvent(QEvent *e) override;
         void leaveEvent(QEvent *e) override;
@@ -46,6 +49,7 @@ class WindowItem : public DockItem
         QRectF m_snapshotSrcRect;
         PreviewContainer *m_appPreview;
         QTimer *timer;
+        QTimer *m_updateIconGeometryTimer;
 };
 
 #endif

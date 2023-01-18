@@ -89,7 +89,6 @@ enum HideState {
 enum MergeMode {
     MergeNone   = 0,
     MergeDock   = 1,
-    MergeAll    = 2,
 };
 
 

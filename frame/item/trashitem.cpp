@@ -1,4 +1,4 @@
-#include "pluginitem.h"
+#include "trashitem.h"
 
 #include "util/utils.h"
 
@@ -12,7 +12,7 @@
 
 DCORE_USE_NAMESPACE
 
-PluginItem::PluginItem(QWidget *parent)
+TrashItem::TrashItem(QWidget *parent)
     : DockItem(parent)
     , m_tips(new TipsWidget(this))
 {
@@ -22,7 +22,7 @@ PluginItem::PluginItem(QWidget *parent)
     setAcceptDrops(true);
 }
 
-void PluginItem::refershIcon()
+void TrashItem::refershIcon()
 {
     const int iconSize = qMin(width(), height());
     QDir dir(QStandardPaths::writableLocation(QStandardPaths::HomeLocation) + "/.local/share/Trash/files/");
@@ -33,7 +33,7 @@ void PluginItem::refershIcon()
     update();
 }
 
-void PluginItem::paintEvent(QPaintEvent *e)
+void TrashItem::paintEvent(QPaintEvent *e)
 {
     DockItem::paintEvent(e);
 
@@ -49,13 +49,13 @@ void PluginItem::paintEvent(QPaintEvent *e)
     painter.drawPixmap(iconX, iconY, m_icon);
 }
 
-void PluginItem::resizeEvent(QResizeEvent *e)
+void TrashItem::resizeEvent(QResizeEvent *e)
 {
     DockItem::resizeEvent(e);
     refershIcon();
 }
 
-void PluginItem::mousePressEvent(QMouseEvent *e)
+void TrashItem::mousePressEvent(QMouseEvent *e)
 {
     if(e->button() == Qt::LeftButton)
         QProcess::startDetached("xdg-open", {QStandardPaths::writableLocation(QStandardPaths::HomeLocation) + "/.local/share/Trash/files/"});
@@ -63,7 +63,7 @@ void PluginItem::mousePressEvent(QMouseEvent *e)
     DockItem::mousePressEvent(e);
 }
 
-void PluginItem::dragEnterEvent(QDragEnterEvent *e)
+void TrashItem::dragEnterEvent(QDragEnterEvent *e)
 {
     if(e->mimeData()->hasUrls()) {
         bool canDelete = true;
@@ -84,7 +84,7 @@ void PluginItem::dragEnterEvent(QDragEnterEvent *e)
     return e->ignore();
 }
 
-void PluginItem::dropEvent(QDropEvent *e)
+void TrashItem::dropEvent(QDropEvent *e)
 {
     foreach (auto url, e->mimeData()->urls())
         QFile(url.toLocalFile()).moveToTrash();
@@ -92,12 +92,12 @@ void PluginItem::dropEvent(QDropEvent *e)
     refershIcon();
 }
 
-QWidget *PluginItem::popupTips()
+QWidget *TrashItem::popupTips()
 {
     return m_tips;
 }
 
-void PluginItem::invokedMenuItem(const QString &itemId, const bool checked) {
+void TrashItem::invokedMenuItem(const QString &itemId, const bool checked) {
     if(itemId == "open")
         QProcess::startDetached("xdg-open", {QStandardPaths::writableLocation(QStandardPaths::HomeLocation) + "/.local/share/Trash/files/"});
     else if(itemId == "clear") {
@@ -113,7 +113,7 @@ void PluginItem::invokedMenuItem(const QString &itemId, const bool checked) {
     }
 }
 
-const QString PluginItem::contextMenu() const {
+const QString TrashItem::contextMenu() const {
     QDir dir(QStandardPaths::writableLocation(QStandardPaths::HomeLocation) + "/.local/share/Trash/files/");
     return QString("{\"items\": [ {\"itemText\": \"打开回收站\", \"itemId\": \"open\", \"isActive\": true}, \
          {\"itemText\": \"清空回收站\", \"itemId\": \"clear\", \"isActive\": %1} ]}").arg(dir.isEmpty() ? "false" : "true");

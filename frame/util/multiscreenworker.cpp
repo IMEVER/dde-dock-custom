@@ -650,7 +650,7 @@ void MultiScreenWorker::initConnection()
  */
 void MultiScreenWorker::displayAnimation(const QString &screen, const Position &pos, AniAction act)
 {
-    if (!testState(AutoHide) || qApp->property("DRAG_STATE").toBool()
+    if (!testState(AutoHide)
             || testState(ChangePositionAnimationStart)
             || testState(HideAnimationStart)
             || testState(ShowAnimationStart)
@@ -1240,7 +1240,7 @@ void MultiScreenWorker::onDelayAutoHideChanged()
  */
 void MultiScreenWorker::tryToShowDock(int eventX, int eventY)
 {
-    if (qApp->property("DRAG_STATE").toBool() || testState(ChangePositionAnimationStart)) {
+    if (testState(ChangePositionAnimationStart)) {
         qWarning() << "dock is draging or animation is running";
         return;
     }

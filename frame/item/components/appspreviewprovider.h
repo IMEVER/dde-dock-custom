@@ -6,10 +6,7 @@
 
 static PreviewContainer *PreviewWindow(const WindowInfoMap &infos, const WindowList &allowClose, const Dock::Position dockPos)
 {
-    static PreviewContainer *preview;
-    if (!preview) {
-        preview = new PreviewContainer;
-    }
+    static PreviewContainer *preview = new PreviewContainer;
 
     preview->disconnect();
     preview->setWindowInfos(infos, allowClose);

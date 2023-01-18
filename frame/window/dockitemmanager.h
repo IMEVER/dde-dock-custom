@@ -75,7 +75,7 @@ public slots:
 
 private:
     explicit DockItemManager();
-    void appItemAdded(const QDBusObjectPath &path, const int index);
+    void appItemAdded(const QDBusObjectPath &path, const int index, const bool updateFrame = true);
     void appItemRemoved(const QString &appId);
     void appItemRemoved(AppItem *appItem, bool animation = true);
     void loadDirAppData();

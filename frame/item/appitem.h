@@ -44,12 +44,11 @@ class AppItem : public DockItem
     Q_OBJECT
 
 public:
-    explicit AppItem(const QDBusObjectPath &entry, QWidget *parent = nullptr);
+    explicit AppItem(const QString path, QWidget *parent = nullptr);
     ~AppItem();
 
     const QString appId() const;
     bool isValid() const;
-    void updateWindowIconGeometries();
     void undock();
     QWidget *appDragWidget();
     void setDockInfo(Dock::Position dockPosition, const QRect &dockGeometry);
@@ -71,6 +70,7 @@ signals:
     void requestActivateWindow(const WId wid) const;
     void requestPreviewWindow(const WId wid) const;
     void requestCancelPreview() const;
+    void requestPresentWindows();
     void dragReady(QWidget *dragWidget);
 
     void enterPreviewWindow() const;
@@ -105,7 +105,6 @@ private slots:
     void updateWindowInfos(const WindowInfoMap &info);
     void mergeModeChanged(MergeMode mode);
     void refershIcon() Q_DECL_OVERRIDE;
-    void activeChanged();
     void showPreview();
     void playSwingEffect();
     void stopSwingEffect();
@@ -119,20 +118,14 @@ private:
     QGraphicsView *m_swingEffectView;
     QGraphicsItemAnimation *m_itemAnimation;
 
-    bool m_active;
     int m_retryTimes;
     unsigned long m_lastclickTimes;
 
     WindowInfoMap m_windowInfos;
-    QString m_id;
-    QString m_desktopFile;
     QPixmap m_appIcon;
 
     QTimer *m_updateIconGeometryTimer;
     QTimer *m_retryObtainIconTimer;
-
-    QFutureWatcher<QPixmap> *m_smallWatcher;
-    QFutureWatcher<QPixmap> *m_largeWatcher;
 
     Place m_place = DockPlace;
     DirItem *m_dirItem;

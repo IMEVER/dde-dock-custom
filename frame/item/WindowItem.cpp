@@ -3,6 +3,7 @@
 #include "components/appsnapshot.h"
 #include "components/appspreviewprovider.h"
 #include "util/XUtils.h"
+#include "xcb/xcb_misc.h"
 
 #include <QX11Info>
 #include <X11/Xlib.h>
@@ -101,15 +102,21 @@ WindowItem::WindowItem(AppItem *appItem, WId wId, WindowInfo windowInfo, bool cl
     connect(timer, &QTimer::timeout, this, &WindowItem::fetchSnapshot);
     timer->start();
 
+    m_updateIconGeometryTimer = new QTimer(this);
+    m_updateIconGeometryTimer->setInterval(500);
+    m_updateIconGeometryTimer->setSingleShot(true);
+    m_updateIconGeometryTimer->start();
+    connect(m_updateIconGeometryTimer, &QTimer::timeout, this, [this]{
+        const QRect r(mapToGlobal(QPoint(0, 0)), mapToGlobal(QPoint(width(), height())));
+        XcbMisc::instance()->set_window_icon_geometry(m_WId, r);
+    });
+
     update();
 
     QTimer::singleShot(2000, this, &WindowItem::fetchSnapshot);
 }
 
-WindowItem::~WindowItem()
-{
-
-}
+WindowItem::~WindowItem() {}
 
 void WindowItem::paintEvent(QPaintEvent *e)
 {
@@ -155,6 +162,12 @@ void WindowItem::paintEvent(QPaintEvent *e)
     painter.drawPixmap(QPoint(itemRect.width() - smallIconSize - itemRect.width() * .1, itemRect.width() - smallIconSize - itemRect.width() * .1), icon.scaled(smallIconSize, smallIconSize));
 }
 
+void WindowItem::mousePressEvent(QMouseEvent *e)
+{
+    m_updateIconGeometryTimer->stop();
+    DockItem::mousePressEvent(e);
+}
+
 void WindowItem::mouseReleaseEvent(QMouseEvent *e)
 {
     if(e->button() == Qt::LeftButton) {
@@ -162,15 +175,30 @@ void WindowItem::mouseReleaseEvent(QMouseEvent *e)
             m_appItem->requestActivateWindow(m_WId);
         else
             KWindowSystem::minimizeWindow(m_WId);
-    } else if(e->button() == Qt::MiddleButton) {
+    } else if(e->button() == Qt::MiddleButton)
         closeWindow();
-    }
+
     hidePopup();
+}
+
+void WindowItem::wheelEvent(QWheelEvent *e)
+{
+    DockItem::wheelEvent(e);
+
+    if (qAbs(e->angleDelta().y()) > 20)
+        emit m_appItem->requestPresentWindows();
+}
+
+void WindowItem::moveEvent(QMoveEvent *e)
+{
+    DockItem::moveEvent(e);
+    m_updateIconGeometryTimer->start();
 }
 
 void WindowItem::resizeEvent(QResizeEvent *e)
 {
     update();
+    m_updateIconGeometryTimer->start();
 }
 
 void WindowItem::enterEvent(QEvent *e)

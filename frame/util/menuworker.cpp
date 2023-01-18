@@ -88,9 +88,6 @@ QMenu *MenuWorker::createMenu()
     QAction *m_mergeDockAct = mergeSubMenu->addAction("合并Dock");
     m_mergeDockAct->setCheckable(true);
     m_mergeDockAct->setChecked(mode == MergeDock);
-    QAction *m_mergeAllAct = mergeSubMenu->addAction("合并所有");
-    m_mergeAllAct->setCheckable(true);
-    m_mergeAllAct->setChecked(mode == MergeAll);
 
     // 多屏显示设置 复制模式也要显示菜单
     if (QApplication::screens().size() > 1) {
@@ -144,8 +141,6 @@ QMenu *MenuWorker::createMenu()
 
         if(action == m_mergeNoneAct)
             return m_itemManager->saveDockMergeMode(MergeNone);
-        else if(action == m_mergeAllAct)
-            return m_itemManager->saveDockMergeMode(MergeAll);
         else if(action == m_mergeDockAct)
             return m_itemManager->saveDockMergeMode(MergeDock);
     });
