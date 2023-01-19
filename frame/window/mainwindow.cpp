@@ -46,6 +46,8 @@ MainWindow::MainWindow(QWidget *parent) : DBlurEffectWidget(parent)
     , m_platformWindowHandle(this)
     , m_topPanelInterface(new TopPanelInterface("me.imever.dde.TopPanel", "/me/imever/dde/TopPanel", QDBusConnection::sessionBus(), this))
 {
+    setVisible(false);
+    
     DPlatformWindowHandle::enableDXcbForWindow(this, true);
     m_platformWindowHandle.setEnableBlurWindow(true);
     m_platformWindowHandle.setTranslucentBackground(true);
@@ -65,9 +67,7 @@ MainPanelControl *MainWindow::panel()
 
 void MainWindow::launch()
 {
-    setVisible(false);
     QTimer::singleShot(400, this, [ this ] {
-        setVisible(true);
         setMaskColor(AutoColor);
         setMaskAlpha(m_multiScreenWorker->opacity());
 
@@ -126,44 +126,27 @@ void MainWindow::initConnections()
 
     connect(m_mainPanel, &MainPanelControl::requestResizeDockSize, this, &MainWindow::resizeDock);
     connect(m_mainPanel, &MainPanelControl::requestResizeDockSizeFinished, this, [this]{
-            QRect rect = m_multiScreenWorker->dockRect(m_multiScreenWorker->deskScreen()
-                                                    , m_multiScreenWorker->position()
-                                                    , HideMode::KeepShowing);
+        int dockSize = 0;
+        if (m_multiScreenWorker->position() == Position::Bottom)
+            dockSize = m_mainPanel->height();
+        else
+            dockSize = m_mainPanel->width();
 
-            // 这个时候屏幕有可能是隐藏的，不能直接使用this->width()这种去设置任务栏的高度，而应该保证原值
-            int dockSize = 0;
-            if (m_multiScreenWorker->position() == Position::Bottom) {
-                dockSize = this->height() == 0 ? rect.height() : this->height();
-            } else {
-                dockSize = this->width() == 0 ? rect.width() : this->width();
-            }
+        dockSize = qBound(MAINWINDOW_MIN_SIZE, dockSize, MAINWINDOW_MAX_SIZE);
 
-            /** FIX ME
-             * 作用：限制dockSize的值在40～100之间。
-             * 问题1：如果dockSize为39，会导致dock的mainwindow高度变成99，显示的内容高度却是39。
-             * 问题2：dockSize的值在这里不应该为39，但在高分屏上开启缩放后，拉高任务栏操作会概率出现。
-             * 暂时未分析出原因，后面再修改。
-             */
-            dockSize = qBound(MAINWINDOW_MIN_SIZE, dockSize, MAINWINDOW_MAX_SIZE);
-
-            // 通知窗管和后端更新数据
-            m_multiScreenWorker->updateDaemonDockSize(dockSize);                                // 1.先更新任务栏高度
-            // onMainWindowSizeChanged(QPoint(0, 0));
-
-            m_multiScreenWorker->requestUpdateFrontendGeometry();                               // 2.再更新任务栏位置,保证先1再2
-
-            m_multiScreenWorker->requestNotifyWindowManager();
-            m_multiScreenWorker->onRequestUpdateRegionMonitor();
-            emit geometryChanged(geometry());
-     });
+        // 通知窗管和后端更新数据
+        m_multiScreenWorker->updateDaemonDockSize(dockSize);                                // 1.先更新任务栏高度
+        m_multiScreenWorker->requestUpdateFrontendGeometry();                               // 2.再更新任务栏位置,保证先1再2
+        m_multiScreenWorker->requestNotifyWindowManager();
+        m_multiScreenWorker->onRequestUpdateRegionMonitor();
+        emit geometryChanged(geometry());
+    });
 
 
     connect(m_mainPanel, &MainPanelControl::requestConttextMenu, m_menuWorker, &MenuWorker::showDockSettingsMenu);
     connect(m_menuWorker, &MenuWorker::autoHideChanged, m_multiScreenWorker, &MultiScreenWorker::onAutoHideChanged);
     connect(m_menuWorker, &MenuWorker::updatePanelGeometry, m_multiScreenWorker, &MultiScreenWorker::updateDisplay);
-
     connect(m_multiScreenWorker, &MultiScreenWorker::opacityChanged, this, &MainWindow::setMaskAlpha, Qt::QueuedConnection);
-    // connect(m_multiScreenWorker, &MultiScreenWorker::requestUpdateDockEntry, DockItemManager::instance(), &DockItemManager::requestUpdateDockItem);
     connect(m_topPanelInterface, &TopPanelInterface::pluginVisibleChanged, this, &MainWindow::pluginVisibleChanged);
 }
 
@@ -178,10 +161,7 @@ void MainWindow::resizeDock(int offset, bool dragging)
     if(dragging)
         m_multiScreenWorker->setWindowSize(offset);
 
-    // const QRect &rect = m_multiScreenWorker->getDockShowMinGeometry(m_multiScreenWorker->deskScreen());
-    const QRect &rect = m_multiScreenWorker->dockRect(m_multiScreenWorker->deskScreen()
-                                                      , pos
-                                                      , HideMode::KeepShowing);
+    const QRect &rect = m_multiScreenWorker->dockRect(m_multiScreenWorker->deskScreen(), pos, HideMode::KeepShowing);
 
     QRect newRect;
     switch (pos) {
@@ -212,7 +192,8 @@ void MainWindow::resizeDock(int offset, bool dragging)
     // 更新界面大小
     m_mainPanel->setFixedSize(newRect.size());
     setFixedSize(newRect.size());
-    move(newRect.topLeft());
+    if(!isHidden())
+        move(newRect.topLeft());
 
     if(!dragging)
         emit m_mainPanel->requestResizeDockSizeFinished();

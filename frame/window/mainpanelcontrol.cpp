@@ -34,7 +34,6 @@
 #include <QString>
 #include <QApplication>
 #include <QPointer>
-
 #include <DGuiApplicationHelper>
 #include <DWindowManagerHelper>
 
@@ -85,7 +84,6 @@ void MainPanelControl::init()
     m_mainPanelLayout->addStretch(1);
 
     m_mainPanelLayout->setMargin(0);
-    m_mainPanelLayout->setContentsMargins(0, 0, 0, 0);
 
     // 固定区域
     m_fixedAreaLayout->setMargin(0);

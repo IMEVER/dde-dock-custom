@@ -147,37 +147,26 @@ public:
 
     QRect dockRect(const QString &screenName, const Position &pos, const HideMode &hideMode);
 
-    QRect getDockShowMinGeometry(const QString &screenName, bool withoutScale = false);
-
 signals:
     void opacityChanged(const quint8 value) const;
-
     // 更新监视区域
     void requestUpdateFrontendGeometry();                       //!!! 给后端的区域不能为是或宽度为0的区域,否则会带来HideState死循环切换的bug
-    void requestNotifyWindowManager();
     void requestUpdateLayout();                                 //　界面需要根据任务栏更新布局的方向
     void requestUpdateDragArea();                               //　更新拖拽区域
-
-    void requestStopAni();
-
-    void requestUpdateDockEntry();
 
 public slots:
     void onAutoHideChanged(bool autoHide);
     void updateDaemonDockSize(int dockSize);
     void onRequestUpdateRegionMonitor();
+    void requestNotifyWindowManager();
     void handleDbusSignal(QDBusMessage);
     void updateDisplay();
 
 private slots:
     // Animation
     void showAniFinished();
-
     void updateParentGeometry(const QVariant &value, const Position &pos);
-
     void onOpacityChanged(const double value);
-
-    void onRequestNotifyWindowManager();
     void onDelayAutoHideChanged();
 
 private:
@@ -197,9 +186,8 @@ private:
     void checkXEventMonitorService();
 
     QRect dockRectWithoutScale(const QString &screenName, const Position &pos, const HideMode &hideMode);
-
     QRect getDockShowGeometry(const QString &screenName, const Position &pos, bool withoutScale = false);
-    QRect getDockHideGeometry(const QString &screenName, const Position &pos, bool withoutScale = false);
+    QRect getDockHideGeometry(const QRect showRect, const Position &pos);
 
     QScreen *screenByName(const QString &screenName);
     bool onScreenEdge(const QString &screenName, const QPoint &point);

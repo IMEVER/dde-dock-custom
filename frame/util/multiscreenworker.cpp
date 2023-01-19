@@ -36,9 +36,9 @@
 #include <QDBusConnection>
 #include <qpa/qplatformscreen.h>
 #include <QApplication>
+#include <DWindowManagerHelper>
 
-const QString MonitorsSwitchTime = "monitorsSwitchTime";
-const QString OnlyShowPrimary = "onlyShowPrimary";
+static const QString MonitorsSwitchTime = "monitorsSwitchTime";
 
 #define DIS_INS DisplayManager::instance()
 
@@ -49,29 +49,27 @@ class SharedData {
         static SharedData *instance()
         {
             static SharedData *INSTANCE = new SharedData;
-
             return INSTANCE;
         }
 
-        QRect getRect(const QString name, Position pos, bool visible, qreal ratio, int itemSize, int itemCount)
+        QRect getRect(const QString name, Position pos, qreal ratio, int itemSize, int itemCount)
         {
-            return data.value(generalKey(name, pos, visible, ratio, itemSize, itemCount), {});
+            return data.value(generalKey(name, pos, ratio, itemSize, itemCount), {});
         }
 
-        void setRect(const QString name, Position pos, bool visible, qreal ratio, int itemSize, int itemCount, QRect rect)
+        void setRect(const QString name, Position pos, qreal ratio, int itemSize, int itemCount, QRect rect)
         {
             if(rect.isValid())
-                data.insert(generalKey(name, pos, visible, ratio, itemSize, itemCount), rect);
+                data.insert(generalKey(name, pos, ratio, itemSize, itemCount), rect);
         }
 
-        QString generalKey(const QString name, Position pos, bool visible, qreal ratio, int itemSize, int itemCount)
+        QString generalKey(const QString name, Position pos, qreal ratio, int itemSize, int itemCount)
         {
-            return QString("%1_%2_%3_%4_%5_%6").arg(name).arg(pos).arg(visible).arg(ratio).arg(itemSize).arg(itemCount);
+            return QString("%1_%2_%3_%4_%5").arg(name).arg(pos).arg(ratio).arg(itemSize).arg(itemCount);
         }
 
     private:
         SharedData(){}
-        ~SharedData(){}
 
     private:
         QMap<QString, QRect> data;
@@ -171,7 +169,7 @@ QRect MultiScreenWorker::dockRect(const QString &screenName, const Position &pos
     if (hideMode == HideMode::KeepShowing)
         return getDockShowGeometry(screenName, pos);
     else
-        return getDockHideGeometry(screenName, pos);
+        return getDockHideGeometry(getDockShowGeometry(screenName, pos), pos);
 }
 
 /**
@@ -187,7 +185,7 @@ QRect MultiScreenWorker::dockRectWithoutScale(const QString &screenName, const P
     if (hideMode == HideMode::KeepShowing)
         return getDockShowGeometry(screenName, pos, true);
     else
-        return getDockHideGeometry(screenName, pos, true);
+        return getDockHideGeometry(getDockShowGeometry(screenName, pos, true), pos);
 }
 
 void MultiScreenWorker::onAutoHideChanged(bool autoHide)
@@ -290,15 +288,11 @@ void MultiScreenWorker::handleDbusSignal(QDBusMessage msg)
 void MultiScreenWorker::showAniFinished()
 {
     const QRect rect = dockRect(m_ds.current(), m_position, HideMode::KeepShowing);
-
-    m_parent->setFixedSize(rect.size());
     m_parent->setGeometry(rect);
 
-    m_parent->panel()->setFixedSize(rect.size());
-    m_parent->panel()->move(0, 0);
-
+    requestNotifyWindowManager();
     emit requestUpdateFrontendGeometry();
-    emit requestNotifyWindowManager();
+    emit DWindowManagerHelper::instance()->windowManagerChanged();
 }
 
 void MultiScreenWorker::updateDisplay()
@@ -309,9 +303,7 @@ void MultiScreenWorker::updateDisplay()
             && !testState(HideAnimationStart)
             && !testState(ShowAnimationStart)
             && !testState(DockIsShowing))
-    {
         showAniFinished();
-    }
 }
 
 void MultiScreenWorker::updateParentGeometry(const QVariant &value, const Position &pos)
@@ -319,21 +311,9 @@ void MultiScreenWorker::updateParentGeometry(const QVariant &value, const Positi
     Q_ASSERT_X(value.type() == QVariant::Rect, "", "ERROR OCCURED!");
 
     const QRect &rect = value.toRect();
-    m_parent->setFixedSize(rect.size());
     m_parent->setGeometry(rect);
 
-    switch (pos) {
-    case Position::Left: {
-        m_parent->panel()->move(rect.width() - m_parent->panel()->width(), 0);
-    }
-    break;
-    case Position::Bottom:
-    case Position::Right: {
-        m_parent->panel()->move(0, 0);
-    }
-    break;
-    case Top: break;
-    }
+    emit DWindowManagerHelper::instance()->windowManagerChanged();
 }
 
 void MultiScreenWorker::onOpacityChanged(const double value)
@@ -364,9 +344,7 @@ void MultiScreenWorker::onRequestUpdateRegionMonitor()
     }
 
     if(DIS_INS->screens().size() < 2 && (m_hideMode == KeepShowing || !testState(AutoHide)))
-    {
         return;
-    }
 
     const static int flags = Motion | Button | Key;
     const static int monitorHeight = static_cast<int>(10 * qApp->devicePixelRatio());
@@ -483,7 +461,7 @@ bool MultiScreenWorker::isCopyMode()
  * @brief 这里用到xcb去设置任务栏的高度，比较特殊，参考_NET_WM_STRUT_PARTIAL属性
  * 在屏幕旋转后，所有参数以控制中心自定义设置里主屏显示的图示为准（旋转不用特殊处理）
  */
-void MultiScreenWorker::onRequestNotifyWindowManager()
+void MultiScreenWorker::requestNotifyWindowManager()
 {
     static QRect lastRect = QRect();
     static int lastScreenWidth = 0;
@@ -596,12 +574,8 @@ void MultiScreenWorker::initConnection()
 
         //!!! 向com.deepin.dde.daemon.Dock的SetFrontendWindowRect接口设置区域时,此区域的高度或宽度不能为0,否则会导致其HideState属性循环切换,造成任务栏循环显示或隐藏
         if (rect.width() > 0 && rect.height() > 0)
-        {
             m_dockInter->SetFrontendWindowRect(int(rect.x()), int(rect.y()), uint(rect.width()), uint(rect.height()));
-            emit requestUpdateDockEntry();
-        }
     });
-    connect(this, &MultiScreenWorker::requestNotifyWindowManager, this, &MultiScreenWorker::onRequestNotifyWindowManager);
 
     connect(m_delayWakeTimer, &QTimer::timeout, this, [this]{
         // 移动Dock至相应屏相应位置
@@ -631,9 +605,11 @@ void MultiScreenWorker::initConnection()
 
     //　更新任务栏内容展示方式
     connect(this, &MultiScreenWorker::requestUpdateLayout, this, [this]{
-        m_parent->panel()->setFixedSize(dockRect(m_ds.current(), position(), HideMode::KeepShowing).size());
+        const QRect rect = dockRect(m_ds.current(), m_position, HideMode::KeepShowing);
+        m_parent->setFixedSize(rect.size());
+        m_parent->panel()->setFixedSize(rect.size());
         m_parent->panel()->move(0, 0);
-        m_parent->panel()->setPositonValue(position());
+        m_parent->panel()->setPositonValue(m_position);
         m_parent->panel()->update();
 
         DockItem::setDockPosition(m_position);
@@ -653,44 +629,14 @@ void MultiScreenWorker::displayAnimation(const QString &screen, const Position &
     if (!testState(AutoHide)
             || testState(ChangePositionAnimationStart)
             || testState(HideAnimationStart)
-            || testState(ShowAnimationStart)
-            || itemCount() == 0)
+            || testState(ShowAnimationStart))
         return;
 
-    QRect mainwindowRect = m_parent->geometry();
-    QRect dockShowRect = getDockShowGeometry(screen, pos);
-    QRect dockHideRect = getDockHideGeometry(screen, pos);
+    if ((act == AniAction::Hide && m_parent->isHidden()) || (act == AniAction::Show && !m_parent->isHidden()))
+        return;
 
-    /** FIXME
-     * 在高分屏2.75倍缩放的情况下，parent()->geometry()返回的任务栏高度有问题（实际是40,返回是39）
-     * 在这里增加判断，当返回值在范围（38，42）开区间内，均认为任务栏显示位置正确，直接返回，不执行动画
-     * 也就是在实际值基础上下浮动1像素的误差范围
-     * 正常屏幕情况下是没有这个问题的
-     */
-    switch (act) {
-    case AniAction::Show:
-        if (pos == Position::Top || pos == Position::Bottom) {
-            if (qAbs(dockShowRect.height() - mainwindowRect.height()) <= 1
-                    && mainwindowRect.contains(dockShowRect.center())) {
-                // emit requestNotifyWindowManager();
-                return;
-            }
-        } else if (pos == Position::Left || pos == Position::Right) {
-            if (qAbs(dockShowRect.width() - mainwindowRect.width()) <= 1
-                    && mainwindowRect.contains(dockShowRect.center())) {
-                // emit requestNotifyWindowManager();
-                return;
-            }
-        }
-        break;
-    case AniAction::Hide:
-        if (m_parent->isHidden()) {
-            // emit requestNotifyWindowManager();
-            // emit requestUpdateFrontendGeometry();
-            return;
-        }
-        break;
-    }
+    QRect dockShowRect = getDockShowGeometry(screen, pos);
+    QRect dockHideRect = getDockHideGeometry(dockShowRect, pos);
 
     QVariantAnimation *ani = new QVariantAnimation(this);
     ani->setEasingCurve(QEasingCurve::InOutCubic);
@@ -711,12 +657,11 @@ void MultiScreenWorker::displayAnimation(const QString &screen, const Position &
         ani->setDirection(QAbstractAnimation::Backward); // 隐藏时动画反向走
         connect(ani, &QVariantAnimation::finished, this, [this]{
             m_parent->hide();
-            emit requestNotifyWindowManager();
+            requestNotifyWindowManager();
         });
         break;
     }
 
-    connect(this, &MultiScreenWorker::requestStopAni, ani, &QVariantAnimation::stop);
     connect(ani, &QVariantAnimation::valueChanged, this, [this](const QVariant &value){
         updateParentGeometry(value, m_position);
     });
@@ -726,6 +671,7 @@ void MultiScreenWorker::displayAnimation(const QString &screen, const Position &
         switch (act) {
         case AniAction::Show:
             if (newState == QVariantAnimation::Running && oldState == QVariantAnimation::Stopped) {
+                m_parent->show();
                 if (m_hideMode == HideMode::KeepShowing || duration)
                     setStates(ShowAnimationStart);
                 else
@@ -747,16 +693,7 @@ void MultiScreenWorker::displayAnimation(const QString &screen, const Position &
         }
     });
 
-    // m_parent->panel()->setFixedSize(dockRect(m_ds.current(), m_position, HideMode::KeepShowing).size());
-    // m_parent->panel()->move(0, 0);
-    // m_parent->panel()->setPositonValue(m_position);
-    // m_parent->panel()->update();
-
-    emit requestStopAni();
-
     ani->start(QVariantAnimation::DeleteWhenStopped);
-    if(m_parent->isHidden())
-        m_parent->show();
 }
 
 /**
@@ -801,35 +738,37 @@ void MultiScreenWorker::changeDockPosition(QString fromScreen, QString toScreen,
     ani2->setDuration(duration);
 
     //　隐藏
-    ani1->setStartValue(getDockShowGeometry(fromScreen, fromPos));
-    ani1->setEndValue(getDockHideGeometry(fromScreen, fromPos));
+    QRect showRect = getDockShowGeometry(fromScreen, fromPos);
+    ani1->setStartValue(showRect);
+    ani1->setEndValue(getDockHideGeometry(showRect, fromPos));
 
     //　显示
-    ani2->setStartValue(getDockHideGeometry(toScreen, toPos));
-    ani2->setEndValue(getDockShowGeometry(toScreen, toPos));
+    showRect = getDockShowGeometry(toScreen, toPos);
+    ani2->setStartValue(getDockHideGeometry(showRect, toPos));
+    ani2->setEndValue(showRect);
 
     group->addAnimation(ani1);
     group->addAnimation(ani2);
 
     // 隐藏时固定一下内容大小
-    connect(ani1, &QVariantAnimation::stateChanged, this, [ this, fromScreen, fromPos ](QAbstractAnimation::State newState, QAbstractAnimation::State oldState) {
-        if (newState == QVariantAnimation::Running && oldState == QVariantAnimation::Stopped) {
-            m_parent->panel()->setFixedSize(dockRect(fromScreen, fromPos, HideMode::KeepShowing).size());
-            m_parent->panel()->move(0, 0);
-        }
-    });
+    // connect(ani1, &QVariantAnimation::stateChanged, this, [ this, fromScreen, fromPos ](QAbstractAnimation::State newState, QAbstractAnimation::State oldState) {
+    //     if (newState == QVariantAnimation::Running && oldState == QVariantAnimation::Stopped) {
+    //         m_parent->panel()->setFixedSize(dockRect(fromScreen, fromPos, HideMode::KeepShowing).size());
+    //         m_parent->panel()->move(0, 0);
+    //     }
+    // });
 
     connect(ani1, &QVariantAnimation::valueChanged, this, [ this, fromPos ](const QVariant & value) {
         updateParentGeometry(value, fromPos);
     });
 
     // 显示时固定一下内容大小
-    connect(ani2, &QVariantAnimation::stateChanged, this, [ this, toScreen, toPos ](QAbstractAnimation::State newState, QAbstractAnimation::State oldState) {
-        if (newState == QVariantAnimation::Running && oldState == QVariantAnimation::Stopped) {
-            m_parent->panel()->setFixedSize(dockRect(toScreen, toPos, HideMode::KeepShowing).size());
-            m_parent->panel()->move(0, 0);
-        }
-    });
+    // connect(ani2, &QVariantAnimation::stateChanged, this, [ this, toScreen, toPos ](QAbstractAnimation::State newState, QAbstractAnimation::State oldState) {
+    //     if (newState == QVariantAnimation::Running && oldState == QVariantAnimation::Stopped) {
+    //         m_parent->panel()->setFixedSize(dockRect(toScreen, toPos, HideMode::KeepShowing).size());
+    //         m_parent->panel()->move(0, 0);
+    //     }
+    // });
 
     connect(ani2, &QVariantAnimation::valueChanged, this, [ this, toPos ](const QVariant & value) {
         updateParentGeometry(value, toPos);
@@ -904,8 +843,8 @@ void MultiScreenWorker::resetDockScreen()
     m_parent->panel()->setFixedSize(rect.size());
     m_parent->panel()->move(0, 0);
 
+    requestNotifyWindowManager();
     emit requestUpdateFrontendGeometry();
-    emit requestNotifyWindowManager();
 }
 
 /**
@@ -938,20 +877,19 @@ void MultiScreenWorker::checkDaemonDockService()
         resetDockScreen();
     };
 
-    const QString serverName = "com.deepin.dde.daemon.Dock";
+    static const QString serverName = "com.deepin.dde.daemon.Dock";
     QDBusConnectionInterface *ifc = QDBusConnection::sessionBus().interface();
 
-    if (!ifc->isServiceRegistered(serverName)) {
-        connect(ifc, &QDBusConnectionInterface::serviceOwnerChanged, this, [ this, serverName, connectionInit, ifc ](const QString & name, const QString & oldOwner, const QString & newOwner) {
+    if (ifc->isServiceRegistered(serverName))
+        connectionInit();
+    else
+        connect(ifc, &QDBusConnectionInterface::serviceOwnerChanged, this, [ this, connectionInit, ifc ](const QString & name, const QString & oldOwner, const QString & newOwner) {
             Q_UNUSED(oldOwner)
             if (name == serverName && !newOwner.isEmpty()) {
                 connectionInit();
                 disconnect(ifc);
             }
         });
-    } else {
-        connectionInit();
-    }
 }
 
 /**
@@ -1007,52 +945,6 @@ void MultiScreenWorker::checkXEventMonitorService()
     }
 }
 
-QRect MultiScreenWorker::getDockShowMinGeometry(const QString &screenName, bool withoutScale)
-{
-    const qreal ratio = withoutScale ? 1 : qApp->devicePixelRatio();
-    const int dockCount = itemCount();
-    const int dockSize = 40;
-
-    QRect rect = SharedData::instance()->getRect(screenName, m_position, true, ratio, dockSize, dockCount);
-    if(rect.isEmpty())
-    {
-        for (auto s : DIS_INS->screens()) {
-            if (s->name() == screenName) {
-                // 拿到当前显示器缩放之前的分辨率
-                QRect screenRect = s->handle()->geometry();
-
-                switch (m_position) {
-                case Position::Bottom:
-                    // rect.setX(static_cast<int>(screenRect.x()));
-                    rect.setY(static_cast<int>(screenRect.y() + screenRect.height() / ratio - dockSize));
-                    // rect.setWidth(static_cast<int>(screenRect.width() / ratio));
-                    rect.setHeight(dockSize);
-                    break;
-                case Position::Left:
-                    rect.setX(static_cast<int>(screenRect.x()));
-                    // rect.setY(static_cast<int>(screenRect.y()));
-                    rect.setWidth(dockSize);
-                    // rect.setHeight(static_cast<int>(screenRect.height() / ratio));
-                    break;
-                case Position::Right:
-                    rect.setX(static_cast<int>(screenRect.x() + screenRect.width() / ratio - dockSize));
-                    // rect.setY(static_cast<int>(screenRect.y()));
-                    rect.setWidth(dockSize);
-                    // rect.setHeight(static_cast<int>(screenRect.height() / ratio));
-                    break;
-                case Top:
-                    break;
-                }
-
-                updateDockRect(rect, screenRect, m_position, ratio, dockSize, dockCount);
-                break;
-            }
-        }
-        SharedData::instance()->setRect(screenName, m_position, true, ratio, dockSize, dockCount, rect);
-    }
-    return rect;
-}
-
 /**
  * @brief 获取任务栏显示时的参数。目前多屏情况下缩放保持一致，如果后续缩放规则修改，这里需要重新调整
  *
@@ -1068,7 +960,7 @@ QRect MultiScreenWorker::getDockShowGeometry(const QString &screenName, const Po
     const int dockSize = static_cast<int>( m_windowSize * (withoutScale ? qApp->devicePixelRatio() : 1));
     const int dockCount = itemCount();
 
-    QRect rect = SharedData::instance()->getRect(screenName, pos, true, ratio, m_windowSize, dockCount);
+    QRect rect = SharedData::instance()->getRect(screenName, pos, ratio, m_windowSize, dockCount);
     if(rect.isEmpty())
     {
         for (auto s : DIS_INS->screens()) {
@@ -1078,22 +970,16 @@ QRect MultiScreenWorker::getDockShowGeometry(const QString &screenName, const Po
 
                 switch (pos) {
                 case Position::Bottom:
-                    // rect.setX(screenRect.x());
                     rect.setY(static_cast<int>(screenRect.y() + screenRect.height() / ratio - dockSize));
-                    // rect.setWidth(static_cast<int>(screenRect.width() / ratio));
                     rect.setHeight(dockSize);
                     break;
                 case Position::Left:
                     rect.setX(screenRect.x());
-                    // rect.setY(screenRect.y());
                     rect.setWidth(dockSize);
-                    // rect.setHeight(static_cast<int>(screenRect.height() / ratio));
                     break;
                 case Position::Right:
                     rect.setX(static_cast<int>(screenRect.x() + screenRect.width() / ratio - dockSize));
-                    // rect.setY(screenRect.y());
                     rect.setWidth(dockSize);
-                    // rect.setHeight(static_cast<int>(screenRect.height() / ratio));
                     break;
                 case Top:
                     break;
@@ -1102,7 +988,7 @@ QRect MultiScreenWorker::getDockShowGeometry(const QString &screenName, const Po
                 break;
             }
         }
-        SharedData::instance()->setRect(screenName, pos, true, ratio, m_windowSize, dockCount, rect);
+        SharedData::instance()->setRect(screenName, pos, ratio, m_windowSize, dockCount, rect);
     }
 
     return rect;
@@ -1117,50 +1003,26 @@ QRect MultiScreenWorker::getDockShowGeometry(const QString &screenName, const Po
  * @param withoutScale  是否考虑缩放（true:获取的是真实值; false:获取的是前端认为的值(默认)）
  * @return QRect        任务栏参数
  */
-QRect MultiScreenWorker::getDockHideGeometry(const QString &screenName, const Position &pos, bool withoutScale)
+QRect MultiScreenWorker::getDockHideGeometry(const QRect showRect, const Position &pos)
 {
-    const double ratio = withoutScale ? 1 : qApp->devicePixelRatio();
-    const int dockSize = static_cast<int>( m_windowSize * (withoutScale ? qApp->devicePixelRatio() : 1));
-    const int dockCount = itemCount();
+    QRect rect = showRect;
 
-    QRect rect = SharedData::instance()->getRect(screenName, pos, false, ratio, m_windowSize, dockCount);
-    if(rect.isEmpty())
-    {
-        for (auto s : DIS_INS->screens()) {
-            if (s->name() == screenName) {
-                // 拿到当前显示器缩放之前的分辨率
-                QRect screenRect = s->handle()->geometry();
-
-                switch (pos) {
-                case Position::Bottom:
-                    // rect.setX(screenRect.x());
-                    rect.setY(static_cast<int>(screenRect.y() + screenRect.height() / ratio));
-                    // rect.setWidth(static_cast<int>(screenRect.width() / ratio));
-                    rect.setHeight(2);
-                    break;
-                case Position::Left:
-                    rect.setX(screenRect.x());
-                    // rect.setY(screenRect.y());
-                    rect.setWidth(2);
-                    // rect.setHeight(static_cast<int>(screenRect.height() / ratio));
-                    break;
-                case Position::Right:
-                    rect.setX(static_cast<int>(screenRect.x() + screenRect.width() / ratio));
-                    // rect.setY(screenRect.y());
-                    rect.setWidth(2);
-                    // rect.setHeight(static_cast<int>(screenRect.height() / ratio));
-                    break;
-                case Top:
-                    break;
-                }
-
-                updateDockRect(rect, screenRect, pos, ratio, dockSize, dockCount);
-                break;
-            }
-        }
-        SharedData::instance()->setRect(screenName, pos, false, ratio, m_windowSize, dockCount, rect);
+    switch (pos) {
+    case Position::Bottom:
+        rect.setY(showRect.bottom());
+        rect.setHeight(showRect.height());
+        break;
+    case Position::Left:
+        rect.setX(showRect.x()-showRect.width());
+        rect.setWidth(showRect.width());
+        break;
+    case Position::Right:
+        rect.setX(showRect.right());
+        rect.setWidth(showRect.width());
+        break;
+    case Top:
+        break;
     }
-
     return rect;
 }
 
@@ -1200,12 +1062,10 @@ bool MultiScreenWorker::onScreenEdge(const QString &screenName, const QPoint &po
 
 const QPoint MultiScreenWorker::rawXPosition(const QPoint &scaledPos)
 {
-    QScreen const *screen = Utils::screenAtByScaled(scaledPos);
+    if(auto screen = Utils::screenAtByScaled(scaledPos))
+        return screen->geometry().topLeft() + (scaledPos - screen->geometry().topLeft()) * screen->devicePixelRatio();
 
-    return screen ? screen->geometry().topLeft() +
-                    (scaledPos - screen->geometry().topLeft()) *
-                    screen->devicePixelRatio()
-                  : scaledPos;
+    return scaledPos;
 }
 
 void MultiScreenWorker::onDelayAutoHideChanged()
@@ -1216,17 +1076,16 @@ void MultiScreenWorker::onDelayAutoHideChanged()
         // 这时候鼠标如果在任务栏上,就不能隐藏
         if (!m_parent->geometry().contains(QCursor::pos()))
             displayAnimation(m_ds.current(), AniAction::Hide);
-    }
         break;
+    }
     case HideMode::SmartHide: {
         if (m_hideState == HideState::Show)
-        {
             displayAnimation(m_ds.current(), AniAction::Show);
-        } else if (m_hideState == HideState::Hide) {
+        else if (m_hideState == HideState::Hide)
             displayAnimation(m_ds.current(), AniAction::Hide);
-        }
-    }
+
         break;
+    }
     case HideMode::KeepShowing:
         displayAnimation(m_ds.current(), AniAction::Show);
         break;
