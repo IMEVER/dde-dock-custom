@@ -28,7 +28,6 @@
 DockItemManager::DockItemManager() : QObject()
     , m_appInter(new DBusDock("com.deepin.dde.daemon.Dock", "/com/deepin/dde/daemon/Dock", QDBusConnection::sessionBus(), this))
     , m_qsettings(new QSettings(QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation) + "/setting.ini", QSettings::IniFormat))
-    , launcherItem(new LauncherItem)
 {
     m_qsettings->setIniCodec(QTextCodec::codecForName("UTF-8"));
     connect(m_appInter, &DBusDock::EntryAdded, this, [this](const QDBusObjectPath &path, int index){ appItemAdded(path, index);});
@@ -83,12 +82,18 @@ bool DockItemManager::isEnableHoverHighlight()
 
 void DockItemManager::setHoverScaleAnimation(bool enable)
 {
-    m_qsettings->setValue("animation/hover", enable);
+    if(enable != isEnableHoverScaleAnimation()) {
+        m_qsettings->setValue("animation/hover", enable);
+        emit hoverScaleChanged(enable);
+    }
 }
 
 void DockItemManager::setInOutAnimation(bool enable)
 {
-    m_qsettings->setValue("animation/inout", enable);
+    if(enable != isEnableInOutAnimation()) {
+        m_qsettings->setValue("animation/inout", enable);
+        emit inoutChanged(enable);
+    }
 }
 
 void DockItemManager::setDragAnimation(bool enable)
@@ -98,7 +103,19 @@ void DockItemManager::setDragAnimation(bool enable)
 
 void DockItemManager::setHoverHighlight(bool enable)
 {
-    m_qsettings->setValue("animation/highlight", enable);
+    if(isEnableHoverHighlight() != enable) {
+        m_qsettings->setValue("animation/highlight", enable);
+        emit hoverHighlighted(enable);
+    }
+}
+
+DockItemManager::ActivateAnimationType DockItemManager::animationType() {
+    return m_qsettings->value("animation/activate", Jump).value<ActivateAnimationType>();
+}
+
+void DockItemManager::setAnimationType(ActivateAnimationType type) {
+    m_qsettings->setValue("animation/activate", type);
+    m_qsettings->sync();
 }
 
 bool DockItemManager::hasWindowItem()
@@ -128,16 +145,6 @@ const QList<QPointer<DirItem>> DockItemManager::dirList()
 bool DockItemManager::appIsOnDock(const QString &appDesktop) const
 {
     return m_appInter->IsOnDock(appDesktop);
-}
-
-void DockItemManager::refershItemsIcon()
-{
-    for (auto item : m_itemList) {
-        item->refershIcon();
-        item->update();
-    }
-    launcherItem->refershIcon();
-    launcherItem->update();
 }
 
 void DockItemManager::itemMoved(DockItem *const sourceItem, DockItem *const targetItem)
@@ -234,13 +241,9 @@ void DockItemManager::appItemRemoved(AppItem *appItem, bool animation)
     m_itemList.removeOne(appItem);
 
     if(appItem->getPlace() == DockItem::DirPlace)
-    {
         appItem->getDirItem()->removeItem(appItem, false);
-    }
     else
-    {
         emit itemRemoved(appItem, animation);
-    }
 
     appItem->removeWindowItem(animation);
     QTimer::singleShot(animation ? 500 : 10, [ appItem ] { appItem->deleteLater(); });
@@ -251,7 +254,7 @@ void DockItemManager::reloadAppItems()
     static bool first = true;
     if(first)
     {
-        emit itemInserted(0, launcherItem);
+        emit itemInserted(0, new LauncherItem);
         emit itemInserted(0, new TrashItem);
         first = false;
     }

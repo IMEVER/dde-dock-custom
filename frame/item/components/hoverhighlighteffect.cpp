@@ -23,14 +23,32 @@
 #include "util/utils.h"
 
 #include <QPainter>
+#include <QEvent>
 #include <QDebug>
 
 HoverHighlightEffect::HoverHighlightEffect(QObject *parent)
     : QGraphicsEffect(parent)
-
     , m_highlighting(false)
 {
+    parent->installEventFilter(this);
+}
 
+HoverHighlightEffect::~HoverHighlightEffect() {
+    parent()->removeEventFilter(this);
+}
+
+bool HoverHighlightEffect::eventFilter(QObject *object, QEvent *event) {
+    if(object == parent()) {
+        if(event->type() == QEvent::Enter) {
+            m_highlighting = true;
+            update();
+        } else if(event->type() == QEvent::Leave) {
+            m_highlighting = false;
+            update();
+        }
+    }
+
+    return QGraphicsEffect::eventFilter(object, event);
 }
 
 void HoverHighlightEffect::draw(QPainter *painter)
@@ -38,9 +56,7 @@ void HoverHighlightEffect::draw(QPainter *painter)
     const QPixmap pix = sourcePixmap(Qt::DeviceCoordinates);
 
     if (m_highlighting)
-    {
         painter->drawPixmap(0, 0, Utils::lighterEffect(pix));
-    } else {
+    else
         painter->drawPixmap(0, 0, pix);
-    }
 }

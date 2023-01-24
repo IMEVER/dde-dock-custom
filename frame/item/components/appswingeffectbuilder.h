@@ -1,6 +1,8 @@
 #ifndef SWINGEFFECT
 #define SWINGEFFECT
 
+#include "interfaces/constants.h"
+
 #include <QGraphicsView>
 #include <QGraphicsItemAnimation>
 #include <QGraphicsPixmapItem>
@@ -116,6 +118,86 @@ static QPair<QGraphicsView *, QGraphicsItemAnimation *> SwingEffect(
         itemAnimation->setPosAt(i / 60.0, pos);
         itemAnimation->setTranslationAt(i / 60.0, px, py);
         itemAnimation->setRotationAt(i / 60.0, Frames[i]);
+    }
+
+    QObject::connect(tl, &QTimeLine::stateChanged, [=](QTimeLine::State newState) {
+        if (newState == QTimeLine::NotRunning) {
+            itemScene->deleteLater();
+            swingEffectView->deleteLater();
+            itemAnimation->deleteLater();
+        }
+    });
+
+    return QPair<QGraphicsView *, QGraphicsItemAnimation *>(swingEffectView, itemAnimation);
+}
+
+static QPair<QGraphicsView *, QGraphicsItemAnimation *> JumpEffect(
+        QWidget *parent, const QPixmap &icon, const QRect & rect, const qreal devicePixelRatio, Position position)
+{
+    QGraphicsView *swingEffectView = new QGraphicsView();
+    swingEffectView->setWindowFlags(Qt::X11BypassWindowManagerHint | Qt::WindowStaysOnTopHint | Qt::WindowDoesNotAcceptFocus);
+    swingEffectView->setAttribute(Qt::WA_TransparentForMouseEvents);
+    swingEffectView->setAttribute( Qt::WA_TranslucentBackground);
+
+    swingEffectView->viewport()->setAutoFillBackground(false);
+    swingEffectView->setFrameShape(QFrame::NoFrame);
+
+    QGraphicsScene *itemScene = new QGraphicsScene();
+    QGraphicsItemAnimation *itemAnimation = new QGraphicsItemAnimation(parent);
+
+    swingEffectView->setScene(itemScene);
+    swingEffectView->setAlignment(Qt::AlignCenter);
+    swingEffectView->setFrameStyle(QFrame::NoFrame);
+    swingEffectView->setContentsMargins(0, 0, 0, 0);
+    swingEffectView->setRenderHints(QPainter::SmoothPixmapTransform);
+    swingEffectView->setViewportUpdateMode(QGraphicsView::SmartViewportUpdate);
+    swingEffectView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    swingEffectView->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+
+    QTimeLine *tl = itemAnimation->timeLine();
+    if (!tl)
+    {
+        tl = new QTimeLine(1200, parent);
+        tl->setFrameRange(0, 60);
+        tl->setLoopCount(1);
+        tl->setEasingCurve(QEasingCurve::OutBounce);
+        tl->setStartFrame(0);
+
+        itemAnimation->setTimeLine(tl);
+    }
+
+    QGraphicsPixmapItem *item = itemScene->addPixmap(icon);
+    item->setTransformationMode(Qt::SmoothTransformation);
+    item->setPos(QPointF(rect.center()) - QPointF(icon.rect().center()) / devicePixelRatio);
+
+    itemAnimation->setItem(item);
+
+    int width = rect.width();
+    int height = rect.height();
+    if(position == Left || position == Right)
+        width *= 2;
+    else
+        height *= 2;
+
+    itemScene->setSceneRect(0, 0, width, height);
+    swingEffectView->setSceneRect(0, 0, width, height);
+    swingEffectView->setFixedSize(QSize(width, height));
+
+    const int px = qreal(-icon.rect().center().x()) / devicePixelRatio;
+    const int py = qreal(-icon.rect().center().y()) / devicePixelRatio;
+    const QPoint pos = rect.center();
+    for (int i(0); i != 60; ++i)
+    {
+        if(position == Left) {
+            itemAnimation->setPosAt(i / 60.0, pos);
+            itemAnimation->setTranslationAt(i / 60.0, px + (i <=30 ? i : 59-i)/60.*width, py);
+        } else if(position == Right) {
+            itemAnimation->setPosAt(i / 60.0, QPoint{width-pos.x(), pos.y()});
+            itemAnimation->setTranslationAt(i / 60.0, px - (i <=30 ? i : 59-i)/60.*width, py);
+        } else {
+            itemAnimation->setPosAt(i / 60.0, QPoint{pos.x(), height - pos.y()});
+            itemAnimation->setTranslationAt(i / 60.0, px, py - (i <=30 ? i : 59-i)/60.*height);
+        }
     }
 
     QObject::connect(tl, &QTimeLine::stateChanged, [=](QTimeLine::State newState) {

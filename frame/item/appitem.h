@@ -108,7 +108,6 @@ private slots:
     void showPreview();
     void playSwingEffect();
     void stopSwingEffect();
-    void checkAttentionEffect();
 
 private:
     TipsWidget *m_appNameTips;

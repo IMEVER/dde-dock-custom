@@ -24,7 +24,6 @@
 
 #include "../interfaces/constants.h"
 #include "util/dockpopupwindow.h"
-#include "components/hoverhighlighteffect.h"
 
 #include <QFrame>
 #include <QPointer>
@@ -76,8 +75,6 @@ signals:
     void requestRefreshWindowVisible() const;
 
 protected:
-    bool event(QEvent *event) override;
-    void paintEvent(QPaintEvent *e) override;
     void mousePressEvent(QMouseEvent *e) override;
     void enterEvent(QEvent *e) override;
     void leaveEvent(QEvent *e) override;
@@ -96,28 +93,19 @@ protected:
 
 protected slots:
     void showContextMenu();
-    void onContextMenuAccepted();
 
 private:
-    void updatePopupPosition();
     void menuActionClicked(QAction *action);
 
 protected:
-    bool m_hover;
     bool m_popupShown;
-    QMenu m_contextMenu;
-
-    QPointer<QWidget> m_lastPopupWidget;
-    QPointer<HoverHighlightEffect> m_hoverEffect;
 
     QTimer *m_popupTipsDelayTimer;
-    QTimer *m_popupAdjustDelayTimer;
 
     static Position DockPosition;
     static QPointer<DockPopupWindow> PopupWindow;
 
-    QVariantAnimation *m_scaleLarger;
-    QVariantAnimation *m_scaleSmaller;
+    QVariantAnimation *m_scale;
 };
 
 #endif // DOCKITEM_H

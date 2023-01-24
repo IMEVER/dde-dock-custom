@@ -61,8 +61,6 @@ MainPanelControl::MainPanelControl(QWidget *parent) : QWidget(parent)
     m_appAreaWidget->setAcceptDrops(true);
     m_appAreaWidget->installEventFilter(this);
 
-    m_splitter->setMouseTracking(true);
-    m_splitter2->setMouseTracking(true);
     m_splitter->installEventFilter(this);
     m_splitter2->installEventFilter(this);
 }
@@ -72,6 +70,7 @@ MainPanelControl::~MainPanelControl(){}
 void MainPanelControl::init()
 {
     m_mainPanelLayout->setAlignment(Qt::AlignCenter);
+    m_mainPanelLayout->setMargin(0);
 
     m_mainPanelLayout->setSpacing(MODE_PADDING);
     m_mainPanelLayout->addStretch(1);
@@ -82,8 +81,6 @@ void MainPanelControl::init()
     m_mainPanelLayout->addWidget(m_splitter2, 0, Qt::AlignCenter);
     m_mainPanelLayout->addLayout(m_lastAreaLayout);
     m_mainPanelLayout->addStretch(1);
-
-    m_mainPanelLayout->setMargin(0);
 
     // 固定区域
     m_fixedAreaLayout->setMargin(0);

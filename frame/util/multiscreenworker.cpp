@@ -288,7 +288,9 @@ void MultiScreenWorker::handleDbusSignal(QDBusMessage msg)
 void MultiScreenWorker::showAniFinished()
 {
     const QRect rect = dockRect(m_ds.current(), m_position, HideMode::KeepShowing);
+    m_parent->setFixedSize(rect.size());
     m_parent->setGeometry(rect);
+    m_parent->panel()->setFixedSize(rect.size());
 
     requestNotifyWindowManager();
     emit requestUpdateFrontendGeometry();
@@ -1010,15 +1012,15 @@ QRect MultiScreenWorker::getDockHideGeometry(const QRect showRect, const Positio
     switch (pos) {
     case Position::Bottom:
         rect.setY(showRect.bottom());
-        rect.setHeight(showRect.height());
+        // rect.setHeight(showRect.height());
         break;
     case Position::Left:
         rect.setX(showRect.x()-showRect.width());
-        rect.setWidth(showRect.width());
+        // rect.setWidth(showRect.width());
         break;
     case Position::Right:
         rect.setX(showRect.right());
-        rect.setWidth(showRect.width());
+        // rect.setWidth(showRect.width());
         break;
     case Top:
         break;
@@ -1145,7 +1147,7 @@ int MultiScreenWorker::itemCount()
 void MultiScreenWorker::updateDockRect(QRect &dockRect, QRect screenRect, Position position, qreal ratio, int dockSize, int count)
 {
     const int splitterWidth = (DockItemManager::instance()->hasWindowItem() ? MODE_PADDING + 2 : 0) + (MODE_PADDING + 2);
-    dockSize = DockItemManager::instance()->isEnableHoverScaleAnimation() ? (dockSize * .9) : (dockSize-2);
+    dockSize = DockItemManager::instance()->isEnableHoverScaleAnimation() ? (dockSize * .8) : (dockSize-2);
     int length;
 
     switch (position)

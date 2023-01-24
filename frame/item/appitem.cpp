@@ -232,7 +232,7 @@ void AppItem::mouseReleaseEvent(QMouseEvent *e)
 
         if (m_windowInfos.isEmpty())
             playSwingEffect();
-        if (m_place == DockItem::DirPlace)
+        else if (m_place == DockItem::DirPlace)
             QTimer::singleShot(1000,  m_dirItem, &DirItem::hideDirpopupWindow);
     }
     else if (e->button() == Qt::LeftButton)
@@ -241,7 +241,7 @@ void AppItem::mouseReleaseEvent(QMouseEvent *e)
 
         if (m_windowInfos.isEmpty())
             playSwingEffect();
-        if (m_place == DockItem::DirPlace)
+        else if (m_place == DockItem::DirPlace)
             QTimer::singleShot(1000, m_dirItem, &DirItem::hideDirpopupWindow);
     }
 
@@ -409,9 +409,10 @@ void AppItem::updateWindowInfos(const WindowInfoMap &info)
         m_updateIconGeometryTimer->start();
 
     // process attention effect
-    if (hasAttention())
-        playSwingEffect();
-    else
+    if (hasAttention()) {
+        if(m_place == DockItem::DockPlace)
+            playSwingEffect();
+    } else if(m_place == DockItem::DirPlace)
         stopSwingEffect();
 
     update();
@@ -558,29 +559,48 @@ void AppItem::check()
 
 void AppItem::playSwingEffect()
 {
+    DockItemManager::ActivateAnimationType type = DockItemManager::instance()->animationType();
     // NOTE(sbw): return if animation view already playing
-    if (m_swingEffectView != nullptr)
+    if (type == DockItemManager::No || m_swingEffectView != nullptr)
         return;
 
-    stopSwingEffect();
-
-    QPair<QGraphicsView *, QGraphicsItemAnimation *> pair = SwingEffect(this, m_appIcon, rect(), devicePixelRatioF());
+    QPair<QGraphicsView *, QGraphicsItemAnimation *> pair = type == DockItemManager::Swing ? SwingEffect(this, m_appIcon, rect(), devicePixelRatioF())
+        : JumpEffect(this, m_appIcon, rect(), devicePixelRatioF(), m_place == DirPlace ? Bottom : DockPosition);
 
     m_swingEffectView = pair.first;
     m_itemAnimation = pair.second;
 
     QTimeLine *tl = m_itemAnimation->timeLine();
-    connect(tl, &QTimeLine::stateChanged, [=](QTimeLine::State newState)
-            {
+    connect(tl, &QTimeLine::stateChanged, [this, type](QTimeLine::State newState) {
         if (newState == QTimeLine::NotRunning) {
             m_swingEffectView->hide();
-            layout()->removeWidget(m_swingEffectView);
+            if(type == DockItemManager::Swing)
+                layout()->removeWidget(m_swingEffectView);
+            else
+                update();
             m_swingEffectView = nullptr;
             m_itemAnimation = nullptr;
-            checkAttentionEffect();
-        } });
 
-    layout()->addWidget(m_swingEffectView);
+            if (m_place == DockItem::DirPlace)
+                m_dirItem->hideDirpopupWindow();
+            else if(m_windowInfos.isEmpty() || hasAttention())
+                QTimer::singleShot(1000, this, [this] {
+                    if (hasAttention()) playSwingEffect();
+                });
+        }
+    });
+
+    if(type == DockItemManager::Swing)
+        layout()->addWidget(m_swingEffectView);
+    else {
+        m_swingEffectView->show();
+        if (DockPosition == Bottom || m_place == DirPlace)
+            m_swingEffectView->move(qobject_cast<QWidget*>(parent())->mapToGlobal(pos()) - QPoint{0, m_swingEffectView->height()-height()});
+        else if (DockPosition == Right)
+            m_swingEffectView->move(qobject_cast<QWidget*>(parent())->mapToGlobal(pos()) - QPoint{m_swingEffectView->width()-width(), 0});
+        else if(DockPosition == Left)
+            m_swingEffectView->move(qobject_cast<QWidget*>(parent())->mapToGlobal(pos()));
+    }
     tl->start();
 }
 
@@ -594,14 +614,6 @@ void AppItem::stopSwingEffect()
 
     if (m_itemAnimation->timeLine() && m_itemAnimation->timeLine()->state() != QTimeLine::NotRunning)
         m_itemAnimation->timeLine()->stop();
-}
-
-void AppItem::checkAttentionEffect()
-{
-    QTimer::singleShot(1000, this, [this] {
-        if (hasAttention())
-            playSwingEffect();
-    });
 }
 
 void AppItem::handleDragDrop(uint timestamp, const QStringList &uris)

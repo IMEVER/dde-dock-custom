@@ -25,8 +25,33 @@
 #include <QAction>
 #include <QMenu>
 #include <QGSettings>
-
 #include <DApplication>
+#include <QProxyStyle>
+#include <QStyleOption>
+#include <QStyleOptionMenuItem>
+
+class MenuProxyStyle: public QProxyStyle{
+public:
+    using QProxyStyle::QProxyStyle;
+    void drawControl(ControlElement element, const QStyleOption *opt, QPainter *p, const QWidget *w) const override
+    {
+        if(element == QStyle::CE_MenuItem){
+            if(const QStyleOptionMenuItem *o = qstyleoption_cast<const QStyleOptionMenuItem *>(opt)){
+                QStyleOptionMenuItem menuitem = *o;
+                if(menuitem.menuItemType == QStyleOptionMenuItem::Separator && !menuitem.text.isEmpty()) {
+                    QString text = o->text;
+                    menuitem.text = "";
+                    QProxyStyle::drawControl(element, &menuitem, p, w);
+                    int margin = 4;
+                    int text_flags = Qt::AlignVCenter | Qt::AlignHCenter | Qt::TextDontClip | Qt::TextSingleLine;
+                    p->drawText(menuitem.rect.adjusted(margin, margin, -margin, -margin),  text_flags, text);
+                    return;
+                }
+            }
+        }
+        QProxyStyle::drawControl(element, opt, p, w);
+    }
+};
 
 MenuWorker::MenuWorker(DBusDock *dockInter,QWidget *parent)
     : QObject (parent)
@@ -67,6 +92,8 @@ QMenu *MenuWorker::createMenu()
     m_smartHideAct->setChecked(m_hideMode == SmartHide);
 
     QMenu *animationSubMenu = m_settingsMenu->addMenu("动画");
+    animationSubMenu->setStyle(new MenuProxyStyle(animationSubMenu->style()));
+
     QAction *m_hoverHighlightAct = animationSubMenu->addAction("悬停高亮");
     m_hoverHighlightAct->setCheckable(true);
     m_hoverHighlightAct->setChecked(m_itemManager->isEnableHoverHighlight());
@@ -79,6 +106,21 @@ QMenu *MenuWorker::createMenu()
     QAction *m_dragAct = animationSubMenu->addAction("拖动动画");
     m_dragAct->setCheckable(true);
     m_dragAct->setChecked(m_itemManager->isEnableDragAnimation());
+
+    animationSubMenu->addSection("提醒动画");
+    QActionGroup *group = new QActionGroup(this);
+    QAction *swingAction = animationSubMenu->addAction("摆动");
+    swingAction->setCheckable(true);
+    swingAction->setChecked(m_itemManager->animationType() == DockItemManager::Swing);
+    group->addAction(swingAction);
+    QAction *jumpAction = animationSubMenu->addAction("跳动");
+    jumpAction->setCheckable(true);
+    jumpAction->setChecked(m_itemManager->animationType() == DockItemManager::Jump);
+    group->addAction(jumpAction);
+    QAction *noAction = animationSubMenu->addAction("无动画");
+    noAction->setCheckable(true);
+    noAction->setChecked(m_itemManager->animationType() == DockItemManager::No);
+    group->addAction(noAction);
 
     MergeMode mode = m_itemManager->getDockMergeMode();
     QMenu *mergeSubMenu = m_settingsMenu->addMenu("窗口");
@@ -143,6 +185,13 @@ QMenu *MenuWorker::createMenu()
             return m_itemManager->saveDockMergeMode(MergeNone);
         else if(action == m_mergeDockAct)
             return m_itemManager->saveDockMergeMode(MergeDock);
+
+        if(action == swingAction)
+            return m_itemManager->setAnimationType(DockItemManager::Swing);
+        if(action == jumpAction)
+            return m_itemManager->setAnimationType(DockItemManager::Jump);
+        if(action == noAction)
+            return m_itemManager->setAnimationType(DockItemManager::No);
     });
 
     return m_settingsMenu;

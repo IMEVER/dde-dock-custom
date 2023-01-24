@@ -38,6 +38,12 @@ class DockItemManager : public QObject
     Q_OBJECT
 
 public:
+    enum ActivateAnimationType {
+        Swing = 0,
+        Jump = 1,
+        No = 2
+    };
+
     static DockItemManager *instance();
 
     const QList<QPointer<DockItem> > itemList();
@@ -54,6 +60,8 @@ public:
     void setInOutAnimation(bool enable);
     void setDragAnimation(bool enable);
     void setHoverHighlight(bool enable);
+    ActivateAnimationType animationType();
+    void setAnimationType(ActivateAnimationType type);
     bool hasWindowItem();
     int itemSize();
 
@@ -65,10 +73,12 @@ signals:
     void requestRefershWindowVisible() const;
     void mergeModeChanged(MergeMode mode);
     void itemCountChanged();
+    void hoverScaleChanged(bool hoverScale);
+    void hoverHighlighted(bool enabled);
+    void inoutChanged(bool enabled);
 
 public slots:
     void reloadAppItems();
-    void refershItemsIcon();
     void itemMoved(DockItem *const sourceItem, DockItem *const targetItem);
     void itemAdded(const QString &appDesktop, int idx);
     void updateDirApp();
@@ -84,10 +94,10 @@ private:
     DBusDock *m_appInter;
     QSettings *m_qsettings;
 
-    LauncherItem *launcherItem;
-
     QList<QPointer<DockItem>> m_itemList;
     QList<QPointer<DirItem>> m_dirList;
 };
+
+Q_DECLARE_METATYPE(DockItemManager::ActivateAnimationType);
 
 #endif // DOCKITEMMANAGER_H

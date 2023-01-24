@@ -30,11 +30,13 @@ class HoverHighlightEffect : public QGraphicsEffect
 
 public:
     explicit HoverHighlightEffect(QObject *parent = nullptr);
+    ~HoverHighlightEffect();
 
     void setHighlighting(const bool highlighting) { m_highlighting = highlighting; }
 
 protected:
-    void draw(QPainter *painter);
+    void draw(QPainter *painter) override;
+    bool eventFilter(QObject *object, QEvent *event) override;
 
 private:
     bool m_highlighting;
