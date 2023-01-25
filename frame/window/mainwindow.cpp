@@ -41,10 +41,10 @@
 
 MainWindow::MainWindow(QWidget *parent) : DBlurEffectWidget(parent)
     , m_mainPanel(new MainPanelControl(this))
-    , m_multiScreenWorker(new MultiScreenWorker(this, DWindowManagerHelper::instance()->hasComposite()))
-    , m_menuWorker(new MenuWorker(m_multiScreenWorker->dockInter(), this))
+    , m_multiScreenWorker(new MultiScreenWorker(this))
+    , m_menuWorker(nullptr)
     , m_platformWindowHandle(this)
-    , m_topPanelInterface(new TopPanelInterface("me.imever.dde.TopPanel", "/me/imever/dde/TopPanel", QDBusConnection::sessionBus(), this))
+    , m_topPanelInterface(nullptr)
 {
     setVisible(false);
 
@@ -139,18 +139,27 @@ void MainWindow::initConnections()
 
         // 通知窗管和后端更新数据
         m_multiScreenWorker->updateDaemonDockSize(dockSize);                                // 1.先更新任务栏高度
-        m_multiScreenWorker->requestUpdateFrontendGeometry();                               // 2.再更新任务栏位置,保证先1再2
-        m_multiScreenWorker->requestNotifyWindowManager();
-        m_multiScreenWorker->onRequestUpdateRegionMonitor();
         emit geometryChanged(geometry());
     });
 
 
-    connect(m_mainPanel, &MainPanelControl::requestConttextMenu, m_menuWorker, &MenuWorker::showDockSettingsMenu);
-    connect(m_menuWorker, &MenuWorker::autoHideChanged, m_multiScreenWorker, &MultiScreenWorker::onAutoHideChanged);
-    connect(m_menuWorker, &MenuWorker::updatePanelGeometry, m_multiScreenWorker, &MultiScreenWorker::updateDisplay);
     connect(m_multiScreenWorker, &MultiScreenWorker::opacityChanged, this, &MainWindow::setMaskAlpha, Qt::QueuedConnection);
-    connect(m_topPanelInterface, &TopPanelInterface::pluginVisibleChanged, this, &MainWindow::pluginVisibleChanged);
+
+    std::function<void()> initDbus = [this, &initDbus] {
+        QTimer::singleShot(100, this, [this, initDbus] {
+            if(!m_multiScreenWorker->dockInter())
+                return initDbus();
+
+            m_menuWorker = new MenuWorker(m_multiScreenWorker->dockInter(), this);
+            connect(m_mainPanel, &MainPanelControl::requestConttextMenu, m_menuWorker, &MenuWorker::showDockSettingsMenu);
+            connect(m_menuWorker, &MenuWorker::autoHideChanged, m_multiScreenWorker, &MultiScreenWorker::onAutoHideChanged);
+            connect(m_menuWorker, &MenuWorker::updatePanelGeometry, m_multiScreenWorker, &MultiScreenWorker::updateDisplay);
+
+            m_topPanelInterface = new TopPanelInterface("me.imever.dde.TopPanel", "/me/imever/dde/TopPanel", QDBusConnection::sessionBus(), this);
+            connect(m_topPanelInterface, &TopPanelInterface::pluginVisibleChanged, this, &MainWindow::pluginVisibleChanged);
+        });
+    };
+    initDbus();
 }
 
 void MainWindow::resizeDock(int offset, bool dragging)
@@ -203,18 +212,19 @@ void MainWindow::resizeDock(int offset, bool dragging)
 }
 
 QStringList MainWindow::GetLoadedPlugins() {
-    return m_topPanelInterface->GetLoadedPlugins();
+    return m_topPanelInterface ? m_topPanelInterface->GetLoadedPlugins() : QStringList();
 }
 
 QString MainWindow::getPluginKey(QString pluginName) {
-    return m_topPanelInterface->getPluginKey(pluginName);
+    return m_topPanelInterface ? m_topPanelInterface->getPluginKey(pluginName) : QString();
 }
 
 bool MainWindow::getPluginVisible(QString pluginName) {
-    return m_topPanelInterface->getPluginVisible(pluginName);
+    return m_topPanelInterface ? m_topPanelInterface->getPluginVisible(pluginName) : false;
 }
 
 void MainWindow::setPluginVisible(QString pluginName, bool visible) {
-    m_topPanelInterface->setPluginVisible(pluginName, visible);
+    if(m_topPanelInterface)
+        m_topPanelInterface->setPluginVisible(pluginName, visible);
 }
 

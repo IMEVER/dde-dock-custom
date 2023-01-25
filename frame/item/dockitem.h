@@ -58,7 +58,6 @@ public:
 
     inline virtual ItemType itemType() const {Q_UNREACHABLE(); return App;}
 
-    QSize sizeHint() const override;
     virtual Place getPlace() { return DockPlace; }
 
 public slots:
@@ -75,6 +74,7 @@ signals:
     void requestRefreshWindowVisible() const;
 
 protected:
+    QSize sizeHint() const override;
     void mousePressEvent(QMouseEvent *e) override;
     void enterEvent(QEvent *e) override;
     void leaveEvent(QEvent *e) override;

@@ -37,10 +37,92 @@
 #include <DGuiApplicationHelper>
 #include <DWindowManagerHelper>
 
-#define SPLITER_SIZE 2
+#define SPLITER_SIZE 4
 #define MODE_PADDING    5
 
 DWIDGET_USE_NAMESPACE
+
+class SplitterWidget : public QWidget {
+    public:
+        explicit SplitterWidget(MainPanelControl *parent) : QWidget(parent), m_parent(parent) {
+            m_type = DGuiApplicationHelper::instance()->themeType();
+            connect(DGuiApplicationHelper::instance(), &DGuiApplicationHelper::themeTypeChanged, this, [this](DGuiApplicationHelper::ColorType type) {
+                m_type = type;
+                update();
+            });
+            setFixedSize(3, 3);
+        }
+
+    protected:
+        void paintEvent(QPaintEvent *e) override {
+            Q_UNUSED(e)
+            QPainter painter(this);
+            QColor color;
+            if (m_type == DGuiApplicationHelper::LightType)
+            {
+                color = Qt::black;
+                painter.setOpacity(0.5);
+            } else {
+                color = Qt::white;
+                painter.setOpacity(0.1);
+            }
+            QRect r = rect();
+            if(m_parent->isHorizontal())
+                r.adjust(1, 3, -1, -3);
+            else
+                r.adjust(3, 1, -3, -1);
+            painter.fillRect(r, color);
+        }
+
+        void enterEvent(QEvent *event) override {
+            QGuiApplication::setOverrideCursor(QCursor(m_parent->isHorizontal() ? Qt::SizeVerCursor : Qt::SizeHorCursor ));
+        }
+
+        void leaveEvent(QEvent *event) override {
+            QGuiApplication::restoreOverrideCursor();
+        }
+
+        void mouseReleaseEvent(QMouseEvent *event) override {
+            releaseMouse();
+            if(dragging) {
+                dragging = false;
+                emit m_parent->requestResizeDockSizeFinished();
+            }
+        }
+
+        void mousePressEvent(QMouseEvent *event) override {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent*>(event);
+            if(mouseEvent->button() == Qt::RightButton) {
+                emit m_parent->requestConttextMenu();
+            } else if(mouseEvent->button() == Qt::LeftButton) {
+                dragging = true;
+                lastPos = QCursor::pos();
+                lastSize = m_parent->isHorizontal() ? height() : width();
+                grabMouse();
+            }
+        }
+
+        void mouseMoveEvent(QMouseEvent *event) override {
+            if(dragging) {
+                QPoint diffPos = QCursor::pos() - lastPos;
+                int s = lastSize;
+                if(m_parent->m_position == Bottom) s = lastSize - diffPos.y();
+                else if(m_parent->m_position == Left) s = lastSize + diffPos.x();
+                else if(m_parent->m_position == Right) s = lastSize - diffPos.x();
+                emit m_parent->requestResizeDockSize(s, true);
+            }
+        }
+
+    private:
+        MainPanelControl *m_parent;
+        DGuiApplicationHelper::ColorType m_type;
+
+        QPoint lastPos;
+        int lastSize;
+        bool dragging;
+};
+
+int beforeIndex = -1;
 
 MainPanelControl::MainPanelControl(QWidget *parent) : QWidget(parent)
     , m_mainPanelLayout(new QBoxLayout(QBoxLayout::LeftToRight, this))
@@ -49,8 +131,8 @@ MainPanelControl::MainPanelControl(QWidget *parent) : QWidget(parent)
     , m_appAreaLayout(new QBoxLayout(QBoxLayout::LeftToRight))
     , m_windowAreaLayout(new QBoxLayout(QBoxLayout::LeftToRight))
     , m_lastAreaLayout(new QBoxLayout(QBoxLayout::LeftToRight))
-    , m_splitter(new QLabel(this))
-    , m_splitter2(new QLabel(this))
+    , m_splitter(new SplitterWidget(this))
+    , m_splitter2(new SplitterWidget(this))
     , m_position(Position::Bottom)
     , m_placeholderItem(nullptr)
     , m_appDragWidget(nullptr)
@@ -60,9 +142,6 @@ MainPanelControl::MainPanelControl(QWidget *parent) : QWidget(parent)
     m_appAreaWidget->setMouseTracking(true);
     m_appAreaWidget->setAcceptDrops(true);
     m_appAreaWidget->installEventFilter(this);
-
-    m_splitter->installEventFilter(this);
-    m_splitter2->installEventFilter(this);
 }
 
 MainPanelControl::~MainPanelControl(){}
@@ -116,7 +195,6 @@ void MainPanelControl::updateMainPanelLayout()
             m_appAreaLayout->setDirection(QBoxLayout::LeftToRight);
             m_windowAreaLayout->setDirection(QBoxLayout::LeftToRight);
             m_lastAreaLayout->setDirection(QBoxLayout::LeftToRight);
-
             break;
         case Position::Right:
         case Position::Left:
@@ -151,11 +229,13 @@ void MainPanelControl::removeAppAreaItem(QWidget *wdg)
 void MainPanelControl::addWindowAreaItem(int index, QWidget *wdg)
 {
     m_windowAreaLayout->insertWidget(index, wdg, 0, Qt::AlignCenter);
+    m_splitter->show();
 }
 
 void MainPanelControl::removeWindowAreaItem(QWidget *wdg)
 {
-    m_appAreaLayout->removeWidget(wdg);
+    m_windowAreaLayout->removeWidget(wdg);
+    if(m_windowAreaLayout->isEmpty()) m_splitter->hide();
 }
 
 void MainPanelControl::addLastAreaItem(int index, QWidget *wdg)
@@ -177,6 +257,7 @@ void MainPanelControl::setPositonValue(Dock::Position position)
     {
         m_position = position;
         updateMainPanelLayout();
+        DockItem::setDockPosition(m_position);
     }
 }
 
@@ -220,12 +301,11 @@ void MainPanelControl::removeItem(DockItem *item, bool animation)
         item->easeOut();
 
     QTimer::singleShot(animation ? 310 : 0, [ this, item ]{
-
         switch (item->itemType()) {
             case DockItem::App:
             case DockItem::Placeholder:
             case DockItem::DirApp:
-                    removeAppAreaItem(item);
+                removeAppAreaItem(item);
                 break;
             case DockItem::Window:
                 removeWindowAreaItem(item);
@@ -253,43 +333,7 @@ void MainPanelControl::moveItem(DockItem *sourceItem, DockItem *targetItem)
 
 bool MainPanelControl::eventFilter(QObject *watched, QEvent *event)
 {
-    if(m_splitter2 == watched || m_splitter == watched) {
-        static QPoint lastPos;
-        static int lastSize;
-        static bool dragging = false;
-        if(event->type() == QEvent::Enter) {
-            QGuiApplication::setOverrideCursor(QCursor(isHorizontal() ? Qt::SizeVerCursor : Qt::SizeHorCursor ));
-        } else if(event->type() == QEvent::Leave) {
-            QGuiApplication::restoreOverrideCursor();
-        } else if(event->type() == QEvent::MouseButtonRelease) {
-            qobject_cast<QWidget*>(watched)->releaseMouse();
-            if(dragging) {
-                dragging = false;
-                emit requestResizeDockSizeFinished();
-            }
-        } else if(event->type() == QEvent::MouseButtonPress) {
-            QMouseEvent *mouseEvent = static_cast<QMouseEvent*>(event);
-            if(mouseEvent->button() == Qt::RightButton) {
-                emit requestConttextMenu();
-                return true;
-            } else if(mouseEvent->button() == Qt::LeftButton) {
-                dragging = true;
-                lastPos = QCursor::pos();
-                lastSize = isHorizontal() ? height() : width();
-                qobject_cast<QWidget*>(watched)->grabMouse();
-            }
-        } else if(event->type() == QEvent::MouseMove) {
-            if(dragging) {
-                QPoint diffPos = QCursor::pos() - lastPos;
-                int s = lastSize;
-                if(m_position == Bottom) s = lastSize - diffPos.y();
-                else if(m_position == Left) s = lastSize + diffPos.x();
-                else if(m_position == Right) s = lastSize - diffPos.x();
-                emit requestResizeDockSize(s, true);
-                return true;
-            }
-        }
-    } else if (m_appDragWidget && watched == static_cast<QGraphicsView *>(m_appDragWidget)->viewport()) {
+    if (m_appDragWidget && watched == static_cast<QGraphicsView *>(m_appDragWidget)->viewport()) {
         QDropEvent *e = static_cast<QDropEvent *>(event);
         bool isContains = m_appAreaWidget->rect().contains(mapFromGlobal(m_appDragWidget->mapToGlobal(e->pos())));
         // bool isContains = m_appAreaWidget->rect().contains(mapFromGlobal(m_appDragWidget->mapToGlobal(e->pos())));
@@ -848,32 +892,6 @@ void MainPanelControl::handleDragDrop(DockItem *sourceItem, QPoint point)
         emit itemCountChanged();
 }
 
-void MainPanelControl::paintEvent(QPaintEvent *e)
-{
-    Q_UNUSED(e)
-    QPainter painter(this);
-    QColor color;
-    if (DGuiApplicationHelper::instance()->themeType() == DGuiApplicationHelper::LightType)
-    {
-        color = Qt::black;
-        painter.setOpacity(0.5);
-    } else {
-        color = Qt::white;
-        painter.setOpacity(0.1);
-    }
-
-    if(m_windowAreaLayout->count() > 0)
-    {
-        m_splitter->show();
-        painter.fillRect(m_splitter->geometry(), color);
-    }
-    else
-        m_splitter->hide();
-
-    m_splitter2->show();
-    painter.fillRect(m_splitter2->geometry(), color);
-}
-
 void MainPanelControl::itemUpdated(DockItem *item)
 {
     item->parentWidget()->adjustSize();
@@ -886,13 +904,13 @@ void MainPanelControl::resizeDockIcon()
     if (isHorizontal()) {
         size = DockItemManager::instance()->isEnableHoverScaleAnimation() ? height() * .8 : height() - 2;
         size = qMax(size, 0);
-        m_splitter->setFixedSize(SPLITER_SIZE, int(size * 0.7));
-        m_splitter2->setFixedSize(SPLITER_SIZE, int(size * 0.7));
+        m_splitter->setFixedSize(SPLITER_SIZE, size);
+        m_splitter2->setFixedSize(SPLITER_SIZE, size);
     } else {
         size = DockItemManager::instance()->isEnableHoverScaleAnimation() ? width() * .8 : width() - 2;
         size = qMax(size, 0);
-        m_splitter->setFixedSize(int(size * 0.7), SPLITER_SIZE);
-        m_splitter2->setFixedSize(int(size * 0.7), SPLITER_SIZE);
+        m_splitter->setFixedSize(size, SPLITER_SIZE);
+        m_splitter2->setFixedSize(size, SPLITER_SIZE);
     }
 
     QSize s(size, size);

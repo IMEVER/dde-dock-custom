@@ -26,13 +26,13 @@
 
 #include <QWidget>
 #include <QBoxLayout>
-#include <QLabel>
 
 using namespace Dock;
 
 class DockItem;
 class PlaceholderItem;
 class AppDragWidget;
+class SplitterWidget;
 class MainPanelControl : public QWidget
 {
     Q_OBJECT
@@ -52,7 +52,6 @@ public:
 protected:
     void resizeEvent(QResizeEvent *event) override;
     bool eventFilter(QObject *watched, QEvent *event) override;
-    void paintEvent(QPaintEvent *e) override;
 
 private:
     void init();
@@ -88,14 +87,15 @@ private:
     QBoxLayout *m_windowAreaLayout;
     QBoxLayout *m_lastAreaLayout;
 
-    QLabel *m_splitter;
-    QLabel *m_splitter2;
+    SplitterWidget *m_splitter;
+    SplitterWidget *m_splitter2;
 
     Position m_position;
     QPointer<PlaceholderItem> m_placeholderItem;
     QString m_draggingMimeKey;
     AppDragWidget *m_appDragWidget;
-    int beforeIndex = -1;
+
+    friend class SplitterWidget;
 };
 
 #endif // MAINPANELCONTROL_H

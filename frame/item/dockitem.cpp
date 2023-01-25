@@ -146,7 +146,6 @@ void DockItem::enterEvent(QEvent *e)
         m_scale->setEndValue(DockItemManager::instance()->itemSize());
         m_scale->start();
     }
-    // update();
     return QWidget::enterEvent(e);
 }
 
@@ -167,7 +166,6 @@ void DockItem::leaveEvent(QEvent *e)
         m_scale->setEndValue(int(DockItemManager::instance()->itemSize()*.8));
         m_scale->start();
     }
-    // update();
 }
 
 const QRect DockItem::perfectIconRect() const
@@ -314,14 +312,10 @@ const QPoint DockItem::popupMarkPoint()
     QPoint p(topleftPoint());
     const QRect r = rect();
     switch (DockPosition) {
-    case Top: {
-        p += QPoint(r.width() / 2, r.height());
-        break;
-    }
-    case Bottom: {
+    case Top:
+    case Bottom:
         p += QPoint(r.width() / 2, 0);
         break;
-    }
     case Left: {
         p += QPoint(r.width(), r.height() / 2);
         break;

@@ -24,7 +24,6 @@
 
 #include "interfaces/constants.h"
 // #include "utils.h"
-#include "item/dockitem.h"
 #include "xcb/xcb_misc.h"
 
 #include <com_deepin_dde_daemon_dock.h>
@@ -32,14 +31,11 @@
 #include <com_deepin_daemon_display_monitor.h>
 #include <com_deepin_api_xeventmonitor.h>
 #include <com_deepin_dde_launcher.h>
-
 #include <DWindowManagerHelper>
-
 #include <QObject>
 #include <QFlag>
 
 #define WINDOWMARGIN ((m_displayMode == Dock::Efficient) ? 0 : 10)
-#define ANIMATIONTIME 300
 
 DGUI_USE_NAMESPACE
 /**
@@ -127,7 +123,7 @@ public:
 
     typedef QFlags<RunState> RunStates;
 
-    MultiScreenWorker(MainWindow *parent, bool composite);
+    MultiScreenWorker(MainWindow *parent);
 
     void initShow();
 
@@ -198,7 +194,7 @@ private:
 
 private:
     MainWindow *m_parent;
-    bool m_composite;
+    int m_animationTime = 300;
 
     // monitor screen
     XEventMonitor *m_eventInter;
@@ -207,9 +203,7 @@ private:
     // DBus interface
     DBusDock *m_dockInter;
     DBusLuncher *m_launcherInter;
-
     QTimer *m_delayWakeTimer;                   // sp3需求，切换屏幕显示延时，默认2秒唤起任务栏
-
     DockScreen m_ds;                            // 屏幕名称信息
 
     // 任务栏属性

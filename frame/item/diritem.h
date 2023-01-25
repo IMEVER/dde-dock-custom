@@ -52,8 +52,6 @@ protected:
     void mouseReleaseEvent(QMouseEvent *e) override;
     void dragEnterEvent(QDragEnterEvent *e) override;
     void dragMoveEvent(QDragMoveEvent *e) override;
-
-    QWidget *popupTips() override;
     const QPoint popupDirMarkPoint();
 
     void showDirPopupWindow();

@@ -3,24 +3,23 @@
 
 #include <QPen>
 
-static QPointer<DockPopupWindow> dirPopupWindow(nullptr);
+static DockPopupWindow *dirPopupWindow(nullptr);
 
 DirItem::DirItem(QString title, QWidget *parent) : DockItem(parent)
 , m_index(0)
 , m_dirTips(new TipsWidget(this))
 {
-    if (dirPopupWindow.isNull()) {
-        DockPopupWindow *arrowRectangle = new DockPopupWindow(nullptr);
-        arrowRectangle->setWindowFlags(Qt::X11BypassWindowManagerHint | Qt::WindowStaysOnTopHint);
+    if (!dirPopupWindow) {
+        dirPopupWindow = new DockPopupWindow(nullptr);
+        dirPopupWindow->setWindowFlags(Qt::X11BypassWindowManagerHint | Qt::WindowStaysOnTopHint);
         // arrowRectangle->setAttribute(Qt::WA_InputMethodEnabled, true);
-        arrowRectangle->setShadowBlurRadius(20);
-        arrowRectangle->setRadius(10);
-        arrowRectangle->setShadowYOffset(2);
-        arrowRectangle->setShadowXOffset(0);
-        arrowRectangle->setArrowWidth(18);
-        arrowRectangle->setArrowHeight(10);
-        arrowRectangle->setObjectName("dirpopup");
-        dirPopupWindow = arrowRectangle;
+        dirPopupWindow->setShadowBlurRadius(20);
+        dirPopupWindow->setRadius(10);
+        dirPopupWindow->setShadowYOffset(2);
+        dirPopupWindow->setShadowXOffset(0);
+        dirPopupWindow->setArrowWidth(18);
+        dirPopupWindow->setArrowHeight(10);
+        dirPopupWindow->setObjectName("dirpopup");
     }
 
     setAcceptDrops(true);
@@ -121,19 +120,14 @@ bool DirItem::isEmpty()
     return m_appList.isEmpty();
 }
 
-QWidget * DirItem::popupTips()
-{
-    return nullptr;
-}
-
 const QPoint DirItem::popupDirMarkPoint()
 {
     if(DockPosition == Position::Left)
-        return dirPopupWindow.data()->pos() + QPoint(dirPopupWindow.data()->width(), dirPopupWindow.data()->height() / 2);
+        return dirPopupWindow->pos() + QPoint(dirPopupWindow->width(), dirPopupWindow->height() / 2);
     if(DockPosition == Position::Right)
-        return dirPopupWindow.data()->pos() + QPoint(0, dirPopupWindow.data()->height() / 2);
+        return dirPopupWindow->pos() + QPoint(0, dirPopupWindow->height() / 2);
     else
-        return dirPopupWindow.data()->pos() + QPoint(dirPopupWindow.data()->width() / 2, 0);
+        return dirPopupWindow->pos() + QPoint(dirPopupWindow->width() / 2, 0);
 }
 
 int DirItem::currentCount()
@@ -166,13 +160,13 @@ void DirItem::paintEvent(QPaintEvent *e)
     // painter.setOpacity(.7);
 
     QRect border = rect();
-    QRect line(border.width() * .1, border.height() * .1, border.width() * .8, border.height() * .8);
+    QRect line(2, 2, border.width()-4, border.height()-4);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.drawRoundedRect(line, 6, 6, Qt::AbsoluteSize);
 
-    painter.drawRoundedRect(line, 10, 10, Qt::AbsoluteSize);
+    // painter.setOpacity(.9);
 
-    painter.setOpacity(.9);
-
-    int padding = border.width() * .1 + 5;
+    int padding = 7;
     int spacing = 4;
     qreal w = (border.width() - spacing) / 2 - padding;
     int i = 0;
@@ -210,8 +204,7 @@ void DirItem::enterEvent(QEvent *e)
 void DirItem::leaveEvent(QEvent *e)
 {
     DockItem::leaveEvent(e);
-    if(m_showPopupTimer->isActive())
-        m_showPopupTimer->stop();
+    m_showPopupTimer->stop();
     m_popupGrid->prepareHide();
 }
 
@@ -228,9 +221,7 @@ void DirItem::mouseReleaseEvent(QMouseEvent *e)
         showDirPopupWindow();
     }
     else if(e->button() != Qt::RightButton)
-    {
         hideDirpopupWindow();
-    }
 
     DockItem::mouseReleaseEvent(e);
 }
@@ -244,9 +235,8 @@ void DirItem::dragEnterEvent(QDragEnterEvent *e)
 
     // ignore request dock event
     QString draggingMimeKey = e->mimeData()->formats().contains("RequestDock") ? "RequestDock" : "text/plain";
-    if (QMimeDatabase().mimeTypeForFile(e->mimeData()->data(draggingMimeKey)).name() == "application/x-desktop") {
+    if (QMimeDatabase().mimeTypeForFile(e->mimeData()->data(draggingMimeKey)).name() == "application/x-desktop")
         return e->ignore();
-    }
 
     e->accept();
 }
@@ -261,40 +251,30 @@ void DirItem::dragMoveEvent(QDragMoveEvent *e)
 
 void DirItem::showDirPopupWindow()
 {
-    DockPopupWindow *popup = dirPopupWindow.data();
-
     emit requestWindowAutoHide(false);
 
-    QWidget *lastContent = popup->getContent();
+    QWidget *lastContent = dirPopupWindow->getContent();
     if (lastContent)
         lastContent->setVisible(false);
 
     switch (DockPosition) {
-    case Top:   popup->setArrowDirection(DockPopupWindow::ArrowTop);     break;
-    case Bottom: popup->setArrowDirection(DockPopupWindow::ArrowBottom);  break;
-    case Left:  popup->setArrowDirection(DockPopupWindow::ArrowLeft);    break;
-    case Right: popup->setArrowDirection(DockPopupWindow::ArrowRight);   break;
+    case Top:
+    case Bottom: dirPopupWindow->setArrowDirection(DockPopupWindow::ArrowBottom);  break;
+    case Left:  dirPopupWindow->setArrowDirection(DockPopupWindow::ArrowLeft);    break;
+    case Right: dirPopupWindow->setArrowDirection(DockPopupWindow::ArrowRight);   break;
     }
-    popup->resize(m_popupGrid->sizeHint());
-    popup->setContent(m_popupGrid);
+    dirPopupWindow->resize(m_popupGrid->sizeHint());
+    dirPopupWindow->setContent(m_popupGrid);
+    dirPopupWindow->show(popupMarkPoint(), true);
 
-    const QPoint p = popupMarkPoint();
-    if (!popup->isVisible())
-        QMetaObject::invokeMethod(popup, "show", Qt::QueuedConnection, Q_ARG(QPoint, p), Q_ARG(bool, true));
-    else
-        popup->show(p, true);
-
-    connect(popup, &DockPopupWindow::accept, this, &DirItem::hideDirpopupWindow, Qt::UniqueConnection);
+    connect(dirPopupWindow, &DockPopupWindow::accept, this, &DirItem::hideDirpopupWindow, Qt::UniqueConnection);
 }
 
 void DirItem::hideDirpopupWindow()
 {
-    if (!dirPopupWindow->isVisible())
-        return;
+    if (!dirPopupWindow->isVisible()) return;
 
-    disconnect(dirPopupWindow.data(), &DockPopupWindow::accept, this, &DirItem::hideDirpopupWindow);
-
+    disconnect(dirPopupWindow, &DockPopupWindow::accept, this, &DirItem::hideDirpopupWindow);
     hidePopup();
-
     dirPopupWindow->hide();
 }
