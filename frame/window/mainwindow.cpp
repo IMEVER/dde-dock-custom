@@ -57,7 +57,6 @@ MainWindow::MainWindow(QWidget *parent) : DBlurEffectWidget(parent)
 
     XcbMisc::instance()->set_window_type(winId(), XcbMisc::Dock);
     initConnections();
-    DockItemManager::instance()->reloadAppItems();
 }
 
 MainPanelControl *MainWindow::panel()
@@ -157,6 +156,9 @@ void MainWindow::initConnections()
 
             m_topPanelInterface = new TopPanelInterface("me.imever.dde.TopPanel", "/me/imever/dde/TopPanel", QDBusConnection::sessionBus(), this);
             connect(m_topPanelInterface, &TopPanelInterface::pluginVisibleChanged, this, &MainWindow::pluginVisibleChanged);
+
+            DockItemManager::instance()->setDbusDock(m_multiScreenWorker->dockInter());
+            DockItemManager::instance()->reloadAppItems();
         });
     };
     initDbus();

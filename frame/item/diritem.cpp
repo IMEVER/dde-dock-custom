@@ -155,20 +155,19 @@ void DirItem::paintEvent(QPaintEvent *e)
     DockItem::paintEvent(e);
 
     QPainter painter(this);
-    // painter.setPen(QPen(Qt::darkYellow, 2));
-    painter.setPen(QPen(Qt::darkCyan, 2));
+    painter.setPen(QPen(Qt::darkCyan, 1));
     // painter.setOpacity(.7);
 
-    QRect border = rect();
-    QRect line(2, 2, border.width()-4, border.height()-4);
+    QRect border = rect().adjusted(2, 2, -2, -2);
+    QRect line(3, 3, border.width()-2, border.height()-2);
     painter.setRenderHint(QPainter::Antialiasing);
     painter.drawRoundedRect(line, 6, 6, Qt::AbsoluteSize);
 
     // painter.setOpacity(.9);
 
-    int padding = 7;
+    int padding = 8;
     int spacing = 4;
-    qreal w = (border.width() - spacing) / 2 - padding;
+    qreal w = (rect().width() - spacing) / 2 - padding;
     int i = 0;
     for(auto appItem : m_appList)
     {

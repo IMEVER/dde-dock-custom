@@ -46,6 +46,8 @@ public:
 
     static DockItemManager *instance();
 
+    void setDbusDock(DBusDock *dbus);
+
     const QList<QPointer<DockItem> > itemList();
     const QList<QPointer<DirItem>> dirList();
     void addDirApp(DirItem *dirItem);

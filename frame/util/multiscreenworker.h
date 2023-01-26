@@ -108,14 +108,11 @@ public:
     };
 
     enum RunState {
-        ShowAnimationStart = 0x1,           // 单次显示动画正在运行状态
-        HideAnimationStart = 0x2,           // 单次隐藏动画正在运行状态
         ChangePositionAnimationStart = 0x4, // 任务栏切换位置动画运行状态
         AutoHide = 0x8,                     // 和MenuWorker保持一致,未设置此state时表示菜单已经打开
         MousePress = 0x10,                  // 当前鼠标是否被按下
         TouchPress = 0x20,                  // 当前触摸屏下是否按下
         LauncherDisplay = 0x40,             // 启动器是否显示
-        DockIsShowing = 0x80,               // 任务栏正在显示
 
         // 如果要添加新的状态，可以在上面添加
         RunState_Mask = 0xffffffff,
@@ -159,11 +156,7 @@ public slots:
     void updateDisplay();
 
 private slots:
-    // Animation
-    void showAniFinished();
-    void updateParentGeometry(const QVariant &value, const Position &pos);
     void onOpacityChanged(const double value);
-    void onDelayAutoHideChanged();
 
 private:
     // 初始化数据信息
@@ -172,7 +165,6 @@ private:
     void displayAnimation(const QString &screen, const Position &pos, AniAction act);
     void displayAnimation(const QString &screen, AniAction act);
 
-    void tryToShowDock(int eventX, int eventY);
     void changeDockPosition(QString lastScreen, QString deskScreen, const Position &fromPos, const Position &toPos);
 
     QString getValidScreen(const Position &pos);
@@ -194,7 +186,7 @@ private:
 
 private:
     MainWindow *m_parent;
-    int m_animationTime = 300;
+    QVariantAnimation *ani;
 
     // monitor screen
     XEventMonitor *m_eventInter;

@@ -26,13 +26,9 @@
 #include <QSet>
 
 DockItemManager::DockItemManager() : QObject()
-    , m_appInter(new DBusDock("com.deepin.dde.daemon.Dock", "/com/deepin/dde/daemon/Dock", QDBusConnection::sessionBus(), this))
     , m_qsettings(new QSettings(QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation) + "/setting.ini", QSettings::IniFormat))
 {
     m_qsettings->setIniCodec(QTextCodec::codecForName("UTF-8"));
-    connect(m_appInter, &DBusDock::EntryAdded, this, [this](const QDBusObjectPath &path, int index){ appItemAdded(path, index);});
-    connect(m_appInter, &DBusDock::EntryRemoved, this, static_cast<void (DockItemManager::*)(const QString &)>(&DockItemManager::appItemRemoved), Qt::QueuedConnection);
-    connect(m_appInter, &DBusDock::ServiceRestarted, this, [ this ] { QTimer::singleShot(500, [ this ] { reloadAppItems(); }); });
 }
 
 
@@ -40,6 +36,13 @@ DockItemManager *DockItemManager::instance()
 {
     static DockItemManager INSTANCE;
     return &INSTANCE;
+}
+
+void DockItemManager::setDbusDock(DBusDock *dbus) {
+    m_appInter = dbus;
+    connect(m_appInter, &DBusDock::EntryAdded, this, [this](const QDBusObjectPath &path, int index){ appItemAdded(path, index);});
+    connect(m_appInter, &DBusDock::EntryRemoved, this, static_cast<void (DockItemManager::*)(const QString &)>(&DockItemManager::appItemRemoved), Qt::QueuedConnection);
+    connect(m_appInter, &DBusDock::ServiceRestarted, this, [ this ] { QTimer::singleShot(500, [ this ] { reloadAppItems(); }); });
 }
 
 MergeMode DockItemManager::getDockMergeMode()
