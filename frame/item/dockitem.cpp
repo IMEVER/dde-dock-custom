@@ -20,6 +20,8 @@
  */
 
 #include "dockitem.h"
+#include "tipswidget.h"
+#include "util/dockpopupwindow.h"
 #include "../window/dockitemmanager.h"
 #include "components/hoverhighlighteffect.h"
 
@@ -27,27 +29,23 @@
 #include <QJsonObject>
 #include <QCursor>
 
-#define ITEM_MAXSIZE    100
-
 Position DockItem::DockPosition = Position::Top;
-QPointer<DockPopupWindow> DockItem::PopupWindow(nullptr);
+static DockPopupWindow *PopupWindow(nullptr);
 
 DockItem::DockItem(QWidget *parent)
     : QWidget(parent)
-    , m_popupShown(false)
     , m_popupTipsDelayTimer(new QTimer(this))
     , m_scale(nullptr)
 {
-    if (PopupWindow.isNull()) {
-        DockPopupWindow *arrowRectangle = new DockPopupWindow(nullptr);
-        arrowRectangle->setShadowBlurRadius(20);
-        arrowRectangle->setRadius(18);
-        arrowRectangle->setShadowYOffset(2);
-        arrowRectangle->setShadowXOffset(0);
-        arrowRectangle->setArrowWidth(18);
-        arrowRectangle->setArrowHeight(10);
-        arrowRectangle->setObjectName("apppopup");
-        PopupWindow = arrowRectangle;
+    if (!PopupWindow) {
+        PopupWindow = new DockPopupWindow(nullptr);
+        PopupWindow->setShadowBlurRadius(20);
+        PopupWindow->setRadius(10);
+        PopupWindow->setShadowYOffset(2);
+        PopupWindow->setShadowXOffset(0);
+        PopupWindow->setArrowWidth(18);
+        PopupWindow->setArrowHeight(10);
+        PopupWindow->setObjectName("apppopup");
     }
 
     m_popupTipsDelayTimer->setInterval(500);
@@ -98,24 +96,9 @@ DockItem::DockItem(QWidget *parent)
     setFixedSize(20, 20);
 }
 
-QSize DockItem::sizeHint() const
-{
-    int size = qMin(maximumWidth(), maximumHeight());
-    if (size > ITEM_MAXSIZE)
-        size = ITEM_MAXSIZE;
-
-    return QSize(size, size);
-}
-
 DockItem::~DockItem()
 {
-    if (m_popupShown)
-        popupWindowAccept();
-}
-
-void DockItem::setDockPosition(const Position side)
-{
-    DockPosition = side;
+    hidePopup();
 }
 
 void DockItem::mousePressEvent(QMouseEvent *e)
@@ -132,17 +115,12 @@ void DockItem::mousePressEvent(QMouseEvent *e)
 
 void DockItem::enterEvent(QEvent *e)
 {
-    // Remove the bottom area to prevent unintentional operation in auto-hide mode.
-    if (!rect().adjusted(0, 0, width(), height() - 5).contains(mapFromGlobal(QCursor::pos())))
-        return;
-
     m_popupTipsDelayTimer->start();
 
     if(getPlace() == DockPlace && DockItemManager::instance()->isEnableHoverScaleAnimation())
     {
         m_scale->stop();
-
-        m_scale->setStartValue(size().width());
+        m_scale->setStartValue(width());
         m_scale->setEndValue(DockItemManager::instance()->itemSize());
         m_scale->start();
     }
@@ -161,7 +139,6 @@ void DockItem::leaveEvent(QEvent *e)
     if(getPlace() == DockPlace && DockItemManager::instance()->isEnableHoverScaleAnimation())
     {
         m_scale->stop();
-
         m_scale->setStartValue(size().width());
         m_scale->setEndValue(int(DockItemManager::instance()->itemSize()*.8));
         m_scale->start();
@@ -184,12 +161,10 @@ const QRect DockItem::perfectIconRect() const
 void DockItem::showContextMenu()
 {
     const QString menuJson = contextMenu();
-    if (menuJson.isEmpty())
-        return;
+    if (menuJson.isEmpty()) return;
 
     QJsonDocument jsonDocument = QJsonDocument::fromJson(menuJson.toLocal8Bit().data());
-    if (jsonDocument.isNull())
-        return;
+    if (jsonDocument.isNull()) return;
 
     QJsonObject jsonMenu = jsonDocument.object();
 
@@ -213,7 +188,6 @@ void DockItem::showContextMenu()
     m_contextMenu->exec(QCursor::pos());
     m_contextMenu->deleteLater();
 
-    emit requestRefreshWindowVisible();
     // if(getPlace() == DockPlace)
     emit requestWindowAutoHide(true);
 }
@@ -234,61 +208,35 @@ void DockItem::showHoverTips()
     if (!r.contains(QCursor::pos()))
         return;
 
-    if(auto content = popupTips())
+    auto tips = popupTips();
+    if(!tips.isEmpty()) {
+        static TipsWidget *content = new TipsWidget;
+        content->setText(tips);
         showPopupWindow(content);
+    }
 }
 
 void DockItem::showPopupWindow(QWidget *const content, const bool model)
 {
-    PopupWindow->setRadius(10);
-
-    m_popupShown = true;
-
     if (model)
         emit requestWindowAutoHide(false);
 
-    DockPopupWindow *popup = PopupWindow.data();
-    if(QWidget *lastContent = popup->getContent())
-        lastContent->setVisible(false);
-
     switch (DockPosition) {
     case Top:
-    case Bottom: popup->setArrowDirection(DockPopupWindow::ArrowBottom);  break;
-    case Left:  popup->setArrowDirection(DockPopupWindow::ArrowLeft);    break;
-    case Right: popup->setArrowDirection(DockPopupWindow::ArrowRight);   break;
+    case Bottom: PopupWindow->setArrowDirection(DockPopupWindow::ArrowBottom);  break;
+    case Left:  PopupWindow->setArrowDirection(DockPopupWindow::ArrowLeft);    break;
+    case Right: PopupWindow->setArrowDirection(DockPopupWindow::ArrowRight);   break;
     }
-    popup->resize(content->sizeHint());
-    popup->setContent(content);
+    PopupWindow->setContent(content);
 
     const QPoint p = popupMarkPoint();
-    if (!popup->isVisible())
-        QMetaObject::invokeMethod(popup, "show", Qt::QueuedConnection, Q_ARG(QPoint, p), Q_ARG(bool, model));
-    else
-        popup->show(p, model);
-
-    connect(popup, &DockPopupWindow::accept, this, &DockItem::popupWindowAccept, Qt::UniqueConnection);
-}
-
-void DockItem::popupWindowAccept()
-{
     if (!PopupWindow->isVisible())
-        return;
+        QMetaObject::invokeMethod(PopupWindow, "show", Qt::QueuedConnection, Q_ARG(QPoint, p), Q_ARG(bool, model));
+    else
+        PopupWindow->show(p, model);
 
-    disconnect(PopupWindow.data(), &DockPopupWindow::accept, this, &DockItem::popupWindowAccept);
-
-    hidePopup();
-
-    //TODO hide appdirwidget
-}
-
-void DockItem::showPopupApplet(QWidget *const applet)
-{
-    // another model popup window already exists
-    if (PopupWindow->model())
-        return;
-
-    showPopupWindow(applet, true);
-    //TODO cancel appdirwidget's hide timer
+    if(model)
+        connect(PopupWindow, &DockPopupWindow::accept, this, &DockItem::hidePopup, Qt::UniqueConnection);
 }
 
 void DockItem::invokedMenuItem(const QString &itemId, const bool checked)
@@ -302,9 +250,13 @@ const QString DockItem::contextMenu() const
     return QString();
 }
 
-QWidget *DockItem::popupTips()
+QString DockItem::popupTips()
 {
-    return nullptr;
+    return QString();
+}
+
+bool DockItem::popupVisible() const {
+    return PopupWindow && PopupWindow->isVisible();
 }
 
 const QPoint DockItem::popupMarkPoint()
@@ -343,10 +295,8 @@ const QPoint DockItem::topleftPoint() const
 void DockItem::hidePopup()
 {
     m_popupTipsDelayTimer->stop();
-    m_popupShown = false;
     PopupWindow->hide();
 
-    emit PopupWindow->accept();
     if(getPlace() == DockPlace)
         emit requestWindowAutoHide(true);
 }
@@ -372,6 +322,6 @@ void DockItem::easeOut()
 void DockItem::hideNonModel()
 {
     // auto hide if popup is not model window
-    if (m_popupShown && !PopupWindow->model())
+    if (!PopupWindow->model())
         hidePopup();
 }

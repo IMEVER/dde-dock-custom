@@ -29,6 +29,7 @@
 #include <QProxyStyle>
 #include <QStyleOption>
 #include <QStyleOptionMenuItem>
+#include <DDBusSender>
 
 class MenuProxyStyle: public QProxyStyle{
 public:
@@ -53,18 +54,14 @@ public:
     }
 };
 
-MenuWorker::MenuWorker(DBusDock *dockInter,QWidget *parent)
-    : QObject (parent)
-    , m_dockInter(dockInter)
-    , m_autoHide(true)
+MenuWorker::MenuWorker(QWidget *parent) : QObject (parent)
 {
 
 }
 
-QMenu *MenuWorker::createMenu()
+QMenu *MenuWorker::createMenu(DBusDock *m_dockInter)
 {
     DockItemManager *m_itemManager = DockItemManager::instance();
-    m_autoHide = false;
     QMenu *m_settingsMenu = new QMenu();
 
     Dock::Position m_position = Dock::Position(m_dockInter->position());
@@ -154,6 +151,16 @@ QMenu *MenuWorker::createMenu()
         });
     }
 
+    m_settingsMenu->addAction("设置个性化", []{
+        DDBusSender().service("com.deepin.dde.ControlCenter")
+        .path("/com/deepin/dde/ControlCenter")
+        .interface("com.deepin.dde.ControlCenter")
+        .method("ShowPage")
+        .arg(QString("personalization"))
+        .arg(QString("Dock"))
+        .call();
+    });
+
     connect(m_settingsMenu, &QMenu::triggered, [ = ](QAction *action){
         if(action == m_bottomPosAct)
             return m_dockInter->setPosition(Bottom);
@@ -197,24 +204,16 @@ QMenu *MenuWorker::createMenu()
     return m_settingsMenu;
 }
 
-void MenuWorker::showDockSettingsMenu()
+void MenuWorker::showDockSettingsMenu(DBusDock *m_dockInter)
 {
     // 菜单将要被打开
-    setAutoHide(false);
+    emit autoHideChanged(false);
 
-    QMenu *menu = createMenu();
+    QMenu *menu = createMenu(m_dockInter);
     menu->exec(QCursor::pos());
     menu->deleteLater();
     menu = nullptr;
     // 菜单已经关闭
-    setAutoHide(true);
+    emit autoHideChanged(true);
 }
 
-void MenuWorker::setAutoHide(const bool autoHide)
-{
-    if (m_autoHide == autoHide)
-        return;
-
-    m_autoHide = autoHide;
-    emit autoHideChanged(m_autoHide);
-}

@@ -39,7 +39,6 @@ using namespace Dock;
 
 class MainPanelControl;
 class MultiScreenWorker;
-class MenuWorker;
 
 class MainWindow : public DBlurEffectWidget
 {
@@ -52,7 +51,7 @@ public:
 
 public slots:
     void launch();
-    
+
     void resizeDock(int offset, bool dragging);
     QStringList GetLoadedPlugins();
     QString getPluginKey(QString pluginName);
@@ -61,6 +60,7 @@ public slots:
 
 protected:
     void initConnections();
+    void moveEvent(QMoveEvent *event) override;
 
 signals:
     void pluginVisibleChanged(QString pluginName, bool visible);
@@ -69,7 +69,6 @@ signals:
 private:
     MainPanelControl *m_mainPanel;
     MultiScreenWorker *m_multiScreenWorker;
-    MenuWorker *m_menuWorker;
 
     DPlatformWindowHandle m_platformWindowHandle;
     TopPanelInterface *m_topPanelInterface;

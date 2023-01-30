@@ -2,7 +2,6 @@
 #define TRASHITEM_H
 
 #include "dockitem.h"
-#include "tipswidget.h"
 
 class TrashItem : public DockItem
 {
@@ -21,14 +20,13 @@ private:
     void dragEnterEvent(QDragEnterEvent *e) override;
     void dropEvent(QDropEvent *e) override;
 
-    QWidget *popupTips() override;
+    QString popupTips() override { return "垃圾桶"; }
 
     void invokedMenuItem(const QString &itemId, const bool checked) Q_DECL_OVERRIDE;
     const QString contextMenu() const Q_DECL_OVERRIDE;
 
 private:
     QPixmap m_icon;
-    TipsWidget *m_tips;
 };
 
 #endif // TRASHITEM_H

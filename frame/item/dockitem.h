@@ -23,14 +23,12 @@
 #define DOCKITEM_H
 
 #include "../interfaces/constants.h"
-#include "util/dockpopupwindow.h"
 
 #include <QFrame>
 #include <QPointer>
 #include <QMenu>
 
 using namespace Dock;
-
 class DockItem : public QWidget
 {
     Q_OBJECT
@@ -54,16 +52,13 @@ public:
     explicit DockItem(QWidget *parent = nullptr);
     ~DockItem();
 
-    static void setDockPosition(const Position side);
-
+    static void setDockPosition(const Position side) { DockPosition = side; }
     inline virtual ItemType itemType() const {Q_UNREACHABLE(); return App;}
-
     virtual Place getPlace() { return DockPlace; }
 
 public slots:
     virtual void refershIcon() {}
 
-    void showPopupApplet(QWidget *const applet);
     void hidePopup();
     void easeIn();
     void easeOut();
@@ -71,10 +66,8 @@ public slots:
 signals:
     void itemDropped(QObject *destination, const QPoint &dropPoint) const;
     void requestWindowAutoHide(const bool autoHide) const;
-    void requestRefreshWindowVisible() const;
 
 protected:
-    QSize sizeHint() const override;
     void mousePressEvent(QMouseEvent *e) override;
     void enterEvent(QEvent *e) override;
     void leaveEvent(QEvent *e) override;
@@ -84,12 +77,12 @@ protected:
     const QPoint topleftPoint() const;
 
     void hideNonModel();
-    void popupWindowAccept();
     virtual void showPopupWindow(QWidget *const content, const bool model = false);
     virtual void showHoverTips();
     virtual void invokedMenuItem(const QString &itemId, const bool checked);
     virtual const QString contextMenu() const;
-    virtual QWidget *popupTips();
+    virtual QString popupTips();
+    bool popupVisible() const;
 
 protected slots:
     void showContextMenu();
@@ -98,13 +91,8 @@ private:
     void menuActionClicked(QAction *action);
 
 protected:
-    bool m_popupShown;
-
     QTimer *m_popupTipsDelayTimer;
-
     static Position DockPosition;
-    static QPointer<DockPopupWindow> PopupWindow;
-
     QVariantAnimation *m_scale;
 };
 

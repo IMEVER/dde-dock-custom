@@ -27,7 +27,8 @@
 #include "dockitemmanager.h"
 
 #include "../item/diritem.h"
-
+#include <dtkwidget_global.h>
+#include <dtkgui_global.h>
 #include <QDrag>
 #include <QTimer>
 #include <QStandardPaths>
@@ -41,6 +42,7 @@
 #define MODE_PADDING 5
 
 DWIDGET_USE_NAMESPACE
+DGUI_USE_NAMESPACE
 
 class SplitterWidget : public QWidget {
     public:
@@ -86,18 +88,18 @@ class SplitterWidget : public QWidget {
             releaseMouse();
             if(dragging) {
                 dragging = false;
-                emit m_parent->requestResizeDockSizeFinished();
+                emit m_parent->requestResizeDockSize(m_parent->isHorizontal() ? m_parent->height() : m_parent->width(), false);
             }
         }
 
         void mousePressEvent(QMouseEvent *event) override {
             QMouseEvent *mouseEvent = static_cast<QMouseEvent*>(event);
-            if(mouseEvent->button() == Qt::RightButton) {
+            if(mouseEvent->button() == Qt::RightButton)
                 emit m_parent->requestConttextMenu();
-            } else if(mouseEvent->button() == Qt::LeftButton) {
+            else if(mouseEvent->button() == Qt::LeftButton) {
                 dragging = true;
                 lastPos = QCursor::pos();
-                lastSize = m_parent->isHorizontal() ? height() : width();
+                lastSize = m_parent->isHorizontal() ? m_parent->height() : m_parent->width();
                 grabMouse();
             }
         }
@@ -125,7 +127,6 @@ class SplitterWidget : public QWidget {
 int beforeIndex = -1;
 
 MainPanelControl::MainPanelControl(QWidget *parent) : QWidget(parent)
-    , m_mainPanelLayout(new QBoxLayout(QBoxLayout::LeftToRight, this))
     , m_appAreaWidget(new QWidget(this))
     , m_fixedAreaLayout(new QBoxLayout(QBoxLayout::LeftToRight))
     , m_appAreaLayout(new QBoxLayout(QBoxLayout::LeftToRight))
@@ -139,6 +140,7 @@ MainPanelControl::MainPanelControl(QWidget *parent) : QWidget(parent)
 {
     init();
     updateMainPanelLayout();
+    m_splitter->hide();
     // m_appAreaWidget->setMouseTracking(true);
     m_appAreaWidget->setAcceptDrops(true);
     m_appAreaWidget->installEventFilter(this);
@@ -148,10 +150,13 @@ MainPanelControl::~MainPanelControl(){}
 
 void MainPanelControl::init()
 {
+    setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
+
+    QBoxLayout *m_mainPanelLayout(new QBoxLayout(QBoxLayout::LeftToRight, this));
     m_mainPanelLayout->setAlignment(Qt::AlignCenter);
     m_mainPanelLayout->setMargin(0);
-
     m_mainPanelLayout->setSpacing(MODE_PADDING);
+
     m_mainPanelLayout->addStretch(1);
     m_mainPanelLayout->addLayout(m_fixedAreaLayout);
     m_mainPanelLayout->addWidget(m_appAreaWidget);
@@ -192,7 +197,7 @@ void MainPanelControl::updateMainPanelLayout()
         case Position::Top:
         case Position::Bottom:
             m_appAreaWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-            m_mainPanelLayout->setDirection(QBoxLayout::LeftToRight);
+            qobject_cast<QBoxLayout*>(layout())->setDirection(QBoxLayout::LeftToRight);
             m_fixedAreaLayout->setDirection(QBoxLayout::LeftToRight);
             m_appAreaLayout->setDirection(QBoxLayout::LeftToRight);
             m_windowAreaLayout->setDirection(QBoxLayout::LeftToRight);
@@ -201,7 +206,7 @@ void MainPanelControl::updateMainPanelLayout()
         case Position::Right:
         case Position::Left:
             m_appAreaWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-            m_mainPanelLayout->setDirection(QBoxLayout::TopToBottom);
+            qobject_cast<QBoxLayout*>(layout())->setDirection(QBoxLayout::TopToBottom);
             m_fixedAreaLayout->setDirection(QBoxLayout::TopToBottom);
             m_appAreaLayout->setDirection(QBoxLayout::TopToBottom);
             m_windowAreaLayout->setDirection(QBoxLayout::TopToBottom);

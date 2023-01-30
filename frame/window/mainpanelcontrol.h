@@ -62,13 +62,13 @@ private:
     void dropTargetItem(DockItem *sourceItem, QPoint point);
     void handleDragDrop(DockItem *sourceItem, QPoint point);
     void moveItem(DockItem *sourceItem, DockItem *targetItem);
-    void resizeDockIcon();
     inline bool isHorizontal() const { return m_position == Bottom || m_position == Top; }
 
 public slots:
     void insertItem(const int index, DockItem *item);
     void removeItem(DockItem *item, bool animation = true);
     void itemUpdated(DockItem *item);
+    void resizeDockIcon();
 
 signals:
     void itemMoved(DockItem *sourceItem, DockItem *targetItem);
@@ -77,10 +77,8 @@ signals:
     void dirAppChanged();
     void requestConttextMenu();
     void requestResizeDockSize(int offset, bool dragging);
-    void requestResizeDockSizeFinished();
 
 private:
-    QBoxLayout *m_mainPanelLayout;
     QWidget *m_appAreaWidget;
     QBoxLayout *m_fixedAreaLayout;
     QBoxLayout *m_appAreaLayout;

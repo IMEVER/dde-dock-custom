@@ -29,18 +29,11 @@
 #include <DDBusSender>
 #include <QApplication>
 
-DCORE_USE_NAMESPACE
-
 LauncherItem::LauncherItem(QWidget *parent)
     : DockItem(parent)
     , m_launcherInter(new LauncherInter("com.deepin.dde.Launcher", "/com/deepin/dde/Launcher", QDBusConnection::sessionBus(), this))
-    , m_tips(new TipsWidget(this))
 {
-    setObjectName("启动器");
     m_launcherInter->setSync(true, false);
-
-    m_tips->setVisible(false);
-    m_tips->setText("启动器");
 }
 
 void LauncherItem::refershIcon()
@@ -84,9 +77,4 @@ void LauncherItem::mouseReleaseEvent(QMouseEvent *e)
 {
     if (e->button() == Qt::LeftButton && !m_launcherInter->IsVisible())
         m_launcherInter->Show();
-}
-
-QWidget *LauncherItem::popupTips()
-{
-    return m_tips;
 }

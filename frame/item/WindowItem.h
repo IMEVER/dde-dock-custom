@@ -3,9 +3,6 @@
 
 #include "dockitem.h"
 #include "appitem.h"
-#include "components/previewcontainer.h"
-
-
 #include <com_deepin_dde_daemon_dock_entry.h>
 
 class AppItem;
@@ -47,7 +44,6 @@ class WindowItem : public DockItem
         bool m_closeable;
         QImage m_snapshot;
         QRectF m_snapshotSrcRect;
-        PreviewContainer *m_appPreview;
         QTimer *timer;
         QTimer *m_updateIconGeometryTimer;
 };

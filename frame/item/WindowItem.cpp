@@ -1,9 +1,11 @@
 #include "WindowItem.h"
 
 #include "components/appsnapshot.h"
-#include "components/appspreviewprovider.h"
+#include "components/previewcontainer.h"
 #include "util/XUtils.h"
 #include "xcb/xcb_misc.h"
+
+#include <dtkwidget_global.h>
 
 #include <QX11Info>
 #include <X11/Xlib.h>
@@ -12,6 +14,8 @@
 #include <X11/Xatom.h>
 #include <sys/shm.h>
 #include <KWindowSystem>
+#include <QMouseEvent>
+#include <QDragEnterEvent>
 
 SHMInfo *getImageDSHM(WId wId)
 {
@@ -29,8 +33,8 @@ SHMInfo *getImageDSHM(WId wId)
     unsigned char *prop_return_deepin_shm;
 
     XGetWindowProperty(display, wId, atom_prop, 0, 32 * 9, false, AnyPropertyType,
-                       &actual_type_return_deepin_shm, &actual_format_return_deepin_shm, &nitems_return_deepin_shm,
-                       &bytes_after_return_deepin_shm, &prop_return_deepin_shm);
+                    &actual_type_return_deepin_shm, &actual_format_return_deepin_shm, &nitems_return_deepin_shm,
+                    &bytes_after_return_deepin_shm, &prop_return_deepin_shm);
 
     return reinterpret_cast<SHMInfo *>(prop_return_deepin_shm);
 }
@@ -94,7 +98,6 @@ WindowItem::WindowItem(AppItem *appItem, WId wId, WindowInfo windowInfo, bool cl
     , m_WId(wId)
     , m_windowInfo(windowInfo)
     , m_closeable(closeable)
-    , m_appPreview(nullptr)
 {
     timer = new QTimer(this);
     timer->setSingleShot(false);
@@ -212,24 +215,20 @@ void WindowItem::enterEvent(QEvent *e)
 void WindowItem::leaveEvent(QEvent *e)
 {
     DockItem::leaveEvent(e);
-    if(m_appPreview && m_appPreview->isVisible())
-    {
+    PreviewContainer *m_appPreview = PreviewContainer::instance();
+    if(m_appPreview->isVisible())
         m_appPreview->prepareHide();
-    }
 }
 
 void WindowItem::dragEnterEvent(QDragEnterEvent *e)
 {
     // ignore drag from panel
-    if (e->source()) {
-        return e->ignore();
-    }
+    if (e->source()) return e->ignore();
 
     // ignore request dock event
     QString draggingMimeKey = e->mimeData()->formats().contains("RequestDock") ? "RequestDock" : "text/plain";
-    if (QMimeDatabase().mimeTypeForFile(e->mimeData()->data(draggingMimeKey)).name() == "application/x-desktop") {
+    if (QMimeDatabase().mimeTypeForFile(e->mimeData()->data(draggingMimeKey)).name() == "application/x-desktop")
         return e->ignore();
-    }
 
     e->accept();
     hidePopup();
@@ -239,7 +238,7 @@ void WindowItem::dragMoveEvent(QDragMoveEvent *e)
 {
     DockItem::dragMoveEvent(e);
 
-    if (!PopupWindow->isVisible())
+    if (!popupVisible())
         showPreview();
 }
 
@@ -275,7 +274,7 @@ void WindowItem::closeWindow() {
 
 void WindowItem::showHoverTips()
 {
-    return showPreview();
+    showPreview();
 }
 
 void WindowItem::showPreview()
@@ -285,17 +284,13 @@ void WindowItem::showPreview()
     WindowList list;
     if(m_closeable)
         list.append(m_WId);
-    m_appPreview = PreviewWindow(map, list, DockPosition);
+    PreviewContainer *m_appPreview = PreviewContainer::instance(map, list, DockPosition);
 
     connect(m_appPreview, &PreviewContainer::requestActivateWindow, m_appItem, &AppItem::requestActivateWindow, Qt::QueuedConnection);
     connect(m_appPreview, &PreviewContainer::requestPreviewWindow, m_appItem, &AppItem::requestPreviewWindow, Qt::QueuedConnection);
     connect(m_appPreview, &PreviewContainer::requestCancelPreviewWindow, m_appItem, &AppItem::requestCancelPreview);
     connect(m_appPreview, &PreviewContainer::requestCheckWindows, m_appItem, &AppItem::check);
     connect(m_appPreview, &PreviewContainer::requestHidePopup, this, &AppItem::hidePopup);
-
-    connect(m_appPreview, &PreviewContainer::requestActivateWindow, [ = ] { m_appPreview = nullptr; });
-    connect(m_appPreview, &PreviewContainer::requestCancelPreviewWindow, [ = ] { m_appPreview = nullptr; });
-    connect(m_appPreview, &PreviewContainer::requestHidePopup, [ = ] { m_appPreview = nullptr; });
 
     showPopupWindow(m_appPreview, true);
 }

@@ -23,10 +23,9 @@
 
 DWIDGET_USE_NAMESPACE
 
-DockPopupWindow::DockPopupWindow(QWidget *parent)
-    : DArrowRectangle(ArrowBottom, parent),
-      m_model(false),
-      m_regionInter(new DRegionMonitor(this))
+DockPopupWindow::DockPopupWindow(QWidget *parent) : DArrowRectangle(ArrowBottom, parent),
+    m_model(false),
+    m_regionInter(new DRegionMonitor(this))
 {
     m_wmHelper = DWindowManagerHelper::instance();
 
@@ -50,11 +49,18 @@ bool DockPopupWindow::model() const
 
 void DockPopupWindow::setContent(QWidget *content)
 {
-    QWidget *lastWidget = getContent();
-    if (lastWidget)
+    if(QWidget *lastWidget = getContent()) {
+        if(lastWidget == content) {
+            resize(content->sizeHint());
+            return;
+        }
         lastWidget->removeEventFilter(this);
+        lastWidget->setVisible(false);
+        disconnect(this, &DockPopupWindow::accept, nullptr, nullptr);
+    }
     content->installEventFilter(this);
 
+    resize(content->sizeHint());
     DArrowRectangle::setContent(content);
 }
 
@@ -64,13 +70,11 @@ void DockPopupWindow::show(const QPoint &pos, const bool model)
 
     show(pos.x(), pos.y());
 
-    if (m_regionInter->registered()) {
+    if (m_regionInter->registered())
         m_regionInter->unregisterRegion();
-    }
 
-    if (m_model) {
+    if (m_model)
         m_regionInter->registerRegion();
-    }
 }
 
 void DockPopupWindow::show(const int x, const int y)
@@ -90,13 +94,10 @@ void DockPopupWindow::hide()
 
 bool DockPopupWindow::eventFilter(QObject *o, QEvent *e)
 {
-    if (o != getContent() || e->type() != QEvent::Resize)
-        return false;
-
     // FIXME: ensure position move after global mouse release event
-    if (isVisible())
+    if (o == getContent() && e->type() == QEvent::Resize && isVisible())
     {
-        QTimer::singleShot(10, this, [=] {
+        QTimer::singleShot(10, this, [this] {
             // NOTE(sbw): double check is necessary, in this time, the popup maybe already hided.
             if (isVisible())
                 show(m_lastPoint, m_model);
@@ -110,10 +111,8 @@ void DockPopupWindow::onGlobMouseRelease(const QPoint &mousePos, const int flag)
 {
     Q_ASSERT(m_model);
 
-    if (!((flag == DRegionMonitor::WatchedFlags::Button_Left) ||
-          (flag == DRegionMonitor::WatchedFlags::Button_Right))) {
+    if (!((flag == DRegionMonitor::WatchedFlags::Button_Left) || (flag == DRegionMonitor::WatchedFlags::Button_Right)))
         return;
-    }
 
     const QRect rect = QRect(pos(), size());
     if (rect.contains(mousePos))

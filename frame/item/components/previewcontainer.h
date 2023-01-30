@@ -31,7 +31,6 @@
 #include "floatingpreview.h"
 
 #include <com_deepin_dde_daemon_dock_entry.h>
-
 #include <DWindowManagerHelper>
 
 DWIDGET_USE_NAMESPACE
@@ -41,7 +40,8 @@ class PreviewContainer : public QWidget
     Q_OBJECT
 
 public:
-    explicit PreviewContainer(QWidget *parent = 0);
+    static PreviewContainer* instance();
+    static PreviewContainer* instance(const WindowInfoMap &infos, const WindowList &allowClose, const Dock::Position dockPos);
 
 signals:
     void requestActivateWindow(const WId wid) const;
@@ -49,7 +49,6 @@ signals:
     void requestCheckWindows() const;
     void requestCancelPreviewWindow() const;
     void requestHidePopup() const;
-    void enterPreviewWindow() const;
 
 public:
     void setWindowInfos(const WindowInfoMap &infos, const WindowList &allowClose);
@@ -61,6 +60,7 @@ public slots:
     void prepareHide();
 
 private:
+    explicit PreviewContainer();
     void adjustSize();
     void appendSnapWidget(const WId wid);
 

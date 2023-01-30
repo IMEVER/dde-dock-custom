@@ -1,5 +1,6 @@
 #include "diritem.h"
 #include "window/dockitemmanager.h"
+#include "util/dockpopupwindow.h"
 
 #include <QPen>
 
@@ -7,7 +8,6 @@ static DockPopupWindow *dirPopupWindow(nullptr);
 
 DirItem::DirItem(QString title, QWidget *parent) : DockItem(parent)
 , m_index(0)
-, m_dirTips(new TipsWidget(this))
 {
     if (!dirPopupWindow) {
         dirPopupWindow = new DockPopupWindow(nullptr);
@@ -19,17 +19,11 @@ DirItem::DirItem(QString title, QWidget *parent) : DockItem(parent)
         dirPopupWindow->setShadowXOffset(0);
         dirPopupWindow->setArrowWidth(18);
         dirPopupWindow->setArrowHeight(10);
-        dirPopupWindow->setObjectName("dirpopup");
     }
 
     setAcceptDrops(true);
 
     m_title = title.isNull() ? "集合" : title;
-
-    setObjectName(m_title);
-
-    m_dirTips->setText(m_title);
-    m_dirTips->hide();
 
     m_popupGrid = new AppDirWidget(m_title, this);
     m_showPopupTimer = new QTimer(this);
@@ -186,7 +180,6 @@ void DirItem::paintEvent(QPaintEvent *e)
         else if (i == 3)
             appRect = QRect(padding + w + spacing, padding + w + spacing, w, w);
 
-
         painter.drawPixmap(appRect, pixmap);
 
         if(++i == 4)
@@ -205,11 +198,6 @@ void DirItem::leaveEvent(QEvent *e)
     DockItem::leaveEvent(e);
     m_showPopupTimer->stop();
     m_popupGrid->prepareHide();
-}
-
-void DirItem::mousePressEvent(QMouseEvent *e)
-{
-    DockItem::mousePressEvent(e);
 }
 
 void DirItem::mouseReleaseEvent(QMouseEvent *e)
@@ -252,17 +240,13 @@ void DirItem::showDirPopupWindow()
 {
     emit requestWindowAutoHide(false);
 
-    QWidget *lastContent = dirPopupWindow->getContent();
-    if (lastContent)
-        lastContent->setVisible(false);
-
     switch (DockPosition) {
     case Top:
     case Bottom: dirPopupWindow->setArrowDirection(DockPopupWindow::ArrowBottom);  break;
     case Left:  dirPopupWindow->setArrowDirection(DockPopupWindow::ArrowLeft);    break;
     case Right: dirPopupWindow->setArrowDirection(DockPopupWindow::ArrowRight);   break;
     }
-    dirPopupWindow->resize(m_popupGrid->sizeHint());
+
     dirPopupWindow->setContent(m_popupGrid);
     dirPopupWindow->show(popupMarkPoint(), true);
 
@@ -271,9 +255,6 @@ void DirItem::showDirPopupWindow()
 
 void DirItem::hideDirpopupWindow()
 {
-    if (!dirPopupWindow->isVisible()) return;
-
-    disconnect(dirPopupWindow, &DockPopupWindow::accept, this, &DirItem::hideDirpopupWindow);
     hidePopup();
     dirPopupWindow->hide();
 }

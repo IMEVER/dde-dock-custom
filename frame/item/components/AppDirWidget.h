@@ -5,6 +5,8 @@
 
 #include <QWidget>
 #include <QLineEdit>
+#include <QGridLayout>
+
 class AppItem;
 class AppDirWidget : public QWidget
 {
@@ -12,7 +14,7 @@ Q_OBJECT
 
 public:
     explicit AppDirWidget(QString title, QWidget *parent=nullptr);
-    ~AppDirWidget();
+    ~AppDirWidget() = default;
 
     void addAppItem(AppItem *item);
     void removeAppItem(AppItem *item);
@@ -21,8 +23,6 @@ public:
 protected:
     void enterEvent(QEvent *e) override;
     void leaveEvent(QEvent *e) override;
-    void dragEnterEvent(QDragEnterEvent *e) override;
-    void dragLeaveEvent(QDragLeaveEvent *e) override;
     bool eventFilter(QObject* object, QEvent* event) override;
 
 private slots:

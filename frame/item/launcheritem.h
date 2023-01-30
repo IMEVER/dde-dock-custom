@@ -23,10 +23,8 @@
 #define LAUNCHERITEM_H
 
 #include "dockitem.h"
-#include "tipswidget.h"
 
 #include <com_deepin_dde_launcher.h>
-
 
 using LauncherInter = com::deepin::dde::Launcher;
 
@@ -47,12 +45,11 @@ private:
     void mousePressEvent(QMouseEvent *e) override;
     void mouseReleaseEvent(QMouseEvent *e) override;
 
-    QWidget *popupTips() override;
+    QString popupTips() override { return "启动器"; }
 
 private:
     QPixmap m_icon;
     LauncherInter *m_launcherInter;
-    TipsWidget *m_tips;
 };
 
 #endif // LAUNCHERITEM_H

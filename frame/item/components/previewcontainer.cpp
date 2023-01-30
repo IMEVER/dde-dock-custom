@@ -30,13 +30,26 @@
 #define MARGIN            0
 #define SNAP_HEIGHT_WITHOUT_COMPOSITE       30
 
-PreviewContainer::PreviewContainer(QWidget *parent)
-    : QWidget(parent),
-      m_needActivate(false),
+PreviewContainer *PreviewContainer::instance() {
+    static PreviewContainer *preview = new PreviewContainer;
+    return preview;
+}
 
-      m_floatingPreview(new FloatingPreview(this)),
-      m_mouseLeaveTimer(new QTimer(this)),
-      m_wmHelper(DWindowManagerHelper::instance())
+PreviewContainer *PreviewContainer::instance(const WindowInfoMap &infos, const WindowList &allowClose, const Dock::Position dockPos)
+{
+    static PreviewContainer *preview = instance();
+    preview->disconnect();
+    preview->setWindowInfos(infos, allowClose);
+    preview->updateSnapshots();
+    preview->updateLayoutDirection(dockPos);
+    return preview;
+}
+
+PreviewContainer::PreviewContainer() : QWidget(),
+    m_needActivate(false),
+    m_floatingPreview(new FloatingPreview(this)),
+    m_mouseLeaveTimer(new QTimer(this)),
+    m_wmHelper(DWindowManagerHelper::instance())
 {
     m_windowListLayout = new QBoxLayout(QBoxLayout::LeftToRight);
     m_windowListLayout->setSpacing(SPACING);
@@ -188,11 +201,8 @@ void PreviewContainer::enterEvent(QEvent *e)
     m_needActivate = false;
     m_mouseLeaveTimer->stop();
 
-    if (m_wmHelper->hasComposite()) {
+    if (m_wmHelper->hasComposite())
         m_waitForShowPreviewTimer->start();
-    }
-
-    Q_EMIT enterPreviewWindow();
 }
 
 void PreviewContainer::leaveEvent(QEvent *e)

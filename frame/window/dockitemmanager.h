@@ -47,7 +47,6 @@ public:
     static DockItemManager *instance();
 
     void setDbusDock(DBusDock *dbus);
-
     const QList<QPointer<DockItem> > itemList();
     const QList<QPointer<DirItem>> dirList();
     void addDirApp(DirItem *dirItem);
@@ -66,13 +65,13 @@ public:
     void setAnimationType(ActivateAnimationType type);
     bool hasWindowItem();
     int itemSize();
+    int itemCount();
 
 signals:
     void itemInserted(const int index, DockItem *item) const;
     void itemRemoved(DockItem *item, bool animation = true) const;
     void itemUpdated(DockItem *item) const;
     void requestWindowAutoHide(const bool autoHide) const;
-    void requestRefershWindowVisible() const;
     void mergeModeChanged(MergeMode mode);
     void itemCountChanged();
     void hoverScaleChanged(bool hoverScale);

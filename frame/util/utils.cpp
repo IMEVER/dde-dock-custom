@@ -94,111 +94,103 @@ const QPixmap Utils::lighterEffect(const QPixmap pixmap, const int delta)
 }
 
 const QPixmap Utils::getIcon(const QString iconName, const int size, const qreal ratio)
-    {
-        QPixmap pixmap;
-        QString key;
-        QIcon icon;
-        // 把size改为小于size的最大偶数 :)
-        const int s = int(size * ratio) & ~1;
+{
+    QPixmap pixmap;
+    // 把size改为小于size的最大偶数 :)
+    const int s = int(size * ratio) & ~1;
 
-        do {
-            // load pixmap from our Cache
-            if (iconName.startsWith("data:image/")) {
-                key = QCryptographicHash::hash(iconName.toUtf8(), QCryptographicHash::Md5).toHex();
+    do {
+        // load pixmap from our Cache
+        if (iconName.startsWith("data:image/")) {
+            QString key = QCryptographicHash::hash(iconName.toUtf8(), QCryptographicHash::Md5).toHex();
 
-                // FIXME(hualet): The cache can reduce memory usage,
-                // that is ~2M on HiDPI enabled machine with 9 icons loaded,
-                // but I don't know why since QIcon has its own cache and all of the
-                // icons loaded are loaded by QIcon::fromTheme, really strange here.
-                if (QPixmapCache::find(key, &pixmap))
-                    break;
-
-                const QStringList strs = iconName.split("base64,");
-                if (strs.size() == 2)
-                    pixmap.loadFromData(QByteArray::fromBase64(strs.at(1).toLatin1()));
-
-                if (!pixmap.isNull())
-                    break;
-            }
-
-            // load pixmap from File
-            if (QFile::exists(iconName)) {
-                pixmap = QPixmap(iconName);
-                if (!pixmap.isNull())
-                    break;
-            }
-
-            icon = QIcon::fromTheme(iconName);
-            if (icon.isNull()) {
-                icon = QIcon::fromTheme("deepinwine-" + iconName);
-            } else {
-                icon = QIcon::fromTheme(iconName, QIcon::fromTheme("application-x-desktop"));
-            }
-
-            // load pixmap from Icon-Theme
-            const int fakeSize = std::max(48, s); // cannot use 16x16, cause 16x16 is label icon
-            pixmap = icon.pixmap(QSize(fakeSize, fakeSize));
-            if (!pixmap.isNull())
+            // FIXME(hualet): The cache can reduce memory usage,
+            // that is ~2M on HiDPI enabled machine with 9 icons loaded,
+            // but I don't know why since QIcon has its own cache and all of the
+            // icons loaded are loaded by QIcon::fromTheme, really strange here.
+            if (QPixmapCache::find(key, &pixmap))
                 break;
 
-            // fallback to a Default pixmap
-            pixmap = QPixmap(":/icons/resources/application-x-desktop.svg");
+            const QStringList strs = iconName.split("base64,");
+            if (strs.size() == 2)
+                pixmap.loadFromData(QByteArray::fromBase64(strs.at(1).toLatin1()));
+
+            if (!pixmap.isNull()) {
+                QPixmapCache::insert(key, pixmap);
+                break;
+            }
+        }
+
+        // load pixmap from File
+        if (QFile::exists(iconName)) {
+            pixmap = QPixmap(iconName);
             if (!pixmap.isNull())
                 break;
-
-            Q_UNREACHABLE();
-
-        } while (false);
-
-        if (!key.isEmpty()) {
-            QPixmapCache::insert(key, pixmap);
         }
 
-        if (pixmap.size().width() != s) {
-            pixmap = pixmap.scaled(s, s, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-        }
-        pixmap.setDevicePixelRatio(ratio);
-        return pixmap;
+        QIcon icon = QIcon::fromTheme(iconName);
+        if (icon.isNull())
+            icon = QIcon::fromTheme("deepinwine-" + iconName, QIcon::fromTheme("application-x-desktop"));
+
+        // load pixmap from Icon-Theme
+        const int fakeSize = std::max(48, s); // cannot use 16x16, cause 16x16 is label icon
+        pixmap = icon.pixmap(QSize(fakeSize, fakeSize));
+        if (!pixmap.isNull())
+            break;
+
+        // fallback to a Default pixmap
+        pixmap = QPixmap(":/icons/resources/application-x-desktop.svg");
+        if (!pixmap.isNull())
+            break;
+
+        Q_UNREACHABLE();
+
+    } while (false);
+
+    if (pixmap.size().width() != s) {
+        pixmap = pixmap.scaled(s, s, Qt::KeepAspectRatio, Qt::SmoothTransformation);
     }
-
+    pixmap.setDevicePixelRatio(ratio);
+    return pixmap;
+}
 
 QPixmap Utils::renderSVG(const QString &path, const QSize &size, const qreal devicePixelRatio) {
-        QImageReader reader;
-        QPixmap pixmap;
-        reader.setFileName(path);
-        if (reader.canRead()) {
-            reader.setScaledSize(size * devicePixelRatio);
-            pixmap = QPixmap::fromImage(reader.read());
-            pixmap.setDevicePixelRatio(devicePixelRatio);
-        }
-        else {
-            pixmap.load(path);
-        }
-
-        return pixmap;
+    QImageReader reader;
+    QPixmap pixmap;
+    reader.setFileName(path);
+    if (reader.canRead()) {
+        reader.setScaledSize(size * devicePixelRatio);
+        pixmap = QPixmap::fromImage(reader.read());
+        pixmap.setDevicePixelRatio(devicePixelRatio);
     }
+    else {
+        pixmap.load(path);
+    }
+
+    return pixmap;
+}
 
 QScreen * Utils::screenAt(const QPoint &point) {
-        for (QScreen *screen : qApp->screens()) {
-            const QRect r { screen->geometry() };
-            const QRect rect { r.topLeft(), r.size() * screen->devicePixelRatio() };
-            if (rect.contains(point)) {
-                return screen;
-            }
+    for (QScreen *screen : qApp->screens()) {
+        const QRect r { screen->geometry() };
+        const QRect rect { r.topLeft(), r.size() * screen->devicePixelRatio() };
+        if (rect.contains(point)) {
+            return screen;
         }
-
-        return nullptr;
     }
+
+    return nullptr;
+}
 
 QScreen * Utils::screenAtByScaled(const QPoint &point) {
-        for (QScreen *screen : qApp->screens()) {
-            if (screen->geometry().contains(point)) {
-                return screen;
-            }
+    for (QScreen *screen : qApp->screens()) {
+        if (screen->geometry().contains(point)) {
+            return screen;
         }
-
-        return nullptr;
     }
+
+    return nullptr;
+}
 
 /**
  * @brief SettingsPtr 根据给定信息返回一个QGSettings指针
@@ -268,8 +260,8 @@ const QVariant Utils::SettingValue(const QString &schema_id, const QByteArray &p
         return v;
     } else{
         qDebug() << "Cannot find gsettings, schema_id:" << schema_id
-                 << " path:" << path << " key:" << key
-                 << "Use fallback value:" << fallback;
+                << " path:" << path << " key:" << key
+                << "Use fallback value:" << fallback;
         // 如果settings->keys()不包含key则会存在内存泄露，所以需要释放
         if (settings)
             delete settings;
@@ -286,8 +278,7 @@ bool Utils::SettingSaveValue(const QString &schema_id, const QByteArray &path, c
         delete settings;
         return true;
     } else{
-        qDebug() << "Cannot find gsettings, schema_id:" << schema_id
-                 << " path:" << path << " key:" << key;
+        qDebug() << "Cannot find gsettings, schema_id:" << schema_id << " path:" << path << " key:" << key;
         if (settings)
             delete settings;
 

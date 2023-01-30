@@ -135,6 +135,19 @@ int DockItemManager::itemSize()
     return m_appInter->windowSizeFashion();
 }
 
+int DockItemManager::itemCount()
+{
+    int count = m_itemList.count() + 1 + 1;
+    for(auto item : m_dirList)
+        count = count - item->currentCount() + 1;
+
+    for(auto item : m_itemList)
+        if(item->itemType() == DockItem::App)
+            count += qobject_cast<AppItem *>(item)->windowCount();
+
+    return count;
+}
+
 const QList<QPointer<DockItem>> DockItemManager::itemList()
 {
     return m_itemList;
@@ -182,9 +195,7 @@ void DockItemManager::appItemAdded(const QDBusObjectPath &path, const int index,
 {
     AppItem *item = new AppItem(path.path());
 
-    connect(item, &DockItem::requestRefreshWindowVisible, this, &DockItemManager::requestRefershWindowVisible, Qt::UniqueConnection);
     connect(item, &DockItem::requestWindowAutoHide, this, &DockItemManager::requestWindowAutoHide, Qt::UniqueConnection);
-
     connect(item, &AppItem::requestActivateWindow, m_appInter, &DBusDock::ActivateWindow, Qt::QueuedConnection);
     connect(item, &AppItem::requestPreviewWindow, m_appInter, &DBusDock::PreviewWindow);
     connect(item, &AppItem::requestCancelPreview, m_appInter, &DBusDock::CancelPreviewWindow);

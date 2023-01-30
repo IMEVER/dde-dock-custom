@@ -1,6 +1,9 @@
 #include "AppDirWidget.h"
 
 #include <QDrag>
+#include <QMouseEvent>
+
+static bool autoHide = true;
 
 AppDirWidget::AppDirWidget(QString title, QWidget *parent) : QWidget(parent)
 , m_row(0)
@@ -49,11 +52,6 @@ AppDirWidget::AppDirWidget(QString title, QWidget *parent) : QWidget(parent)
     connect(m_mouseLeaveTimer, &QTimer::timeout, this, &AppDirWidget::checkMouseLeave);
 }
 
-AppDirWidget::~AppDirWidget()
-{
-
-}
-
 void AppDirWidget::addAppItem(AppItem *item)
 {
     m_Layout->addWidget(item, m_row, m_column++);
@@ -65,14 +63,10 @@ void AppDirWidget::addAppItem(AppItem *item)
         m_column = 0;
     }
 
-    connect(item, &AppItem::enterPreviewWindow, [ this ]{ m_mouseLeaveTimer->stop(); });
-    connect(item, &AppItem::leavePreviewWindow, [ this ]{ checkMouseLeave(); });
-    connect(item, &DockItem::requestWindowAutoHide, [ this ](bool hide) {
-        if(!hide) {
-            QTimer::singleShot(50, [ this ] { m_mouseLeaveTimer->stop(); });
-        } else {
-            m_mouseLeaveTimer->start();
-        }
+    connect(item, &DockItem::requestWindowAutoHide, this, [ this ](bool hide) {
+        autoHide = hide;
+        if(!hide)
+            m_mouseLeaveTimer->stop();
     });
     m_Layout->update();
 }
@@ -113,25 +107,20 @@ void AppDirWidget::removeAppItem(AppItem *item)
 
     item->removeEventFilter(this);
 
-    disconnect(item, &AppItem::enterPreviewWindow, 0, 0);
-    disconnect(item, &AppItem::leavePreviewWindow, 0, 0);
-    disconnect(item, &DockItem::requestWindowAutoHide, 0, 0);
+    disconnect(item, &DockItem::requestWindowAutoHide, this, 0);
     m_Layout->update();
 }
 
 void AppDirWidget::prepareHide()
 {
-    m_mouseLeaveTimer->start();
+    if(autoHide)
+        m_mouseLeaveTimer->start();
 }
 
 void AppDirWidget::checkMouseLeave()
 {
-    const bool hover = underMouse();
-
-    if (hover)
-        return;
-
-    emit requestHidePopup();
+    if(!underMouse())
+        emit requestHidePopup();
 }
 
 void AppDirWidget::enterEvent(QEvent *e)
@@ -143,17 +132,8 @@ void AppDirWidget::enterEvent(QEvent *e)
 void AppDirWidget::leaveEvent(QEvent *e)
 {
     QWidget::leaveEvent(e);
-    m_mouseLeaveTimer->start();
-}
-
-void AppDirWidget::dragEnterEvent(QDragEnterEvent *e)
-{
-    QWidget::dragEnterEvent(e);
-}
-
-void AppDirWidget::dragLeaveEvent(QDragLeaveEvent *e)
-{
-    QWidget::dragLeaveEvent(e);
+    if(!QRect(mapToGlobal({0, 0}), size()).contains(QCursor::pos()) && autoHide)
+        m_mouseLeaveTimer->start();
 }
 
 bool AppDirWidget::eventFilter(QObject* object, QEvent* event)
@@ -169,9 +149,7 @@ bool AppDirWidget::eventFilter(QObject* object, QEvent* event)
         QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
         if (mouseEvent && mouseEvent->buttons() == Qt::LeftButton)
         {
-            DockItem *item = qobject_cast<DockItem *>(object);
-            if(item)
-            {
+            if(DockItem *item = qobject_cast<DockItem *>(object)) {
                 QPixmap pixmap = item->grab();
                 QDrag *drag = new QDrag(item);
                 drag->setPixmap(pixmap);

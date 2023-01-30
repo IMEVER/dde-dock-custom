@@ -34,23 +34,16 @@ class MenuWorker : public QObject
 {
     Q_OBJECT
 public:
-    explicit MenuWorker(DBusDock *dockInter,QWidget *parent = nullptr);
+    explicit MenuWorker(QWidget *parent = nullptr);
 
-    void showDockSettingsMenu();
+    void showDockSettingsMenu(DBusDock *m_dockInter);
 
 signals:
     void autoHideChanged(const bool autoHide) const;
     void updatePanelGeometry();
 
-public slots:
-    void setAutoHide(const bool autoHide);
-
 private:
-    QMenu *createMenu();
-
-private:
-    DBusDock *m_dockInter;
-    bool m_autoHide;
+    QMenu *createMenu(DBusDock *m_dockInter);
 };
 
 #endif // MENUWORKER_H

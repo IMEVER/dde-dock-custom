@@ -23,8 +23,6 @@
 #define MULTISCREENWORKER_H
 
 #include "interfaces/constants.h"
-// #include "utils.h"
-#include "xcb/xcb_misc.h"
 
 #include <com_deepin_dde_daemon_dock.h>
 #include <com_deepin_daemon_display.h>
@@ -124,8 +122,6 @@ public:
 
     void initShow();
 
-    DBusDock *dockInter() { return m_dockInter; }
-
     inline bool testState(RunState state) { return (m_state & state); }
     void setStates(RunStates state, bool on = true);
     void setWindowSize(int size);
@@ -141,11 +137,11 @@ public:
     QRect dockRect(const QString &screenName, const Position &pos, const HideMode &hideMode);
 
 signals:
+    void dockInterReady(DBusDock *dockInter);
     void opacityChanged(const quint8 value) const;
     // 更新监视区域
     void requestUpdateFrontendGeometry();                       //!!! 给后端的区域不能为是或宽度为0的区域,否则会带来HideState死循环切换的bug
     void requestUpdateLayout();                                 //　界面需要根据任务栏更新布局的方向
-    void requestUpdateDragArea();                               //　更新拖拽区域
 
 public slots:
     void onAutoHideChanged(bool autoHide);
@@ -155,16 +151,12 @@ public slots:
     void handleDbusSignal(QDBusMessage);
     void updateDisplay();
 
-private slots:
-    void onOpacityChanged(const double value);
-
 private:
     // 初始化数据信息
     void initConnection();
 
     void displayAnimation(const QString &screen, const Position &pos, AniAction act);
     void displayAnimation(const QString &screen, AniAction act);
-
     void changeDockPosition(QString lastScreen, QString deskScreen, const Position &fromPos, const Position &toPos);
 
     QString getValidScreen(const Position &pos);
@@ -180,13 +172,12 @@ private:
     QScreen *screenByName(const QString &screenName);
     bool onScreenEdge(const QString &screenName, const QPoint &point);
     const QPoint rawXPosition(const QPoint &scaledPos);
-    int itemCount();
     void updateDockRect(QRect &dockRect, QRect screenRect, Position position, qreal ratio, int dockSize, int count);
     bool isCopyMode();
 
 private:
     MainWindow *m_parent;
-    QVariantAnimation *ani;
+    QPropertyAnimation *ani;
 
     // monitor screen
     XEventMonitor *m_eventInter;

@@ -10,22 +10,17 @@
 #include <QStandardPaths>
 #include <DDesktopServices>
 
-DCORE_USE_NAMESPACE
+static const QString TRASHPATH = QStandardPaths::writableLocation(QStandardPaths::HomeLocation) + "/.local/share/Trash/files/";
 
-TrashItem::TrashItem(QWidget *parent)
-    : DockItem(parent)
-    , m_tips(new TipsWidget(this))
+TrashItem::TrashItem(QWidget *parent) : DockItem(parent)
 {
-    m_tips->setVisible(false);
-    m_tips->setText("垃圾桶");
-
     setAcceptDrops(true);
 }
 
 void TrashItem::refershIcon()
 {
     const int iconSize = qMin(width(), height());
-    QDir dir(QStandardPaths::writableLocation(QStandardPaths::HomeLocation) + "/.local/share/Trash/files/");
+    QDir dir(TRASHPATH);
     if(dir.isEmpty())
         m_icon = Utils::getIcon("user-trash", iconSize * 0.9, devicePixelRatioF());
     else
@@ -36,9 +31,6 @@ void TrashItem::refershIcon()
 void TrashItem::paintEvent(QPaintEvent *e)
 {
     DockItem::paintEvent(e);
-
-    if (!isVisible())
-        return;
 
     QPainter painter(this);
 
@@ -58,7 +50,7 @@ void TrashItem::resizeEvent(QResizeEvent *e)
 void TrashItem::mousePressEvent(QMouseEvent *e)
 {
     if(e->button() == Qt::LeftButton)
-        QProcess::startDetached("xdg-open", {QStandardPaths::writableLocation(QStandardPaths::HomeLocation) + "/.local/share/Trash/files/"});
+        QProcess::startDetached("xdg-open", {TRASHPATH});
 
     DockItem::mousePressEvent(e);
 }
@@ -92,29 +84,21 @@ void TrashItem::dropEvent(QDropEvent *e)
     refershIcon();
 }
 
-QWidget *TrashItem::popupTips()
-{
-    return m_tips;
-}
-
 void TrashItem::invokedMenuItem(const QString &itemId, const bool checked) {
     if(itemId == "open")
-        QProcess::startDetached("xdg-open", {QStandardPaths::writableLocation(QStandardPaths::HomeLocation) + "/.local/share/Trash/files/"});
+        QProcess::startDetached("xdg-open", {TRASHPATH});
     else if(itemId == "clear") {
-        QString filesPath = QDir::homePath() + "/.local/share/Trash/files/";
-        QString infoPath = QDir::homePath() + "/.local/share/Trash/info/";
-
-        QProcess::execute("rm", { "-r", infoPath, filesPath});
+        QProcess::execute("rm", { "-r", QDir::homePath() + "/.local/share/Trash/info/", TRASHPATH});
         QDir dir(QDir::homePath() + "/.local/share/Trash/");
         dir.mkdir("files");
         dir.mkdir("info");
-        DDesktopServices::playSystemSoundEffect(DDesktopServices::SSE_EmptyTrash);
+        Dtk::Widget::DDesktopServices::playSystemSoundEffect(Dtk::Widget::DDesktopServices::SSE_EmptyTrash);
         refershIcon();
     }
 }
 
 const QString TrashItem::contextMenu() const {
-    QDir dir(QStandardPaths::writableLocation(QStandardPaths::HomeLocation) + "/.local/share/Trash/files/");
+    QDir dir(TRASHPATH);
     return QString("{\"items\": [ {\"itemText\": \"打开回收站\", \"itemId\": \"open\", \"isActive\": true}, \
-         {\"itemText\": \"清空回收站\", \"itemId\": \"clear\", \"isActive\": %1} ]}").arg(dir.isEmpty() ? "false" : "true");
+        {\"itemText\": \"清空回收站\", \"itemId\": \"clear\", \"isActive\": %1} ]}").arg(dir.isEmpty() ? "false" : "true");
 }

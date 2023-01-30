@@ -26,8 +26,6 @@
 #include "dockitem.h"
 #include "diritem.h"
 #include "WindowItem.h"
-#include "components/previewcontainer.h"
-#include "tipswidget.h"
 
 #include <QGraphicsView>
 #include <QGraphicsItem>
@@ -73,9 +71,6 @@ signals:
     void requestPresentWindows();
     void dragReady(QWidget *dragWidget);
 
-    void enterPreviewWindow() const;
-    void leavePreviewWindow() const;
-
     void windowItemInserted(WindowItem *);
     void windowItemRemoved(WindowItem *, bool animation = true);
 
@@ -90,12 +85,11 @@ private:
     void dragMoveEvent(QDragMoveEvent *e) override;
     void dropEvent(QDropEvent *e) override;
     void leaveEvent(QEvent *e) override;
-    void showEvent(QShowEvent *e) override;
 
     void showHoverTips() Q_DECL_OVERRIDE;
     void invokedMenuItem(const QString &itemId, const bool checked) Q_DECL_OVERRIDE;
     const QString contextMenu() const Q_DECL_OVERRIDE;
-    QWidget *popupTips() Q_DECL_OVERRIDE;
+    QString popupTips() Q_DECL_OVERRIDE;
     const QPoint popupMarkPoint() override;
     bool hasAttention() const;
 
@@ -110,21 +104,16 @@ private slots:
     void stopSwingEffect();
 
 private:
-    TipsWidget *m_appNameTips;
-    PreviewContainer *m_appPreviewTips;
     DockEntryInter *m_itemEntryInter;
 
     QGraphicsView *m_swingEffectView;
     QGraphicsItemAnimation *m_itemAnimation;
 
-    int m_retryTimes;
     unsigned long m_lastclickTimes;
-
     WindowInfoMap m_windowInfos;
     QPixmap m_appIcon;
 
     QTimer *m_updateIconGeometryTimer;
-    QTimer *m_retryObtainIconTimer;
 
     Place m_place = DockPlace;
     DirItem *m_dirItem;

@@ -24,6 +24,7 @@
 #include "mainpanelcontrol.h"
 #include "dockitemmanager.h"
 #include "util/utils.h"
+#include "xcb/xcb_misc.h"
 #include "util/multiscreenworker.h"
 #include "util/menuworker.h"
 
@@ -32,6 +33,8 @@
 #include <DPlatformTheme>
 #include <QDebug>
 #include <QEvent>
+#include <QHBoxLayout>
+#include <QResizeEvent>
 #include <QApplication>
 #include <QX11Info>
 #include <qpa/qplatformwindow.h>
@@ -42,10 +45,13 @@
 MainWindow::MainWindow(QWidget *parent) : DBlurEffectWidget(parent)
     , m_mainPanel(new MainPanelControl(this))
     , m_multiScreenWorker(new MultiScreenWorker(this))
-    , m_menuWorker(nullptr)
     , m_platformWindowHandle(this)
     , m_topPanelInterface(nullptr)
 {
+    QHBoxLayout *layout = new QHBoxLayout(this);
+    layout->setMargin(0);
+    layout->addWidget(m_mainPanel);
+
     setVisible(false);
 
     DPlatformWindowHandle::enableDXcbForWindow(this, true);
@@ -115,9 +121,7 @@ void MainWindow::initConnections()
     connect(DockItemManager::instance(), &DockItemManager::itemRemoved, m_mainPanel, &MainPanelControl::removeItem, Qt::DirectConnection);
     connect(DockItemManager::instance(), &DockItemManager::itemUpdated, m_mainPanel, &MainPanelControl::itemUpdated, Qt::DirectConnection);
     connect(DockItemManager::instance(), &DockItemManager::requestWindowAutoHide, m_multiScreenWorker, &MultiScreenWorker::onAutoHideChanged);
-    connect(DockItemManager::instance(), &DockItemManager::hoverScaleChanged, this, [this](const bool enabled) {
-        resizeDock(DockItemManager::instance()->itemSize(), false);
-    });
+    connect(DockItemManager::instance(), &DockItemManager::hoverScaleChanged, m_mainPanel, &MainPanelControl::resizeDockIcon);
 
     connect(m_mainPanel, &MainPanelControl::itemMoved, DockItemManager::instance(), &DockItemManager::itemMoved, Qt::DirectConnection);
     connect(m_mainPanel, &MainPanelControl::itemAdded, DockItemManager::instance(), &DockItemManager::itemAdded, Qt::DirectConnection);
@@ -125,43 +129,28 @@ void MainWindow::initConnections()
     connect(DockItemManager::instance(), &DockItemManager::itemCountChanged, m_multiScreenWorker, &MultiScreenWorker::updateDisplay, Qt::DirectConnection);
     connect(m_mainPanel, &MainPanelControl::itemCountChanged, m_multiScreenWorker, &MultiScreenWorker::updateDisplay);
     connect(m_mainPanel, &MainPanelControl::dirAppChanged, DockItemManager::instance(), &DockItemManager::updateDirApp);
-
     connect(m_mainPanel, &MainPanelControl::requestResizeDockSize, this, &MainWindow::resizeDock);
-    connect(m_mainPanel, &MainPanelControl::requestResizeDockSizeFinished, this, [this]{
-        int dockSize = 0;
-        if (m_multiScreenWorker->position() == Position::Bottom)
-            dockSize = m_mainPanel->height();
-        else
-            dockSize = m_mainPanel->width();
-
-        dockSize = qBound(MAINWINDOW_MIN_SIZE, dockSize, MAINWINDOW_MAX_SIZE);
-
-        // 通知窗管和后端更新数据
-        m_multiScreenWorker->updateDaemonDockSize(dockSize);                                // 1.先更新任务栏高度
-        emit geometryChanged(geometry());
-    });
-
 
     connect(m_multiScreenWorker, &MultiScreenWorker::opacityChanged, this, &MainWindow::setMaskAlpha, Qt::QueuedConnection);
-
-    std::function<void()> initDbus = [this, &initDbus] {
-        QTimer::singleShot(100, this, [this, initDbus] {
-            if(!m_multiScreenWorker->dockInter())
-                return initDbus();
-
-            m_menuWorker = new MenuWorker(m_multiScreenWorker->dockInter(), this);
-            connect(m_mainPanel, &MainPanelControl::requestConttextMenu, m_menuWorker, &MenuWorker::showDockSettingsMenu);
+    connect(m_multiScreenWorker, &MultiScreenWorker::dockInterReady, this, [this](DBusDock *dockInter) {
+        connect(m_mainPanel, &MainPanelControl::requestConttextMenu, this, [this, dockInter]{
+            MenuWorker *m_menuWorker = new MenuWorker(this);
             connect(m_menuWorker, &MenuWorker::autoHideChanged, m_multiScreenWorker, &MultiScreenWorker::onAutoHideChanged);
             connect(m_menuWorker, &MenuWorker::updatePanelGeometry, m_multiScreenWorker, &MultiScreenWorker::updateDisplay);
-
-            m_topPanelInterface = new TopPanelInterface("me.imever.dde.TopPanel", "/me/imever/dde/TopPanel", QDBusConnection::sessionBus(), this);
-            connect(m_topPanelInterface, &TopPanelInterface::pluginVisibleChanged, this, &MainWindow::pluginVisibleChanged);
-
-            DockItemManager::instance()->setDbusDock(m_multiScreenWorker->dockInter());
-            DockItemManager::instance()->reloadAppItems();
+            m_menuWorker->showDockSettingsMenu(dockInter);
+            m_menuWorker->deleteLater();
         });
-    };
-    initDbus();
+        m_topPanelInterface = new TopPanelInterface("me.imever.dde.TopPanel", "/me/imever/dde/TopPanel", QDBusConnection::sessionBus(), this);
+        connect(m_topPanelInterface, &TopPanelInterface::pluginVisibleChanged, this, &MainWindow::pluginVisibleChanged);
+
+        DockItemManager::instance()->setDbusDock(dockInter);
+        DockItemManager::instance()->reloadAppItems();
+    });
+}
+
+void MainWindow::moveEvent(QMoveEvent *event) {
+    DBlurEffectWidget::moveEvent(event);
+    emit DWindowManagerHelper::instance()->windowManagerChanged();
 }
 
 void MainWindow::resizeDock(int offset, bool dragging)
@@ -169,8 +158,6 @@ void MainWindow::resizeDock(int offset, bool dragging)
     offset = qBound(MAINWINDOW_MIN_SIZE, offset, MAINWINDOW_MAX_SIZE);
 
     const Position pos = m_multiScreenWorker->position();
-    if(((pos == Bottom ||pos == Top) && offset == height()) || ((pos == Left ||pos == Right) && offset == width()))
-        return;
 
     if(dragging)
         m_multiScreenWorker->setWindowSize(offset);
@@ -179,6 +166,7 @@ void MainWindow::resizeDock(int offset, bool dragging)
 
     QRect newRect;
     switch (pos) {
+    case Top:
     case Bottom: {
         newRect.setX(rect.x());
         newRect.setY(rect.y() + rect.height() - offset);
@@ -200,17 +188,15 @@ void MainWindow::resizeDock(int offset, bool dragging)
         newRect.setHeight(rect.height());
     }
         break;
-    case Top: break;
     }
 
-    // 更新界面大小
-    m_mainPanel->setFixedSize(newRect.size());
-    setFixedSize(newRect.size());
-    if(!isHidden())
-        move(newRect.topLeft());
+    setGeometry(newRect);
 
-    if(!dragging)
-        emit m_mainPanel->requestResizeDockSizeFinished();
+    if(!dragging) {
+        // 通知窗管和后端更新数据
+        m_multiScreenWorker->updateDaemonDockSize(offset);                                // 1.先更新任务栏高度
+        emit geometryChanged(geometry());
+    }
 }
 
 QStringList MainWindow::GetLoadedPlugins() {

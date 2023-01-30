@@ -3,7 +3,6 @@ cmake_minimum_required(VERSION 3.7)
 set(BIN_NAME dde-dock)
 
 configure_file(environments.h.in environments.h @ONLY)
-
 # Sources files
 file(GLOB_RECURSE SRCS "*.h" "*.cpp")
 
@@ -25,21 +24,20 @@ pkg_check_modules(QGSettings REQUIRED gsettings-qt)
 
 qt5_add_dbus_adaptor(SRCS dbus/com.deepin.dde.Dock.xml window/mainwindow.h MainWindow dbusdockadaptors DBusDockAdaptors)
 set_source_files_properties(dbus/me.imever.dde.toppanel.xml PROPERTIES CLASSNAME TopPanelInterface NO_NAMESPACE true)
-# set_source_file_property(dbus/me.imever.dde.toppanel.xml )
 qt5_add_dbus_interface(SRCS dbus/me.imever.dde.toppanel.xml TopPanelInterface )
 
 # driver-manager
 add_executable(${BIN_NAME} ${SRCS} item/item.qrc frame.qrc)
 target_include_directories(${BIN_NAME} PUBLIC ${DtkWidget_INCLUDE_DIRS}
-                                              ${XCB_EWMH_INCLUDE_DIRS}
-                                              ${DFrameworkDBus_INCLUDE_DIRS}
-                                              ${Qt5Gui_PRIVATE_INCLUDE_DIRS}
-                                              ${PROJECT_BINARY_DIR}
-                                              ${DtkGUI_INCLUDE_DIRS}
-                                              ${QGSettings_INCLUDE_DIRS}
-                                              ${KF5WindowSystem_INCLUDE_DIRS}
-                                              ${Qt5Svg_INCLUDE_DIRS}
-                                              )
+                                            ${XCB_EWMH_INCLUDE_DIRS}
+                                            ${DFrameworkDBus_INCLUDE_DIRS}
+                                            ${Qt5Gui_PRIVATE_INCLUDE_DIRS}
+                                            ${PROJECT_BINARY_DIR}
+                                            ${DtkGUI_INCLUDE_DIRS}
+                                            ${QGSettings_INCLUDE_DIRS}
+                                            ${KF5WindowSystem_INCLUDE_DIRS}
+                                            ${Qt5Svg_INCLUDE_DIRS}
+                                            )
 
 target_link_libraries(${BIN_NAME} PRIVATE
     ${XCB_EWMH_LIBRARIES}
@@ -56,18 +54,6 @@ target_link_libraries(${BIN_NAME} PRIVATE
     xdo
     X11
 )
-
-if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "sw_64")
-    target_compile_definitions(${BIN_NAME} PUBLIC DISABLE_SHOW_ANIMATION)
-endif()
-
-if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "mips64")
-    target_compile_definitions(${BIN_NAME} PUBLIC DISABLE_SHOW_ANIMATION)
-endif()
-
-if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aarch64")
-    target_compile_definitions(${BIN_NAME} PUBLIC DISABLE_SHOW_ANIMATION)
-endif()
 
 # bin
 # install(TARGETS ${BIN_NAME} DESTINATION bin)
