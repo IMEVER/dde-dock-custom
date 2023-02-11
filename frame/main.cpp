@@ -46,15 +46,13 @@ void RegisterDdeSession()
     qunsetenv(envName.toUtf8().data());
 
     if (!cookie.isEmpty()) {
-        QDBusPendingReply<bool> r = DDBusSender()
+        DDBusSender()
                 .interface("com.deepin.SessionManager")
                 .path("/com/deepin/SessionManager")
                 .service("com.deepin.SessionManager")
                 .method("Register")
                 .arg(QString(cookie))
                 .call();
-
-        qDebug() << Q_FUNC_INFO << r.value();
     }
 }
 
@@ -62,8 +60,6 @@ int main(int argc, char *argv[])
 {
     DApplication::setAttribute(Qt::AA_EnableHighDpiScaling, true);
     DGuiApplicationHelper::setAttribute(DGuiApplicationHelper::UseInactiveColorGroup, false);
-    // DGuiApplicationHelper::setUseInactiveColorGroup(false);
-    // DApplication::loadDXcbPlugin();
     DApplication app(argc, argv);
 
     app.setOrganizationName("IMEVER");
@@ -76,17 +72,13 @@ int main(int argc, char *argv[])
     DLogManager::registerConsoleAppender();
     DLogManager::registerFileAppender();
 
-    QCommandLineOption disablePlugOption(QStringList() << "x" << "disable-plugins", "do not load plugins.");
     QCommandLineParser parser;
     parser.setApplicationDescription("DDE Dock");
     parser.addHelpOption();
     parser.addVersionOption();
-    parser.addOption(disablePlugOption);
     parser.process(app);
 
-    if (!app.setSingleInstance(QString("dde-dock_%1").arg(getuid()))) {
-        return -1;
-    }
+    if (!app.setSingleInstance(QString("dde-dock_%1").arg(getuid()))) return -1;
 
     RegisterDdeSession();
 
@@ -99,7 +91,7 @@ int main(int argc, char *argv[])
     QDBusConnection::sessionBus().registerService("com.deepin.dde.Dock");
     QDBusConnection::sessionBus().registerObject("/com/deepin/dde/Dock", "com.deepin.dde.Dock", &mw);
 
-    QTimer::singleShot(100, &mw, &MainWindow::launch);
+    mw.launch();
 
     return app.exec();
 }

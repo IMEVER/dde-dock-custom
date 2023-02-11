@@ -146,10 +146,12 @@ AppItem *DirItem::lastItem()
 
 void DirItem::paintEvent(QPaintEvent *e)
 {
+    if(isScaling()) return ;
+
     DockItem::paintEvent(e);
 
     QPainter painter(this);
-    painter.setPen(QPen(Qt::darkCyan, 1));
+    painter.setPen(QPen(Qt::darkCyan, 2));
     // painter.setOpacity(.7);
 
     QRect border = rect().adjusted(2, 2, -2, -2);
@@ -166,8 +168,6 @@ void DirItem::paintEvent(QPaintEvent *e)
     for(auto appItem : m_appList)
     {
         QPixmap pixmap = appItem->appIcon();
-        if(pixmap.isNull())
-            pixmap = QPixmap(":/icons/resources/application-x-desktop.svg");
 
         QRect appRect;
 
@@ -196,6 +196,7 @@ void DirItem::enterEvent(QEvent *e)
 void DirItem::leaveEvent(QEvent *e)
 {
     DockItem::leaveEvent(e);
+
     m_showPopupTimer->stop();
     m_popupGrid->prepareHide();
 }

@@ -134,7 +134,8 @@ public:
     inline const HideState &hideState() { return m_hideState; }
     inline quint8 opacity() { return m_opacity * 255; }
 
-    QRect dockRect(const QString &screenName, const Position &pos, const HideMode &hideMode);
+    QRect getDockShowGeometry(const QString &screenName, const Position &pos, bool withoutScale = false);
+    QRect getDockHideGeometry(const QRect showRect, const Position &pos);
 
 signals:
     void dockInterReady(DBusDock *dockInter);
@@ -164,10 +165,6 @@ private:
 
     void checkDaemonDockService();
     void checkXEventMonitorService();
-
-    QRect dockRectWithoutScale(const QString &screenName, const Position &pos, const HideMode &hideMode);
-    QRect getDockShowGeometry(const QString &screenName, const Position &pos, bool withoutScale = false);
-    QRect getDockHideGeometry(const QRect showRect, const Position &pos);
 
     QScreen *screenByName(const QString &screenName);
     bool onScreenEdge(const QString &screenName, const QPoint &point);

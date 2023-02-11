@@ -41,7 +41,8 @@ public:
     enum ActivateAnimationType {
         Swing = 0,
         Jump = 1,
-        No = 2
+        Scale = 2,
+        No = 3
     };
 
     static DockItemManager *instance();

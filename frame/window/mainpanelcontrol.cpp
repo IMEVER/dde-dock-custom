@@ -150,6 +150,7 @@ MainPanelControl::~MainPanelControl(){}
 
 void MainPanelControl::init()
 {
+    setAttribute(Qt::WA_OpaquePaintEvent, false);
     setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
 
     QBoxLayout *m_mainPanelLayout(new QBoxLayout(QBoxLayout::LeftToRight, this));
@@ -342,9 +343,7 @@ bool MainPanelControl::eventFilter(QObject *watched, QEvent *event)
 {
     if (m_appDragWidget && watched == static_cast<QGraphicsView *>(m_appDragWidget)->viewport()) {
         QDropEvent *e = static_cast<QDropEvent *>(event);
-        bool isContains = m_appAreaWidget->rect().contains(mapFromGlobal(m_appDragWidget->mapToGlobal(e->pos())));
-        // bool isContains = m_appAreaWidget->rect().contains(mapFromGlobal(m_appDragWidget->mapToGlobal(e->pos())));
-        if (isContains) {
+        if (e && m_appAreaWidget->rect().contains(mapFromGlobal(m_appDragWidget->mapToGlobal(e->pos())))) {
             if (event->type() == QEvent::DragMove) {
                 dropTargetItem(qobject_cast<DockItem *>(e->source()), m_appAreaWidget->mapFromGlobal(m_appDragWidget->mapToGlobal(e->pos())));
                 return true;
@@ -366,10 +365,13 @@ bool MainPanelControl::eventFilter(QObject *watched, QEvent *event)
         }
     } else if(DockItem *item = qobject_cast<DockItem *>(watched)) {
         static QPoint m_mousePressPos;
+        static int m_mousePressTime;
         if(event->type() == QEvent::MouseButtonPress) {
             QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
-            if(mouseEvent->button() == Qt::LeftButton)
+            if(mouseEvent->button() == Qt::LeftButton) {
                 m_mousePressPos = mouseEvent->globalPos();
+                m_mousePressTime = QDateTime::currentMSecsSinceEpoch();
+            }
         } else if(event->type() == QEvent::MouseButtonRelease) {
             QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
             if(mouseEvent->button() == Qt::LeftButton)
@@ -377,7 +379,8 @@ bool MainPanelControl::eventFilter(QObject *watched, QEvent *event)
         } else if(event->type() == QEvent::MouseMove && !m_mousePressPos.isNull()) {
             QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
             const QPoint distance = mouseEvent->globalPos() - m_mousePressPos;
-            if (distance.manhattanLength() >= QApplication::startDragDistance()) {
+            const int disTime = QDateTime::currentMSecsSinceEpoch() - m_mousePressTime;
+            if (distance.manhattanLength() >= QApplication::startDragDistance() && disTime >= QApplication::startDragTime()) {
                 beforeIndex = m_appAreaLayout->indexOf(item);
                 startDrag(item);
                 beforeIndex = -1;
@@ -509,16 +512,14 @@ void MainPanelControl::startDrag(DockItem *item)
 
     item->update();
 
-    AppDrag *appDrag = new AppDrag(item);
+    QPointer<AppDrag> appDrag = new AppDrag(item);
 
     m_appDragWidget = appDrag->appDragWidget();
 
-    connect(m_appDragWidget, &AppDragWidget::destroyed, this, [ this ] {
-        m_appDragWidget = nullptr;
-    });
+    connect(m_appDragWidget, &AppDragWidget::destroyed, this, [ this ] { m_appDragWidget = nullptr; });
 
-    appDrag->appDragWidget()->setOriginPos((m_appAreaWidget->mapToGlobal(item->pos())));
-    appDrag->appDragWidget()->setDockInfo(m_position, QRect(mapToGlobal(m_appAreaWidget->pos()), m_appAreaWidget->size()));
+    m_appDragWidget->setOriginPos((m_appAreaWidget->mapToGlobal(item->pos())));
+    m_appDragWidget->setDockInfo(m_position, QRect(mapToGlobal(m_appAreaWidget->pos()), m_appAreaWidget->size()));
 
     if (DWindowManagerHelper::instance()->hasComposite()) {
         appDrag->setPixmap(pixmap);
@@ -539,11 +540,10 @@ void MainPanelControl::startDrag(DockItem *item)
     appDrag->exec(Qt::MoveAction);
 
     // app关闭特效情况下移除
-    if (item->itemType() == DockItem::App && !DWindowManagerHelper::instance()->hasComposite()) {
-        if (m_appDragWidget->isRemoveAble())
-            qobject_cast<AppItem *>(item)->undock();
-    }
+    if (item->itemType() == DockItem::App && !DWindowManagerHelper::instance()->hasComposite())
+        if (m_appDragWidget && m_appDragWidget->isRemoveAble()) qobject_cast<AppItem *>(item)->undock();
 
+    if(appDrag.isNull() == false) appDrag->deleteLater();
     m_appDragWidget = nullptr;
     item->update();
 }
@@ -687,17 +687,15 @@ void MainPanelControl::dropTargetItem(DockItem *sourceItem, QPoint point)
         DockItem *last = qobject_cast<DockItem *>(m_appAreaLayout->itemAt(m_appAreaLayout->count() - 2)->widget());
 
         if (isHorizontal()) {
-            if (point.x() < 0 && sourceItem != first) {
+            if (point.x() < 0 && sourceItem != first)
                 index = 1;
-            } else if(point.x() > m_appAreaWidget->width() && sourceItem != last) {
+            else if(point.x() > m_appAreaWidget->width() && sourceItem != last)
                 index = m_appAreaLayout->count()-1;
-            }
         } else {
-            if (point.y() < 0 && sourceItem != first) {
+            if (point.y() < 0 && sourceItem != first)
                 index = 1;
-            } else if(point.y() > m_appAreaWidget->height() && sourceItem != last) {
+            else if(point.y() > m_appAreaWidget->height() && sourceItem != last)
                 index = m_appAreaLayout->count()-1;
-            }
         }
 
         if(index > -2)
@@ -909,13 +907,11 @@ void MainPanelControl::resizeDockIcon()
     int size;
 
     if (isHorizontal()) {
-        size = DockItemManager::instance()->isEnableHoverScaleAnimation() ? height() * .8 : height() - 2;
-        size = qMax(size, 0);
+        size = qMax(height() - 2, 0);
         m_splitter->setFixedSize(SPLITER_SIZE, size);
         m_splitter2->setFixedSize(SPLITER_SIZE, size);
     } else {
-        size = DockItemManager::instance()->isEnableHoverScaleAnimation() ? width() * .8 : width() - 2;
-        size = qMax(size, 0);
+        size = qMax(width() - 2, 0);
         m_splitter->setFixedSize(size, SPLITER_SIZE);
         m_splitter2->setFixedSize(size, SPLITER_SIZE);
     }

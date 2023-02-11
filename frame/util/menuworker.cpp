@@ -30,6 +30,7 @@
 #include <QStyleOption>
 #include <QStyleOptionMenuItem>
 #include <DDBusSender>
+#include <QPainter>
 
 class MenuProxyStyle: public QProxyStyle{
 public:
@@ -183,10 +184,7 @@ QMenu *MenuWorker::createMenu(DBusDock *m_dockInter)
         if(action == m_dragAct)
             return m_itemManager->setDragAnimation(action->isChecked());
         if(action == m_hoverScaleAct)
-        {
-            m_itemManager->setHoverScaleAnimation(action->isChecked());
-            return updatePanelGeometry();
-        }
+            return m_itemManager->setHoverScaleAnimation(action->isChecked());
 
         if(action == m_mergeNoneAct)
             return m_itemManager->saveDockMergeMode(MergeNone);

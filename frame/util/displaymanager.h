@@ -33,7 +33,6 @@ using DisplayInter = com::deepin::daemon::Display;
 using namespace Dock;
 
 class QScreen;
-class QTimer;
 class QGSettings;
 class DisplayManager: public QObject, public Singleton<DisplayManager>
 {

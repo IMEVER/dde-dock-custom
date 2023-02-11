@@ -40,7 +40,6 @@ public:
 
 signals:
     void autoHideChanged(const bool autoHide) const;
-    void updatePanelGeometry();
 
 private:
     QMenu *createMenu(DBusDock *m_dockInter);

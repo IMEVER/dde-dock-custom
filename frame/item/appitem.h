@@ -27,11 +27,7 @@
 #include "diritem.h"
 #include "WindowItem.h"
 
-#include <QGraphicsView>
-#include <QGraphicsItem>
-#include <QGraphicsItemAnimation>
 #include <DGuiApplicationHelper>
-
 #include <com_deepin_dde_daemon_dock_entry.h>
 
 using DockEntryInter = com::deepin::dde::daemon::dock::Entry;
@@ -52,7 +48,9 @@ public:
     void setDockInfo(Dock::Position dockPosition, const QRect &dockGeometry);
 
     inline ItemType itemType() const Q_DECL_OVERRIDE { return App; }
-    QPixmap appIcon(){ return m_appIcon; }
+    inline QPixmap appIcon() const {
+        return m_icon.isNull() ? QPixmap(":/icons/resources/application-x-desktop.svg") : m_icon;
+    }
     QString getDesktopFile();
     Place getPlace() override { return m_place; }
     DirItem *getDirItem();
@@ -78,7 +76,6 @@ private:
     void moveEvent(QMoveEvent *e) override;
     void paintEvent(QPaintEvent *e) override;
     void mouseReleaseEvent(QMouseEvent *e) override;
-    void mousePressEvent(QMouseEvent *e) override;
     void wheelEvent(QWheelEvent *e) override;
     void resizeEvent(QResizeEvent *e) override;
     void dragEnterEvent(QDragEnterEvent *e) override;
@@ -105,13 +102,10 @@ private slots:
 
 private:
     DockEntryInter *m_itemEntryInter;
-
-    QGraphicsView *m_swingEffectView;
-    QGraphicsItemAnimation *m_itemAnimation;
+    QVariantAnimation *m_itemAnimation;
 
     unsigned long m_lastclickTimes;
     WindowInfoMap m_windowInfos;
-    QPixmap m_appIcon;
 
     QTimer *m_updateIconGeometryTimer;
 

@@ -13,9 +13,7 @@ public:
     inline ItemType itemType() const override {return Plugins;}
     void refershIcon() override;
 
-private:
-    void paintEvent(QPaintEvent *e) override;
-    void resizeEvent(QResizeEvent *e) override;
+protected:
     void mousePressEvent(QMouseEvent *e) override;
     void dragEnterEvent(QDragEnterEvent *e) override;
     void dropEvent(QDropEvent *e) override;
@@ -26,7 +24,7 @@ private:
     const QString contextMenu() const Q_DECL_OVERRIDE;
 
 private:
-    QPixmap m_icon;
+    QFileSystemWatcher *m_watcher;
 };
 
 #endif // TRASHITEM_H

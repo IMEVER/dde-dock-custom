@@ -18,7 +18,6 @@ class WindowItem : public DockItem
 
     protected:
         void paintEvent(QPaintEvent *e) override;
-        void mousePressEvent(QMouseEvent *e) override;
         void mouseReleaseEvent(QMouseEvent *e) override;
         void wheelEvent(QWheelEvent *e) override;
         void moveEvent(QMoveEvent *e) override;

@@ -43,36 +43,6 @@ void LauncherItem::refershIcon()
     update();
 }
 
-void LauncherItem::paintEvent(QPaintEvent *e)
-{
-    DockItem::paintEvent(e);
-
-    if (!isVisible())
-        return;
-
-    QPainter painter(this);
-
-    const auto ratio = devicePixelRatioF();
-    const int iconX = rect().center().x() - m_icon.rect().center().x() / ratio;
-    const int iconY = rect().center().y() - m_icon.rect().center().y() / ratio;
-
-    painter.drawPixmap(iconX, iconY, m_icon);
-}
-
-void LauncherItem::resizeEvent(QResizeEvent *e)
-{
-    DockItem::resizeEvent(e);
-
-    refershIcon();
-}
-
-void LauncherItem::mousePressEvent(QMouseEvent *e)
-{
-    hidePopup();
-
-    return QWidget::mousePressEvent(e);
-}
-
 void LauncherItem::mouseReleaseEvent(QMouseEvent *e)
 {
     if (e->button() == Qt::LeftButton && !m_launcherInter->IsVisible())

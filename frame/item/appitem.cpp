@@ -24,7 +24,7 @@
 
 #include "util/utils.h"
 #include "xcb/xcb_misc.h"
-#include "components/appswingeffectbuilder.h"
+#include "components/appeffect.h"
 #include "components/previewcontainer.h"
 #include "../window/dockitemmanager.h"
 
@@ -40,10 +40,8 @@
 AppItem::AppItem(const QString path, QWidget *parent)
     : DockItem(parent)
     , m_itemEntryInter(new DockEntryInter("com.deepin.dde.daemon.Dock", path, QDBusConnection::sessionBus(), this))
-    , m_swingEffectView(nullptr)
     , m_itemAnimation(nullptr)
     , m_lastclickTimes(0)
-    , m_appIcon(QPixmap())
     , m_updateIconGeometryTimer(nullptr)
     , m_dirItem(nullptr)
 {
@@ -131,14 +129,9 @@ void AppItem::moveEvent(QMoveEvent *e)
 
 void AppItem::paintEvent(QPaintEvent *e)
 {
-    DockItem::paintEvent(e);
-
-    if (m_swingEffectView != nullptr)
-        return;
+    if (m_itemAnimation != nullptr || isScaling()) return;
 
     QPainter painter(this);
-    if (!painter.isActive())
-        return;
     painter.setRenderHint(QPainter::Antialiasing, true);
     painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
 
@@ -194,12 +187,12 @@ void AppItem::paintEvent(QPaintEvent *e)
             painter.drawPixmap(p, pixmap);
     }
 
-    painter.drawPixmap(appIconPosition(), m_appIcon.isNull() ? QPixmap(":/icons/resources/application-x-desktop.svg") : m_appIcon);
+    painter.drawPixmap(appIconPosition(), m_icon.isNull() ? QPixmap(":/icons/resources/application-x-desktop.svg") : m_icon);
 }
 
 void AppItem::mouseReleaseEvent(QMouseEvent *e)
 {
-    int curTimestamp = QX11Info::getTimestamp();
+    unsigned long curTimestamp = QX11Info::getTimestamp();
     if ((curTimestamp - m_lastclickTimes) < 300)
         return;
 
@@ -225,18 +218,6 @@ void AppItem::mouseReleaseEvent(QMouseEvent *e)
     }
 }
 
-void AppItem::mousePressEvent(QMouseEvent *e)
-{
-    if(m_updateIconGeometryTimer)
-        m_updateIconGeometryTimer->stop();
-
-    if (m_place == DockPlace)
-        hidePopup();
-
-    // context menu will handle in DockItem
-    DockItem::mousePressEvent(e);
-}
-
 void AppItem::wheelEvent(QWheelEvent *e)
 {
     QWidget::wheelEvent(e);
@@ -249,7 +230,6 @@ void AppItem::resizeEvent(QResizeEvent *e)
 {
     DockItem::resizeEvent(e);
     if(m_updateIconGeometryTimer) m_updateIconGeometryTimer->start();
-    refershIcon();
 }
 
 void AppItem::dragEnterEvent(QDragEnterEvent *e)
@@ -348,7 +328,7 @@ QPoint AppItem::appIconPosition() const
 {
     const auto ratio = devicePixelRatioF();
     const QRectF itemRect = rect();
-    const QRectF iconRect = m_appIcon.rect();
+    const QRectF iconRect = m_icon.rect();
     const qreal iconX = itemRect.center().x() - iconRect.center().x() / ratio;
     const qreal iconY = itemRect.center().y() - iconRect.center().y() / ratio;
 
@@ -463,7 +443,7 @@ void AppItem::refershIcon()
     const QString icon = m_itemEntryInter->icon();
     const int iconSize = qMin(width(), height());
 
-    m_appIcon = Utils::getIcon(icon, iconSize * 0.85, devicePixelRatioF());
+    m_icon = Utils::getIcon(icon, iconSize * 0.85, devicePixelRatioF());
 
     update();
 }
@@ -490,29 +470,18 @@ void AppItem::check()
 
 void AppItem::playSwingEffect()
 {
-    DockItemManager::ActivateAnimationType type = DockItemManager::instance()->animationType();
-    // NOTE(sbw): return if animation view already playing
-    if (type == DockItemManager::No || m_swingEffectView != nullptr)
-        return;
+    const DockItemManager::ActivateAnimationType type = DockItemManager::instance()->animationType();
+    if (type == DockItemManager::No || m_itemAnimation) return;
 
-    QPair<QGraphicsView *, QGraphicsItemAnimation *> pair = type == DockItemManager::Swing ? SwingEffect(this, m_appIcon, rect(), devicePixelRatioF())
-        : JumpEffect(this, m_appIcon, rect(), devicePixelRatioF(), m_place == DirPlace ? Bottom : DockPosition);
+    m_itemAnimation = type == DockItemManager::Swing ? AppEffect::SwingEffect(this, m_icon)
+        : AppEffect::JumpEffect(this, m_icon, m_place == DirPlace ? Bottom : DockPosition);
 
-    m_swingEffectView = pair.first;
-    m_itemAnimation = pair.second;
-
-    QTimeLine *tl = m_itemAnimation->timeLine();
-    connect(tl, &QTimeLine::stateChanged, [this, type](QTimeLine::State newState) {
-        if (newState == QTimeLine::NotRunning) {
-            m_swingEffectView->hide();
-            if(type == DockItemManager::Swing)
-                layout()->removeWidget(m_swingEffectView);
-            else
-                update();
-            m_swingEffectView = nullptr;
+    connect(m_itemAnimation, &QVariantAnimation::stateChanged, [this](const QVariantAnimation::State &newState, const QVariantAnimation::State &oldState) {
+        if (newState == QVariantAnimation::Stopped) {
             m_itemAnimation = nullptr;
+            update();
 
-            if (m_place == DockItem::DirPlace)
+            if (m_place == DirPlace)
                 m_dirItem->hideDirpopupWindow();
             else if(m_windowInfos.isEmpty() || hasAttention())
                 QTimer::singleShot(1000, this, [this] {
@@ -521,30 +490,14 @@ void AppItem::playSwingEffect()
         }
     });
 
-    if(type == DockItemManager::Swing)
-        layout()->addWidget(m_swingEffectView);
-    else {
-        m_swingEffectView->show();
-        if (DockPosition == Bottom || m_place == DirPlace)
-            m_swingEffectView->move(qobject_cast<QWidget*>(parent())->mapToGlobal(pos()) - QPoint{0, m_swingEffectView->height()-height()});
-        else if (DockPosition == Right)
-            m_swingEffectView->move(qobject_cast<QWidget*>(parent())->mapToGlobal(pos()) - QPoint{m_swingEffectView->width()-width(), 0});
-        else if(DockPosition == Left)
-            m_swingEffectView->move(qobject_cast<QWidget*>(parent())->mapToGlobal(pos()));
-    }
-    tl->start();
+    m_itemAnimation->start();
+    update();
 }
 
 void AppItem::stopSwingEffect()
 {
-    if (m_swingEffectView == nullptr || m_itemAnimation == nullptr)
-        return;
-
-    // stop swing effect
-    m_swingEffectView->setVisible(false);
-
-    if (m_itemAnimation->timeLine())
-        m_itemAnimation->timeLine()->stop();
+    if (m_itemAnimation)
+        m_itemAnimation->stop();
 }
 
 void AppItem::handleDragDrop(uint timestamp, const QStringList &uris)

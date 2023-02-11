@@ -46,7 +46,7 @@ class MainWindow : public DBlurEffectWidget
 
 public:
     explicit MainWindow(QWidget *parent = nullptr);
-    MainPanelControl *panel();
+    inline MainPanelControl *panel() { return m_mainPanel; }
     friend class MainPanelControl;
 
 public slots:

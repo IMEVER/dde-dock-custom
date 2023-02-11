@@ -36,19 +36,14 @@ public:
     explicit LauncherItem(QWidget *parent = nullptr) ;
 
     inline ItemType itemType() const override {return Launcher;}
-
     void refershIcon() override;
 
-private:
-    void paintEvent(QPaintEvent *e) override;
-    void resizeEvent(QResizeEvent *e) override;
-    void mousePressEvent(QMouseEvent *e) override;
+protected:
     void mouseReleaseEvent(QMouseEvent *e) override;
 
     QString popupTips() override { return "启动器"; }
 
 private:
-    QPixmap m_icon;
     LauncherInter *m_launcherInter;
 };
 

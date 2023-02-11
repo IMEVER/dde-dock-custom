@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.7)
 set(BIN_NAME dde-dock)
 
 configure_file(environments.h.in environments.h @ONLY)
+
 # Sources files
 file(GLOB_RECURSE SRCS "*.h" "*.cpp")
 
@@ -54,6 +55,7 @@ target_link_libraries(${BIN_NAME} PRIVATE
     xdo
     X11
 )
+
 
 # bin
 # install(TARGETS ${BIN_NAME} DESTINATION bin)

@@ -65,11 +65,6 @@ MainWindow::MainWindow(QWidget *parent) : DBlurEffectWidget(parent)
     initConnections();
 }
 
-MainPanelControl *MainWindow::panel()
-{
-    return m_mainPanel;
-}
-
 void MainWindow::launch()
 {
     QTimer::singleShot(400, this, [ this ] {
@@ -111,6 +106,7 @@ void MainWindow::initConnections()
             else
                 m_platformWindowHandle.setBorderColor(QColor(QColor::Invalid));
         }
+        for(auto item : m_mainPanel->findChildren<DockItem*>()) item->refershIcon();
     });
     connect(&m_platformWindowHandle, &DPlatformWindowHandle::windowRadiusChanged, this, [this]{
         int radius = DWindowManagerHelper::instance()->hasComposite() ? DGuiApplicationHelper::instance()->systemTheme()->windowRadius(3) : 3;
@@ -121,7 +117,6 @@ void MainWindow::initConnections()
     connect(DockItemManager::instance(), &DockItemManager::itemRemoved, m_mainPanel, &MainPanelControl::removeItem, Qt::DirectConnection);
     connect(DockItemManager::instance(), &DockItemManager::itemUpdated, m_mainPanel, &MainPanelControl::itemUpdated, Qt::DirectConnection);
     connect(DockItemManager::instance(), &DockItemManager::requestWindowAutoHide, m_multiScreenWorker, &MultiScreenWorker::onAutoHideChanged);
-    connect(DockItemManager::instance(), &DockItemManager::hoverScaleChanged, m_mainPanel, &MainPanelControl::resizeDockIcon);
 
     connect(m_mainPanel, &MainPanelControl::itemMoved, DockItemManager::instance(), &DockItemManager::itemMoved, Qt::DirectConnection);
     connect(m_mainPanel, &MainPanelControl::itemAdded, DockItemManager::instance(), &DockItemManager::itemAdded, Qt::DirectConnection);
@@ -136,7 +131,6 @@ void MainWindow::initConnections()
         connect(m_mainPanel, &MainPanelControl::requestConttextMenu, this, [this, dockInter]{
             MenuWorker *m_menuWorker = new MenuWorker(this);
             connect(m_menuWorker, &MenuWorker::autoHideChanged, m_multiScreenWorker, &MultiScreenWorker::onAutoHideChanged);
-            connect(m_menuWorker, &MenuWorker::updatePanelGeometry, m_multiScreenWorker, &MultiScreenWorker::updateDisplay);
             m_menuWorker->showDockSettingsMenu(dockInter);
             m_menuWorker->deleteLater();
         });
@@ -162,7 +156,7 @@ void MainWindow::resizeDock(int offset, bool dragging)
     if(dragging)
         m_multiScreenWorker->setWindowSize(offset);
 
-    const QRect &rect = m_multiScreenWorker->dockRect(m_multiScreenWorker->deskScreen(), pos, HideMode::KeepShowing);
+    const QRect &rect = m_multiScreenWorker->getDockShowGeometry(m_multiScreenWorker->deskScreen(), pos);
 
     QRect newRect;
     switch (pos) {
@@ -212,7 +206,6 @@ bool MainWindow::getPluginVisible(QString pluginName) {
 }
 
 void MainWindow::setPluginVisible(QString pluginName, bool visible) {
-    if(m_topPanelInterface)
-        m_topPanelInterface->setPluginVisible(pluginName, visible);
+    if(m_topPanelInterface) m_topPanelInterface->setPluginVisible(pluginName, visible);
 }
 

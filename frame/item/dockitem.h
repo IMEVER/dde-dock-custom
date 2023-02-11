@@ -68,6 +68,8 @@ signals:
     void requestWindowAutoHide(const bool autoHide) const;
 
 protected:
+    void paintEvent(QPaintEvent *) override;
+    void resizeEvent(QResizeEvent *event) override;
     void mousePressEvent(QMouseEvent *e) override;
     void enterEvent(QEvent *e) override;
     void leaveEvent(QEvent *e) override;
@@ -86,6 +88,7 @@ protected:
 
 protected slots:
     void showContextMenu();
+    bool isScaling() const { return m_animation; }
 
 private:
     void menuActionClicked(QAction *action);
@@ -94,6 +97,10 @@ protected:
     QTimer *m_popupTipsDelayTimer;
     static Position DockPosition;
     QVariantAnimation *m_scale;
+    QPixmap m_icon;
+
+private:
+    QVariantAnimation *m_animation;
 };
 
 #endif // DOCKITEM_H

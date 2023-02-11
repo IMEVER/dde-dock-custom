@@ -24,6 +24,7 @@
 #include "util/dockpopupwindow.h"
 #include "../window/dockitemmanager.h"
 #include "components/hoverhighlighteffect.h"
+#include "components/appeffect.h"
 
 #include <QMouseEvent>
 #include <QJsonObject>
@@ -36,6 +37,7 @@ DockItem::DockItem(QWidget *parent)
     : QWidget(parent)
     , m_popupTipsDelayTimer(new QTimer(this))
     , m_scale(nullptr)
+    , m_animation(nullptr)
 {
     if (!PopupWindow) {
         PopupWindow = new DockPopupWindow(nullptr);
@@ -51,16 +53,11 @@ DockItem::DockItem(QWidget *parent)
     m_popupTipsDelayTimer->setInterval(500);
     m_popupTipsDelayTimer->setSingleShot(true);
 
-    if(DockItemManager::instance()->isEnableHoverHighlight()) {
-        HoverHighlightEffect *m_hoverEffect = new HoverHighlightEffect(this);
-        setGraphicsEffect(m_hoverEffect);
-    }
-    connect(DockItemManager::instance(), &DockItemManager::hoverHighlighted, this, [this](const bool enabled){
-        HoverHighlightEffect *m_hoverEffect = nullptr;
-        if(enabled)
-            m_hoverEffect = new HoverHighlightEffect(this);
+    if(DockItemManager::instance()->isEnableHoverHighlight())
+        setGraphicsEffect(new HoverHighlightEffect(this));
 
-        setGraphicsEffect(m_hoverEffect);
+    connect(DockItemManager::instance(), &DockItemManager::hoverHighlighted, this, [this](const bool enabled){
+        setGraphicsEffect(enabled ? new HoverHighlightEffect(this) : nullptr);
     });
 
     connect(m_popupTipsDelayTimer, &QTimer::timeout, this, &DockItem::showHoverTips);
@@ -73,7 +70,7 @@ DockItem::DockItem(QWidget *parent)
         const bool enabledInoutAnimation = DockItemManager::instance()->isEnableInOutAnimation();
         if((enabledScaleAnimation || enabledInoutAnimation) && !m_scale) {
             m_scale = new QVariantAnimation(this);
-            m_scale->setDuration(300);
+            m_scale->setDuration(330);
             m_scale->setEasingCurve(QEasingCurve::Linear);
             connect(m_scale, &QVariantAnimation::valueChanged, this, [this](const QVariant &value){
                 int size = value.toInt();
@@ -101,6 +98,27 @@ DockItem::~DockItem()
     hidePopup();
 }
 
+void DockItem::paintEvent(QPaintEvent *e)
+{
+    if(m_icon.isNull() || m_animation) return;
+
+    QPainter painter(this);
+
+    const auto ratio = devicePixelRatioF();
+    const int iconX = rect().center().x() - m_icon.rect().center().x() / ratio;
+    const int iconY = rect().center().y() - m_icon.rect().center().y() / ratio;
+
+    painter.drawPixmap(iconX, iconY, m_icon);
+}
+
+void DockItem::resizeEvent(QResizeEvent *e)
+{
+    if(m_animation) return;
+
+    QWidget::resizeEvent(e);
+    refershIcon();
+}
+
 void DockItem::mousePressEvent(QMouseEvent *e)
 {
     m_popupTipsDelayTimer->stop();
@@ -119,10 +137,20 @@ void DockItem::enterEvent(QEvent *e)
 
     if(getPlace() == DockPlace && DockItemManager::instance()->isEnableHoverScaleAnimation())
     {
-        m_scale->stop();
-        m_scale->setStartValue(width());
-        m_scale->setEndValue(DockItemManager::instance()->itemSize());
-        m_scale->start();
+        if(m_animation)
+            m_animation->setDirection(QVariantAnimation::Forward);
+        else {
+            m_animation = AppEffect::ScaleEffect(this, (m_icon.isNull() || itemType() == Window) ? grab() : m_icon, DockPosition);
+            connect(m_animation, &QVariantAnimation::stateChanged, this, [this](const QVariantAnimation::State newState, const QVariantAnimation::State oldState) {
+                if(newState == QVariantAnimation::Running)
+                    update();
+                else if(newState == QVariantAnimation::Stopped && m_animation->direction() == QVariantAnimation::Backward) {
+                    m_animation = nullptr;
+                    update();
+                }
+            });
+        }
+        m_animation->start();
     }
     return QWidget::enterEvent(e);
 }
@@ -131,17 +159,13 @@ void DockItem::leaveEvent(QEvent *e)
 {
     QWidget::leaveEvent(e);
 
+    hideNonModel();
     m_popupTipsDelayTimer->stop();
 
-    // auto hide if popup is not model window
-    hideNonModel();
-
-    if(getPlace() == DockPlace && DockItemManager::instance()->isEnableHoverScaleAnimation())
+    if(m_animation)
     {
-        m_scale->stop();
-        m_scale->setStartValue(size().width());
-        m_scale->setEndValue(int(DockItemManager::instance()->itemSize()*.8));
-        m_scale->start();
+        m_animation->setDirection(QVariantAnimation::Backward);
+        m_animation->start();
     }
 }
 
@@ -305,9 +329,8 @@ void DockItem::easeIn()
 {
     m_scale->stop();
 
-    int w = DockItemManager::instance()->isEnableHoverScaleAnimation() ? int(DockItemManager::instance()->itemSize() * .8) : DockItemManager::instance()->itemSize()-2;
     m_scale->setStartValue(1);
-    m_scale->setEndValue(w);
+    m_scale->setEndValue(DockItemManager::instance()->itemSize()-2);
     m_scale->start();
 }
 

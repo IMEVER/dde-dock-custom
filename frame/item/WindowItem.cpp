@@ -60,7 +60,7 @@ QRect rectRemovedShadow(WId wId, const QImage &qimage, unsigned char *prop_to_re
     unsigned long bytes_after_return_gtk;
 
     const auto r = XGetWindowProperty(display, wId, gtk_frame_extents, 0, 4, false, XA_CARDINAL,
-                                      &actual_type_return_gtk, &actual_format_return_gtk, &n_items_return_gtk, &bytes_after_return_gtk, &prop_to_return_gtk);
+                                    &actual_type_return_gtk, &actual_format_return_gtk, &n_items_return_gtk, &bytes_after_return_gtk, &prop_to_return_gtk);
     if (!r && prop_to_return_gtk && n_items_return_gtk == 4 && actual_format_return_gtk == 32) {
         qDebug() << "remove shadow frame...";
         const unsigned long *extents = reinterpret_cast<const unsigned long *>(prop_to_return_gtk);
@@ -99,6 +99,8 @@ WindowItem::WindowItem(AppItem *appItem, WId wId, WindowInfo windowInfo, bool cl
     , m_windowInfo(windowInfo)
     , m_closeable(closeable)
 {
+    m_icon = m_appItem->appIcon();
+
     timer = new QTimer(this);
     timer->setSingleShot(false);
     timer->setInterval(10000);
@@ -123,37 +125,23 @@ WindowItem::~WindowItem() {}
 
 void WindowItem::paintEvent(QPaintEvent *e)
 {
-    DockItem::paintEvent(e);
-    QPainter painter(this);
-
-    const QPixmap icon = m_appItem->appIcon();
-    const QRectF itemRect = rect();
-
+    if(isScaling()) return;
+    
     if(m_snapshot.isNull())
-    {
-        painter.setRenderHint(QPainter::Antialiasing, true);
-        painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+        return DockItem::paintEvent(e);
 
-        const auto ratio = devicePixelRatioF();
-        const QRectF iconRect = icon.rect();
-        const qreal iconX = itemRect.center().x() - iconRect.center().x() / ratio;
-        const qreal iconY = itemRect.center().y() - iconRect.center().y() / ratio;
-
-        painter.drawPixmap(QPoint(iconX, iconY), icon);
-        return;
-    }
-
+    QPainter painter(this);
     painter.save();
 
+    const QRectF itemRect = rect();
     const auto ratio = devicePixelRatioF();
 
     const qreal offset_x = width() / 2.0 - m_snapshotSrcRect.width() / ratio / 2 - m_snapshotSrcRect.left() / ratio;
     const qreal offset_y = height() / 2.0 - m_snapshotSrcRect.height() / ratio / 2 - m_snapshotSrcRect.top() / ratio;
 
-    const QImage  &im = m_snapshot;
     int radius = 3;
     QBrush brush;
-    brush.setTextureImage(im);
+    brush.setTextureImage(m_snapshot);
     painter.setBrush(brush);
     painter.setPen(Qt::NoPen);
     painter.scale(1 / ratio, 1 / ratio);
@@ -162,13 +150,7 @@ void WindowItem::paintEvent(QPaintEvent *e)
 
     painter.restore();
     int smallIconSize = itemRect.width() / 3;
-    painter.drawPixmap(QPoint(itemRect.width() - smallIconSize - itemRect.width() * .1, itemRect.width() - smallIconSize - itemRect.width() * .1), icon.scaled(smallIconSize, smallIconSize));
-}
-
-void WindowItem::mousePressEvent(QMouseEvent *e)
-{
-    m_updateIconGeometryTimer->stop();
-    DockItem::mousePressEvent(e);
+    painter.drawPixmap(QPoint(itemRect.width() - smallIconSize - itemRect.width() * .1, itemRect.width() - smallIconSize - itemRect.width() * .1), m_icon.scaled(smallIconSize, smallIconSize));
 }
 
 void WindowItem::mouseReleaseEvent(QMouseEvent *e)
@@ -180,8 +162,6 @@ void WindowItem::mouseReleaseEvent(QMouseEvent *e)
             KWindowSystem::minimizeWindow(m_WId);
     } else if(e->button() == Qt::MiddleButton)
         closeWindow();
-
-    hidePopup();
 }
 
 void WindowItem::wheelEvent(QWheelEvent *e)

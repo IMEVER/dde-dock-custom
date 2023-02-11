@@ -27,8 +27,7 @@
 #include <QDBusConnection>
 #include <QDesktopWidget>
 
-DisplayManager::DisplayManager(QObject *parent)
-    : QObject(parent)
+DisplayManager::DisplayManager(QObject *parent) : QObject(parent)
     , m_gsettings(Utils::SettingsPtr("com.deepin.dde.dock.mainwindow", "/com/deepin/dde/dock/mainwindow/", this))
     , m_onlyInPrimary(Utils::SettingValue("com.deepin.dde.dock.mainwindow", "/com/deepin/dde/dock/mainwindow/", "onlyShowPrimary", false).toBool())
 {

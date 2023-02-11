@@ -63,12 +63,12 @@ private:
     void handleDragDrop(DockItem *sourceItem, QPoint point);
     void moveItem(DockItem *sourceItem, DockItem *targetItem);
     inline bool isHorizontal() const { return m_position == Bottom || m_position == Top; }
+    void resizeDockIcon();
 
 public slots:
     void insertItem(const int index, DockItem *item);
     void removeItem(DockItem *item, bool animation = true);
     void itemUpdated(DockItem *item);
-    void resizeDockIcon();
 
 signals:
     void itemMoved(DockItem *sourceItem, DockItem *targetItem);
