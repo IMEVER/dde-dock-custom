@@ -65,6 +65,8 @@ const QPixmap Utils::loadSvg(const QString &iconName, const QSize size, const qr
 
 const QPixmap Utils::lighterEffect(const QPixmap pixmap, const int delta)
 {
+    if(pixmap.width() == 0) return pixmap;
+    
     QImage image = pixmap.toImage();
 
     const int width = image.width();

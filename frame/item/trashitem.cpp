@@ -22,17 +22,24 @@ TrashItem::TrashItem(QWidget *parent) : DockItem(parent)
 {
     setAcceptDrops(true);
     connect(m_watcher, &QFileSystemWatcher::directoryChanged, this, &TrashItem::refershIcon);
+    refershIcon();
+}
+
+QString TrashItem::popupTips() {
+    return m_count == 0 ? "垃圾桶" : QString("垃圾桶（ %1 项 ）").arg(m_count);
 }
 
 void TrashItem::refershIcon()
 {
-    const int iconSize = qMin(width(), height());
     QDir dir(TRASHFILE);
-    if (dir.exists() == false or dir.isEmpty())
-        m_icon = Utils::getIcon("user-trash", iconSize * 0.9, devicePixelRatioF());
-    else
-        m_icon = Utils::getIcon("user-trash-full", iconSize * 0.9, devicePixelRatioF());
-    update();
+    dir.setFilter(QDir::AllEntries | QDir::NoDotAndDotDot);
+    if (dir.exists() == false or dir.isEmpty()) {
+        m_icon = QIcon::fromTheme("user-trash");
+        m_count = 0;
+    } else {
+        m_icon = QIcon::fromTheme("user-trash-full");
+        m_count = dir.count();
+    }
 }
 
 void TrashItem::mousePressEvent(QMouseEvent *e)
@@ -60,7 +67,6 @@ void TrashItem::dragEnterEvent(QDragEnterEvent *e)
         if (canDelete)
         {
             e->setDropAction(Qt::MoveAction);
-            e->accept();
             hidePopup();
             return e->accept();
         }
@@ -73,8 +79,6 @@ void TrashItem::dropEvent(QDropEvent *e)
 {
     foreach (auto url, e->mimeData()->urls())
         QFile(url.toLocalFile()).moveToTrash();
-
-    refershIcon();
 }
 
 void TrashItem::invokedMenuItem(const QString &itemId, const bool checked)
@@ -99,8 +103,7 @@ void TrashItem::invokedMenuItem(const QString &itemId, const bool checked)
 
 const QString TrashItem::contextMenu() const
 {
-    QDir dir(TRASHFILE);
     return QString("{\"items\": [ {\"itemText\": \"打开回收站\", \"itemId\": \"open\", \"isActive\": true}, \
         {\"itemText\": \"清空回收站\", \"itemId\": \"clear\", \"isActive\": %1} ]}")
-        .arg(!dir.exists() or dir.isEmpty() ? "false" : "true");
+        .arg(m_count == 0 ? "false" : "true");
 }

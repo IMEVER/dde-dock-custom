@@ -4,6 +4,7 @@
   <property access="read" type="(iiii)" name="geometry">
   <annotation name="org.qtproject.QtDBus.QtTypeName" value="QRect" />
   </property>
+    <method name="callShow"/>
     <method name="resizeDock">
       <arg name="offset" type="i" direction="in"/>
       <arg name="dragging" type="b" direction="in"/>
@@ -23,6 +24,13 @@
         <arg name="pluginName" type="s" direction="in"/>
         <arg name="visible" type="b" direction="in"/>
     </method>
+
+    <method name="setItemOnDock">
+        <arg name="settingKey" type="s" direction="in"/>
+        <arg name="itemKey" type="s" direction="in"/>
+        <arg name="visible" type="b" direction="in"/>
+    </method>
+
     <signal name="pluginVisibleChanged">
         <arg type="s"/>
         <arg type="b"/>

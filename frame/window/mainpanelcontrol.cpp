@@ -25,8 +25,8 @@
 #include "../item/components/appdrag.h"
 #include "../item/appitem.h"
 #include "dockitemmanager.h"
-
 #include "../item/diritem.h"
+
 #include <dtkwidget_global.h>
 #include <dtkgui_global.h>
 #include <QDrag>
@@ -125,9 +125,9 @@ class SplitterWidget : public QWidget {
 };
 
 int beforeIndex = -1;
+static AppDrag *appDrag(nullptr);
 
 MainPanelControl::MainPanelControl(QWidget *parent) : QWidget(parent)
-    , m_appAreaWidget(new QWidget(this))
     , m_fixedAreaLayout(new QBoxLayout(QBoxLayout::LeftToRight))
     , m_appAreaLayout(new QBoxLayout(QBoxLayout::LeftToRight))
     , m_windowAreaLayout(new QBoxLayout(QBoxLayout::LeftToRight))
@@ -136,14 +136,11 @@ MainPanelControl::MainPanelControl(QWidget *parent) : QWidget(parent)
     , m_splitter2(new SplitterWidget(this))
     , m_position(Position::Bottom)
     , m_placeholderItem(nullptr)
-    , m_appDragWidget(nullptr)
 {
     init();
     updateMainPanelLayout();
     m_splitter->hide();
-    // m_appAreaWidget->setMouseTracking(true);
-    m_appAreaWidget->setAcceptDrops(true);
-    m_appAreaWidget->installEventFilter(this);
+    setAcceptDrops(true);
 }
 
 MainPanelControl::~MainPanelControl(){}
@@ -160,7 +157,7 @@ void MainPanelControl::init()
 
     m_mainPanelLayout->addStretch(1);
     m_mainPanelLayout->addLayout(m_fixedAreaLayout);
-    m_mainPanelLayout->addWidget(m_appAreaWidget);
+    m_mainPanelLayout->addLayout(m_appAreaLayout);
     m_mainPanelLayout->addWidget(m_splitter, 0, Qt::AlignCenter);
     m_mainPanelLayout->addLayout(m_windowAreaLayout);
     m_mainPanelLayout->addWidget(m_splitter2, 0, Qt::AlignCenter);
@@ -173,13 +170,10 @@ void MainPanelControl::init()
     m_fixedAreaLayout->setSpacing(MODE_PADDING);
     m_fixedAreaLayout->setAlignment(Qt::AlignCenter);
     // 应用程序
-    m_appAreaWidget->setLayout(m_appAreaLayout);
     m_appAreaLayout->setMargin(0);
     m_appAreaLayout->setContentsMargins(0, 0, 0, 0);
     m_appAreaLayout->setSpacing(MODE_PADDING);
     m_appAreaLayout->setAlignment(Qt::AlignCenter);
-    m_appAreaLayout->addStretch(1);
-    m_appAreaLayout->addStretch(1);
 
     m_windowAreaLayout->setMargin(0);
     m_windowAreaLayout->setContentsMargins(0, 0, 0, 0);
@@ -197,7 +191,6 @@ void MainPanelControl::updateMainPanelLayout()
     switch (m_position) {
         case Position::Top:
         case Position::Bottom:
-            m_appAreaWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
             qobject_cast<QBoxLayout*>(layout())->setDirection(QBoxLayout::LeftToRight);
             m_fixedAreaLayout->setDirection(QBoxLayout::LeftToRight);
             m_appAreaLayout->setDirection(QBoxLayout::LeftToRight);
@@ -206,7 +199,6 @@ void MainPanelControl::updateMainPanelLayout()
             break;
         case Position::Right:
         case Position::Left:
-            m_appAreaWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
             qobject_cast<QBoxLayout*>(layout())->setDirection(QBoxLayout::TopToBottom);
             m_fixedAreaLayout->setDirection(QBoxLayout::TopToBottom);
             m_appAreaLayout->setDirection(QBoxLayout::TopToBottom);
@@ -240,12 +232,6 @@ void MainPanelControl::addWindowAreaItem(int index, QWidget *wdg)
     m_splitter->show();
 }
 
-void MainPanelControl::removeWindowAreaItem(QWidget *wdg)
-{
-    m_windowAreaLayout->removeWidget(wdg);
-    if(m_windowAreaLayout->isEmpty()) m_splitter->hide();
-}
-
 void MainPanelControl::addLastAreaItem(int index, QWidget *wdg)
 {
     wdg->setFixedSize(DockItemManager::instance()->itemSize(), DockItemManager::instance()->itemSize());
@@ -269,16 +255,32 @@ void MainPanelControl::setPositonValue(Dock::Position position)
     }
 }
 
-void MainPanelControl::insertItem(int index, DockItem *item)
+void MainPanelControl::insertItem(int index, DockItem *item, bool animation)
 {
+    connect(item, &DockItem::inoutFinished, this, [this, item](bool in){
+        if(in == false)
+        {
+            switch (item->itemType()) {
+                case DockItem::App:
+                case DockItem::Placeholder:
+                case DockItem::DirApp:
+                    removeAppAreaItem(item);
+                    break;
+                case DockItem::Plugins:
+                    m_lastAreaLayout->removeWidget(item);
+                    break;
+                case DockItem::Window:
+                    m_windowAreaLayout->removeWidget(item);
+                    if(m_windowAreaLayout->isEmpty()) m_splitter->hide();
+                    break;
+                default:
+                    break;
+            }
+        }
+    });
+
     if(item->itemType() == DockItem::App || item->itemType() == DockItem::DirApp || item->itemType() == DockItem::Launcher)
         item->installEventFilter(this);
-
-    if(DockItemManager::instance()->isEnableInOutAnimation())
-    {
-        item->setFixedSize(QSize(0, 0));
-        item->easeIn();
-    }
 
     switch (item->itemType()) {
         case DockItem::Launcher:
@@ -287,7 +289,7 @@ void MainPanelControl::insertItem(int index, DockItem *item)
         case DockItem::App:
         case DockItem::Placeholder:
         case DockItem::DirApp:
-            addAppAreaItem(index ==-1 ? m_appAreaLayout->count() -1 : index, item);
+            addAppAreaItem(index ==-1 ? m_appAreaLayout->count() : index, item);
             break;
         case DockItem::Window:
             addWindowAreaItem(index, item);
@@ -298,59 +300,27 @@ void MainPanelControl::insertItem(int index, DockItem *item)
         default:
             break;
     }
+
+    item->easeIn(animation);
 }
 
 void MainPanelControl::removeItem(DockItem *item, bool animation)
 {
-    // if(item->itemType() == DockItem::App || item->itemType() == DockItem::DirApp)
-        // item->removeEventFilter(this);
-
-    if(DockItemManager::instance()->isEnableInOutAnimation() && animation)
-        item->easeOut();
-
-    QTimer::singleShot(animation ? 310 : 0, [ this, item ]{
-        switch (item->itemType()) {
-            case DockItem::App:
-            case DockItem::Placeholder:
-            case DockItem::DirApp:
-                removeAppAreaItem(item);
-                break;
-            case DockItem::Window:
-                removeWindowAreaItem(item);
-                break;
-            default:
-                break;
-        }
-    });
-}
-
-void MainPanelControl::moveItem(DockItem *sourceItem, DockItem *targetItem)
-{
-    if (targetItem->itemType() != DockItem::App && targetItem->itemType() == DockItem::DirApp)
-        return;
-
-    // get target index
-    int idx = m_appAreaLayout->indexOf(targetItem);
-
-    // remove old item
-    removeItem(sourceItem, false);
-
-    // insert new position
-    insertItem(idx, sourceItem);
+    item->easeOut(animation);
 }
 
 bool MainPanelControl::eventFilter(QObject *watched, QEvent *event)
 {
-    if (m_appDragWidget && watched == static_cast<QGraphicsView *>(m_appDragWidget)->viewport()) {
+    if (appDrag && watched == static_cast<QGraphicsView *>(appDrag->appDragWidget())->viewport()) {
         QDropEvent *e = static_cast<QDropEvent *>(event);
-        if (e && m_appAreaWidget->rect().contains(mapFromGlobal(m_appDragWidget->mapToGlobal(e->pos())))) {
+        if (e && rect().contains(mapFromGlobal(appDrag->appDragWidget()->mapToGlobal(e->pos())))) {
+            QPoint pos = mapFromGlobal(appDrag->appDragWidget()->mapToGlobal(e->pos()));
             if (event->type() == QEvent::DragMove) {
-                dropTargetItem(qobject_cast<DockItem *>(e->source()), m_appAreaWidget->mapFromGlobal(m_appDragWidget->mapToGlobal(e->pos())));
+                dropTargetItem(qobject_cast<DockItem *>(e->source()), pos);
                 return true;
             } else if (event->type() == QEvent::Drop) {
-                DockItem *item = qobject_cast<DockItem *>(e->source());
-                handleDragDrop(item, m_appAreaWidget->mapFromGlobal(m_appDragWidget->mapToGlobal(e->pos())));
-                m_appDragWidget->hide();
+                handleDragDrop(qobject_cast<DockItem *>(e->source()), pos);
+                appDrag->appDragWidget()->hide();
                 return true;
             }
         }
@@ -380,81 +350,76 @@ bool MainPanelControl::eventFilter(QObject *watched, QEvent *event)
             QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
             const QPoint distance = mouseEvent->globalPos() - m_mousePressPos;
             const int disTime = QDateTime::currentMSecsSinceEpoch() - m_mousePressTime;
-            if (distance.manhattanLength() >= QApplication::startDragDistance() && disTime >= QApplication::startDragTime()) {
+            if (distance.manhattanLength() >= QApplication::startDragDistance() && disTime >= 100 /*QApplication::startDragTime()*/) {
                 beforeIndex = m_appAreaLayout->indexOf(item);
                 startDrag(item);
                 beforeIndex = -1;
                 return true;
             }
         }
-    } else if(watched == m_appAreaWidget) {
-        switch (event->type())
-        {
-        case QEvent::DragEnter: {
-            QDragEnterEvent *mouseEvent = static_cast<QDragEnterEvent *>(event);
-            // if(DockItem *sourceItem = qobject_cast<DockItem *>(mouseEvent->source())){
-            //     event->accept();
-            //     return true;
-            // }
+    }
 
-            // 拖app到dock上
-            static const char *RequestDockKey = "RequestDock";
-            static const char *RequestDockKeyFallback = "text/plain";
-            static const char *DesktopMimeType = "application/x-desktop";
-            auto DragmineData = mouseEvent->mimeData();
-            m_draggingMimeKey = DragmineData->formats().contains(RequestDockKey) ? RequestDockKey : RequestDockKeyFallback;
+    return QWidget::eventFilter(watched, event);
+}
 
-            // dragging item is NOT a desktop file
-            if (QMimeDatabase().mimeTypeForFile(DragmineData->data(m_draggingMimeKey)).name() != DesktopMimeType) {
+void MainPanelControl::dragEnterEvent(QDragEnterEvent *event) {
+
+    // 拖app到dock上
+    auto DragmineData = event->mimeData();
+    m_draggingMimeKey = DragmineData->formats().contains("RequestDock") ? "RequestDock" : "text/plain";
+
+    // dragging item is NOT a desktop file
+    if (QMimeDatabase().mimeTypeForFile(DragmineData->data(m_draggingMimeKey)).name() != "application/x-desktop")
+        event->ignore();
+    else if (QString(DragmineData->data(m_draggingMimeKey)).endsWith("dde-trash.desktop"))
+        event->ignore();
+    else if (DockItemManager::instance()->appIsOnDock(DragmineData->data(m_draggingMimeKey)))
+        event->ignore();
+    else event->accept(m_appAreaLayout->geometry());
+
+    if(event->isAccepted() == false && DragmineData->hasUrls()) {
+        QList<QUrl> urls = DragmineData->urls();
+        if(urls.size() == 1 && urls.first().isLocalFile()) {
+            QFileInfo info(urls.first().toLocalFile());//TODO: add features
+            if(info.exists() && info.isDir()) {
+                event->accept(m_lastAreaLayout->geometry() | m_splitter2->geometry());
                 m_draggingMimeKey.clear();
-                mouseEvent->ignore();
-                return false;
             }
-
-            //如果当前从桌面拖拽的的app是trash，则不能放入app任务栏中
-            static const QString str = "file://" + QStandardPaths::locate(QStandardPaths::DesktopLocation, "dde-trash.desktop");
-            static const QString str_t = QStandardPaths::locate(QStandardPaths::ApplicationsLocation, "dde-trash.desktop");
-
-            if ((str == DragmineData->data(m_draggingMimeKey)) || (str_t == DragmineData->data(m_draggingMimeKey))) {
-                mouseEvent->ignore();
-                return false;
-            }
-
-            if (DockItemManager::instance()->appIsOnDock(DragmineData->data(m_draggingMimeKey))) {
-                mouseEvent->ignore();
-                return false;
-            }
-            event->accept();
-            return true;
-            break;
         }
-        case QEvent::DragLeave:
-            if (m_placeholderItem) {
-                removeAppAreaItem(m_placeholderItem);
-                m_placeholderItem->deleteLater();
+    }
+}
+
+void MainPanelControl::dragMoveEvent(QDragMoveEvent *event) {
+    if (m_placeholderItem.isNull())
+        m_placeholderItem = new PlaceholderItem;
+
+    if(m_draggingMimeKey.isEmpty()) {
+        if(m_lastAreaLayout->geometry().united(m_splitter2->geometry()).contains(event->pos())) {
+            if(m_lastAreaLayout->indexOf(m_placeholderItem) == -1) {
+                const int width = DockItemManager::instance()->itemSize();
+                m_placeholderItem->setFixedSize(width-2, width-2);
+                m_lastAreaLayout->insertWidget(0, m_placeholderItem);
             }
-            break;
-        case QEvent::DragMove: {
-            QDragMoveEvent *mouseEvent = static_cast<QDragMoveEvent *>(event);
-            // if(DockItem *sourceItem = qobject_cast<DockItem *>(mouseEvent->source())) {
-            //     // other dockItem调整顺序
-            //     dropTargetItem(sourceItem, mouseEvent->pos());
-            // } else {
-                // 应用程序拖到dock上
-                if (m_placeholderItem.isNull()) m_placeholderItem = new PlaceholderItem;
-                dropTargetItem(m_placeholderItem, mouseEvent->pos());
-            // }
-            event->accept();
-            return true;
-            break;
-        }
-        case QEvent::Drop: {
-            QDropEvent *mouseEvent = static_cast<QDropEvent *>(event);
-            if (m_placeholderItem) {
-                QPoint point = mouseEvent->pos();
+        } else
+            m_lastAreaLayout->removeWidget(m_placeholderItem);
+    } else
+        dropTargetItem(m_placeholderItem, event->pos());
+}
+
+void MainPanelControl::dropEvent(QDropEvent *event) {
+    if (m_placeholderItem) {
+        QPoint point = event->pos();
+        if(m_draggingMimeKey.isEmpty()) {
+            if(m_lastAreaLayout->geometry().contains(event->pos()))
+                emit folderAdded(event->mimeData()->urls().first().toLocalFile());
+
+            m_lastAreaLayout->removeWidget(m_placeholderItem);
+            m_placeholderItem->deleteLater();
+        } else {
+            if(m_appAreaLayout->geometry().contains(point)) {
                 DirItem *targetItem = nullptr;
 
-                for (int i = 1 ; i < m_appAreaLayout->count()-2; ++i)
+                for (int i = 0; i < m_appAreaLayout->count(); ++i)
                 {
                     DockItem *dockItem = qobject_cast<DockItem *>(m_appAreaLayout->itemAt(i)->widget());
                     if (!dockItem || dockItem == m_placeholderItem || dockItem->itemType() != DockItem::DirApp)
@@ -484,106 +449,109 @@ bool MainPanelControl::eventFilter(QObject *watched, QEvent *event)
                 if(targetItem)
                 {
                     index = m_appAreaLayout->indexOf(targetItem) + targetItem->currentCount();
-                    targetItem->addId(mouseEvent->mimeData()->data(m_draggingMimeKey));
+                    targetItem->addId(event->mimeData()->data(m_draggingMimeKey));
                 }
 
-                emit itemAdded(mouseEvent->mimeData()->data(m_draggingMimeKey), index-1);
-                removeAppAreaItem(m_placeholderItem);
-                m_placeholderItem->deleteLater();
+                emit itemAdded(event->mimeData()->data(m_draggingMimeKey), index-1);
             }
-            // else if(DockItem *source = qobject_cast<DockItem *>(mouseEvent->source())) {
-            //     handleDragDrop(source, mouseEvent->pos());
-            // }
-            event->accept();
-            return true;
-            break;
-        }
-        default:
-            break;
+
+            removeAppAreaItem(m_placeholderItem);
+            m_placeholderItem->deleteLater();
         }
     }
+}
 
-    return QWidget::eventFilter(watched, event);
+void MainPanelControl::dragLeaveEvent(QDragLeaveEvent *event) {
+    if (m_placeholderItem) {
+        removeAppAreaItem(m_placeholderItem);
+        m_placeholderItem->deleteLater();
+    }
 }
 
 void MainPanelControl::startDrag(DockItem *item)
 {
-    const QPixmap pixmap = item->grab();
-
     item->update();
+    const QPixmap pixmap = item->grab();
+    appDrag = new AppDrag(item);
+    connect(appDrag->appDragWidget(), &AppDragWidget::finished, this, [this, item](bool undock){
+        if(undock && qobject_cast<AppItem*>(item))
+            qobject_cast<AppItem*>(item)->undock();
+        else
+            handleDragDrop(item, item->geometry().center());
+    });
+    appDrag->appDragWidget()->setOriginPos((mapToGlobal(item->pos())));
+    appDrag->appDragWidget()->setDockInfo(m_position, QRect(mapToGlobal(QPoint(0, 0)), size()));
 
-    QPointer<AppDrag> appDrag = new AppDrag(item);
-
-    m_appDragWidget = appDrag->appDragWidget();
-
-    connect(m_appDragWidget, &AppDragWidget::destroyed, this, [ this ] { m_appDragWidget = nullptr; });
-
-    m_appDragWidget->setOriginPos((m_appAreaWidget->mapToGlobal(item->pos())));
-    m_appDragWidget->setDockInfo(m_position, QRect(mapToGlobal(m_appAreaWidget->pos()), m_appAreaWidget->size()));
-
-    if (DWindowManagerHelper::instance()->hasComposite()) {
-        appDrag->setPixmap(pixmap);
-        // m_appDragWidget->show();
-
-        static_cast<QGraphicsView *>(m_appDragWidget)->viewport()->installEventFilter(this);
-        appDrag->setHotSpot(pixmap.rect().center() / pixmap.devicePixelRatioF());
-    } else if(qobject_cast<AppItem *>(item)) {
-        const QPixmap &dragPix = qobject_cast<AppItem *>(item)->appIcon();
-        appDrag->QDrag::setPixmap(dragPix);
-        appDrag->setHotSpot(dragPix.rect().center() / dragPix.devicePixelRatioF());
-    } else {
-        appDrag->QDrag::setPixmap(pixmap);
-        appDrag->setHotSpot(pixmap.rect().center() / pixmap.devicePixelRatioF());
-    }
+    appDrag->setPixmap(pixmap);
+    static_cast<QGraphicsView *>(appDrag->appDragWidget())->viewport()->installEventFilter(this);
+    appDrag->setHotSpot(pixmap.rect().center() / pixmap.devicePixelRatioF());
 
     appDrag->setMimeData(new QMimeData);
     appDrag->exec(Qt::MoveAction);
+    appDrag = nullptr;
 
-    // app关闭特效情况下移除
-    if (item->itemType() == DockItem::App && !DWindowManagerHelper::instance()->hasComposite())
-        if (m_appDragWidget && m_appDragWidget->isRemoveAble()) qobject_cast<AppItem *>(item)->undock();
-
-    if(appDrag.isNull() == false) appDrag->deleteLater();
-    m_appDragWidget = nullptr;
     item->update();
 }
 
 void MainPanelControl::dropTargetItem(DockItem *sourceItem, QPoint point)
 {
     static QPoint lastPos;
-    const bool animation = DockItemManager::instance()->isEnableDragAnimation();
     const int width = DockItemManager::instance()->itemSize();
 
-    for (int i = 1 ; i < m_appAreaLayout->count()-2; ++i)
+    if(m_appAreaLayout->geometry().contains(point) == false) {
+        if(m_appAreaLayout->indexOf(sourceItem) == -1) {
+            sourceItem->setFixedSize(width * .1, width * .1);
+            if(isHorizontal())
+                addAppAreaItem(point.x() < m_appAreaLayout->geometry().x() ? 0 : m_appAreaLayout->count(), sourceItem);
+            else
+                addAppAreaItem(point.y() < m_appAreaLayout->geometry().y() ? 0 : m_appAreaLayout->count(), sourceItem);
+        }
+        return;
+    }
+    if(m_appAreaLayout->isEmpty())
+        return addAppAreaItem(0, sourceItem);
+    if(m_appAreaLayout->count() == 1 && m_appAreaLayout->itemAt(0)->widget() == sourceItem)
+        return;
+
+    const bool animation = DockItemManager::instance()->isEnableDragAnimation();
+
+    for (int i = 0; i < m_appAreaLayout->count(); ++i)
     {
         DockItem *dockItem = qobject_cast<DockItem *>(m_appAreaLayout->itemAt(i)->widget());
-
         qreal ratio = 1;
-        QRect rect;
-        rect.setTopLeft(dockItem->pos());
-        rect.setSize(dockItem->size());
+        QRect rect = dockItem->geometry();
 
         if(isHorizontal())
         {
-            if(rect.left() <= point.x() && rect.right() >= point.x() ) {
+            if(rect.left()-MODE_PADDING/2 <= point.x() && rect.right()+MODE_PADDING/2 >= point.x() ) {
                 if(sourceItem == dockItem)
                 {
-                    if(animation)
-                        ratio = 1 - (qFabs(rect.center().x() - point.x())) / ( width / 1.0);
+                    if(animation) ratio = 1 - (qFabs(rect.center().x() - point.x())) / ( width * 1.0);
                 }
                 else if(qFabs(rect.center().x() - point.x()) < rect.width()/4)
                 {
-                    if(animation && sourceItem->itemType() != DockItem::DirApp && m_appAreaLayout->indexOf(sourceItem) > -1)
+                    // if(animation && sourceItem->itemType() != DockItem::DirApp && m_appAreaLayout->indexOf(sourceItem) > -1)
+                    // {
+                    //     removeAppAreaItem(sourceItem);
+                    //     sourceItem->setVisible(false);
+                    // }
+                    if(m_appAreaLayout->indexOf(sourceItem) == -1)
                     {
-                        removeAppAreaItem(sourceItem);
-                        sourceItem->setVisible(false);
+                        addAppAreaItem(m_appAreaLayout->indexOf(dockItem) + ( point.x() > rect.center().x() ? 1 : 0 ) , sourceItem);
+                        sourceItem->setVisible(true);
                     }
+                    if(animation) ratio = .1;
                 }
                 else if (qFabs(rect.center().x() - point.x()) > rect.width()/4)
                 {
                     if(qFabs(rect.center().x() - point.x()) > qFabs(rect.center().x() - lastPos.x()))
                     {
-                        if(!animation || sourceItem->itemType() == DockItem::DirApp)
+                        if(m_appAreaLayout->indexOf(sourceItem) == -1)
+                        {
+                            addAppAreaItem(m_appAreaLayout->indexOf(dockItem) + ( point.x() > rect.center().x() ? 1 : 0 ) , sourceItem);
+                            sourceItem->setVisible(true);
+                        }
+                        else //if(!animation || sourceItem->itemType() == DockItem::DirApp)
                         {
                             if(point.x() > rect.center().x())
                             {
@@ -602,18 +570,11 @@ void MainPanelControl::dropTargetItem(DockItem *sourceItem, QPoint point)
                                 }
                             }
                         }
-                        else if(m_appAreaLayout->indexOf(sourceItem) == -1)
-                        {
-                            addAppAreaItem(m_appAreaLayout->indexOf(dockItem) + ( point.x() > rect.center().x() ? 1 : 0 ) , sourceItem);
-                            sourceItem->setVisible(true);
-                        }
                     }
-                    if(animation)
-                        ratio = qFabs(rect.center().x() - point.x()) / ( width / 1.0 );
+                    if(animation) ratio = qMax(.1, qFabs(rect.center().x() - point.x()) / ( width * 1.0 ));
                 }
 
-                if(animation)
-                    sourceItem->setFixedSize(width * ratio, width * ratio);
+                if(animation) sourceItem->setFixedSize(width * ratio, width * ratio);
 
                 lastPos = point;
                 return;
@@ -621,25 +582,35 @@ void MainPanelControl::dropTargetItem(DockItem *sourceItem, QPoint point)
         }
         else
         {
-            if(rect.top() <= point.y() && rect.bottom() >= point.y() ) {
+            if(rect.top()-MODE_PADDING/2 <= point.y() && rect.bottom()+MODE_PADDING/2 >= point.y() ) {
                 if(sourceItem == dockItem)
                 {
-                    if(animation)
-                        ratio = 1 - qFabs(rect.center().y() - point.y()) / ( width / 1.0);
+                    if(animation) ratio = 1 - qFabs(rect.center().y() - point.y()) / ( width / 1.0);
                 }
                 else if(qFabs(rect.center().y() - point.y()) < rect.width()/5)
                 {
-                    if(animation && sourceItem->itemType() != DockItem::DirApp && m_appAreaLayout->indexOf(sourceItem) > -1)
+                    // if(animation && sourceItem->itemType() != DockItem::DirApp && m_appAreaLayout->indexOf(sourceItem) > -1)
+                    // {
+                    //     removeAppAreaItem(sourceItem);
+                    //     sourceItem->setVisible(false);
+                    // }
+                    if(m_appAreaLayout->indexOf(sourceItem) == -1)
                     {
-                        removeAppAreaItem(sourceItem);
-                        sourceItem->setVisible(false);
+                        addAppAreaItem(m_appAreaLayout->indexOf(dockItem) + ( point.y() > rect.center().y() ? 1 : 0 ), sourceItem);
+                        sourceItem->setVisible(true);
                     }
+                    if(animation) ratio = .1;
                 }
                 else if (qFabs(rect.center().y() - point.y()) > rect.width()/5)
                 {
                     if(qFabs(rect.center().y() - point.y()) > qFabs(rect.center().y() - lastPos.y()))
                     {
-                        if(!animation || sourceItem->itemType() == DockItem::DirApp)
+                        if(m_appAreaLayout->indexOf(sourceItem) == -1)
+                        {
+                            addAppAreaItem(m_appAreaLayout->indexOf(dockItem) + ( point.y() > rect.center().y() ? 1 : 0 ), sourceItem);
+                            sourceItem->setVisible(true);
+                        }
+                        else //if(!animation || sourceItem->itemType() == DockItem::DirApp)
                         {
                             if(point.y() > rect.center().y())
                             {
@@ -658,71 +629,35 @@ void MainPanelControl::dropTargetItem(DockItem *sourceItem, QPoint point)
                                 }
                             }
                         }
-                        else if(m_appAreaLayout->indexOf(sourceItem) == -1)
-                        {
-                            addAppAreaItem(m_appAreaLayout->indexOf(dockItem) + ( point.y() > rect.center().y() ? 1 : 0 ), sourceItem);
-                            sourceItem->setVisible(true);
-                        }
                     }
-                    if(animation)
-                        ratio = qFabs(rect.center().y() - point.y()) / ( width / 1.0 );
+                    if(animation) ratio = qMax(.1, qFabs(rect.center().y() - point.y()) / ( width / 1.0 ));
                 }
 
-                if(animation)
-                    sourceItem->setFixedSize(width * ratio, width * ratio);
+                if(animation) sourceItem->setFixedSize(width * ratio, width * ratio);
 
                 lastPos = point;
                 return;
             }
         }
     }
-
     lastPos = point;
-
-    if (m_appAreaLayout->count() > 2) {
-        // appitem调整顺序是，判断是否拖放在两边空白区域
-        int index = -2;
-
-        DockItem *first = qobject_cast<DockItem *>(m_appAreaLayout->itemAt(1)->widget());
-        DockItem *last = qobject_cast<DockItem *>(m_appAreaLayout->itemAt(m_appAreaLayout->count() - 2)->widget());
-
-        if (isHorizontal()) {
-            if (point.x() < 0 && sourceItem != first)
-                index = 1;
-            else if(point.x() > m_appAreaWidget->width() && sourceItem != last)
-                index = m_appAreaLayout->count()-1;
-        } else {
-            if (point.y() < 0 && sourceItem != first)
-                index = 1;
-            else if(point.y() > m_appAreaWidget->height() && sourceItem != last)
-                index = m_appAreaLayout->count()-1;
-        }
-
-        if(index > -2)
-            addAppAreaItem(index, sourceItem);
-    }
 }
 
 void MainPanelControl::handleDragDrop(DockItem *sourceItem, QPoint point)
 {
     bool needUpdateDirApp = false;
     bool needUpdateWindowSize = false;
-
     DockItem *targetItem = nullptr;
 
-    if(sourceItem->itemType() == DockItem::App)
+    if(sourceItem->itemType() == DockItem::App && m_appAreaLayout->geometry().contains(point))
     {
-        for (int i = 1 ; i < m_appAreaLayout->count()-2; ++i)
+        for (int i = 0; i < m_appAreaLayout->count(); ++i)
         {
             DockItem *dockItem = qobject_cast<DockItem *>(m_appAreaLayout->itemAt(i)->widget());
-            if (!dockItem || dockItem == sourceItem)
-                continue;
-
             QRect rect(dockItem->pos(), dockItem->size());
-
             if (isHorizontal())
             {
-                if(qFabs(rect.center().x() - point.x()) < rect.width() / 2 + MODE_PADDING) {
+                if(qFabs(rect.center().x() - point.x()) < rect.width() / 2 + MODE_PADDING/2) {
                     if(qFabs(rect.center().x() - point.x()) < rect.width() / 4)
                         targetItem = dockItem;
                     break;
@@ -730,7 +665,7 @@ void MainPanelControl::handleDragDrop(DockItem *sourceItem, QPoint point)
             }
             else
             {
-                if(qFabs(rect.center().y() - point.y()) < rect.width() / 2 + MODE_PADDING)
+                if(qFabs(rect.center().y() - point.y()) < rect.width() / 2 + MODE_PADDING/2)
                 {
                     if(qFabs(rect.center().y() - point.y()) < rect.width() / 4)
                         targetItem = dockItem;
@@ -738,22 +673,22 @@ void MainPanelControl::handleDragDrop(DockItem *sourceItem, QPoint point)
                 }
             }
         }
+        if(targetItem == sourceItem) targetItem = nullptr;
     }
 
     if(targetItem)
     {
-        DockItem *replaceItem;
+        AppItem *replaceItem;
         AppItem *source = qobject_cast<AppItem *>(sourceItem);
-        QList<QPointer<DockItem>> appList = DockItemManager::instance()->itemList();
+        QList<QPointer<AppItem>> appList = DockItemManager::instance()->itemList();
 
-        const int sourceIndex = appList.indexOf(sourceItem);
+        const int sourceIndex = appList.indexOf(source);
         int replaceIndex;
 
         DirItem *sourceDir = source->getDirItem();
         if(sourceDir)
         {
-            if(sourceDir == targetItem)
-                return;
+            if(sourceDir == targetItem) return;
 
             sourceDir->removeItem(source);
         } else
@@ -768,25 +703,22 @@ void MainPanelControl::handleDragDrop(DockItem *sourceItem, QPoint point)
         }
         else
         {
-            replaceItem = targetItem;
+            replaceItem = qobject_cast<AppItem*>(targetItem);
 
             int currentIndex = m_appAreaLayout->indexOf(targetItem);
             if(!sourceDir)
             {
                 replaceIndex = appList.indexOf(replaceItem);
-                if(replaceIndex > sourceIndex)
-                    currentIndex --;
+                if(replaceIndex > sourceIndex) currentIndex --;
             }
 
             removeAppAreaItem(targetItem);
 
-            DirItem *createDirItem = new DirItem();
+            DirItem *createDirItem = DockItemManager::instance()->createDir();
             createDirItem->addItem(qobject_cast<AppItem *>(targetItem));
             createDirItem->addItem(source);
 
             addAppAreaItem(currentIndex, createDirItem);
-
-            DockItemManager::instance()->addDirApp(createDirItem);
         }
 
         needUpdateDirApp = true;
@@ -801,117 +733,97 @@ void MainPanelControl::handleDragDrop(DockItem *sourceItem, QPoint point)
                 replaceItem = appList.at(replaceIndex + 1).data();
         }
 
-        if(replaceItem)
-            emit itemMoved(source, replaceItem);
+        if(replaceItem) emit itemMoved(source, replaceItem);
     }
     else
     {
-        int afterIndex = m_appAreaLayout->indexOf(sourceItem);
+        const int afterIndex = m_appAreaLayout->indexOf(sourceItem);
         sourceItem->setFixedSize(DockItemManager::instance()->itemSize(), DockItemManager::instance()->itemSize());
 
-        if(afterIndex == -1)
+        DockItem *target = nullptr;
+        if(beforeIndex == -1)
         {
-            if(beforeIndex > -1)
-            {
-                addAppAreaItem(beforeIndex, sourceItem);
-                sourceItem->setVisible(true);
-            }
-            else if(AppItem *source = qobject_cast<AppItem *>(sourceItem))
-            {
-                DirItem *sourceDir = source->getDirItem();
-                sourceDir->rerender(source);
-            }
-        }
-        else if(beforeIndex == -1 || beforeIndex != afterIndex)
-        {
-            DockItem *target = nullptr;
-            if(beforeIndex == -1)
-            {
-                AppItem *source = qobject_cast<AppItem *>(sourceItem);
-                DirItem *sourceDir = source->getDirItem();
-                const int dirIndex = m_appAreaLayout->indexOf(sourceDir);
+            AppItem *source = qobject_cast<AppItem *>(sourceItem);
+            DirItem *sourceDir = source->getDirItem();
+            const int dirIndex = m_appAreaLayout->indexOf(sourceDir);
 
-                sourceDir->removeItem(source);
-                needUpdateWindowSize = true;
+            sourceDir->removeItem(source);
+            needUpdateWindowSize = true;
 
-                if(dirIndex > afterIndex)
-                {
-                    int nextIndex = afterIndex + 1;
-                    while(!target && dirIndex >= nextIndex)
-                    {
-                        target = qobject_cast<DockItem *>(m_appAreaLayout->itemAt(nextIndex++)->widget());
-                        if(target->itemType() == DockItem::DirApp)
-                            target = qobject_cast<DirItem *>(target)->firstItem();
-                    }
-                }
-                else
-                {
-                    int prevIndex = afterIndex - 1;
-                    while(!target && prevIndex >=1)
-                    {
-                        target = qobject_cast<DockItem *>(m_appAreaLayout->itemAt(prevIndex--)->widget());
-                        if(target->itemType() == DockItem::DirApp)
-                            target = qobject_cast<DirItem *>(target)->lastItem();
-                    }
-                }
-            }
-            else if(beforeIndex != afterIndex)
+            if(dirIndex > afterIndex)
             {
-                target = qobject_cast<DockItem *>(afterIndex > beforeIndex ? m_appAreaLayout->itemAt(afterIndex - 1)->widget() : m_appAreaLayout->itemAt(afterIndex + 1)->widget());
-                if (target->itemType() == DockItem::DirApp)
+                int nextIndex = afterIndex + 1;
+                while(!target && dirIndex >= nextIndex)
                 {
-                    if(afterIndex < beforeIndex)
+                    target = qobject_cast<DockItem *>(m_appAreaLayout->itemAt(nextIndex++)->widget());
+                    if(target->itemType() == DockItem::DirApp)
                         target = qobject_cast<DirItem *>(target)->firstItem();
-                    else
+                }
+            }
+            else
+            {
+                int prevIndex = afterIndex - 1;
+                while(!target && prevIndex >=0)
+                {
+                    target = qobject_cast<DockItem *>(m_appAreaLayout->itemAt(prevIndex--)->widget());
+                    if(target->itemType() == DockItem::DirApp)
                         target = qobject_cast<DirItem *>(target)->lastItem();
                 }
             }
-
-            if(target && target != sourceItem)
+        }
+        else if(beforeIndex != afterIndex)
+        {
+            target = qobject_cast<DockItem *>(afterIndex > beforeIndex ? m_appAreaLayout->itemAt(afterIndex - 1)->widget() : m_appAreaLayout->itemAt(afterIndex + 1)->widget());
+            if (target->itemType() == DockItem::DirApp)
             {
-                if(sourceItem->itemType() == DockItem::App)
-                    emit itemMoved(sourceItem, target);
+                if(afterIndex < beforeIndex)
+                    target = qobject_cast<DirItem *>(target)->firstItem();
                 else
-                    for(auto oneSource : qobject_cast<DirItem *>(sourceItem)->getAppList())
-                        emit itemMoved(oneSource, target);
+                    target = qobject_cast<DirItem *>(target)->lastItem();
             }
         }
-    }
 
-    QList<QPointer<DirItem>> dirs = DockItemManager::instance()->dirList();
-    for(auto item = dirs.begin(); item != dirs.end(); item++)
-    {
-        if((*item)->isEmpty())
+        if(target && target != sourceItem)
         {
-            removeAppAreaItem(*item);
-            (*item)->setVisible(false);
-
-            needUpdateDirApp = true;
-            needUpdateWindowSize = true;
+            if(sourceItem->itemType() == DockItem::App)
+                emit itemMoved(qobject_cast<AppItem*>(sourceItem), qobject_cast<AppItem*>(target));
+            else
+                for(auto oneSource : qobject_cast<DirItem *>(sourceItem)->getAppList())
+                    emit itemMoved(oneSource, qobject_cast<AppItem*>(target));
         }
     }
 
-    if(needUpdateDirApp)
-        emit dirAppChanged();
-    if(needUpdateWindowSize)
-        emit itemCountChanged();
-}
+    if(needUpdateDirApp == false)
+        for(int i=0,len=m_appAreaLayout->count(); i<len; i++)
+        {
+            auto item = qobject_cast<DirItem*>(m_appAreaLayout->itemAt(i)->widget());
+            if(item && item->isEmpty())
+            {
+                needUpdateDirApp = true;
+                needUpdateWindowSize = true;
+                break;
+            }
+        }
 
-void MainPanelControl::itemUpdated(DockItem *item)
-{
-    item->parentWidget()->adjustSize();
+    if(needUpdateDirApp) emit dirAppChanged();
+    if(needUpdateWindowSize) emit itemCountChanged();
 }
 
 void MainPanelControl::resizeDockIcon()
 {
+    if(m_fixedAreaLayout->count() == 0) return;
+
+    const int oldSize = m_fixedAreaLayout->itemAt(0)->widget()->width();
     int size;
 
     if (isHorizontal()) {
         size = qMax(height() - 2, 0);
+        if(size == oldSize) return;
         m_splitter->setFixedSize(SPLITER_SIZE, size);
         m_splitter2->setFixedSize(SPLITER_SIZE, size);
     } else {
         size = qMax(width() - 2, 0);
+        if(size == oldSize) return;
         m_splitter->setFixedSize(size, SPLITER_SIZE);
         m_splitter2->setFixedSize(size, SPLITER_SIZE);
     }
@@ -920,7 +832,7 @@ void MainPanelControl::resizeDockIcon()
     if(m_fixedAreaLayout->count() > 0)
         m_fixedAreaLayout->itemAt(0)->widget()->setFixedSize(s);
 
-    for (int i = 1; i < m_appAreaLayout->count()-2; ++ i)
+    for (int i = 0; i < m_appAreaLayout->count(); ++ i)
         m_appAreaLayout->itemAt(i)->widget()->setFixedSize(s);
 
     for(int i(0); i < m_windowAreaLayout->count(); ++i)

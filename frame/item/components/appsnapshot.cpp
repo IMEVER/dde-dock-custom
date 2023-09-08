@@ -56,7 +56,7 @@ AppSnapshot::AppSnapshot(const WId wid, QWidget *parent)
     , m_wid(wid)
     , m_title(new TipsWidget)
     , m_waitLeaveTimer(new QTimer(this))
-    , m_closeBtn2D(new DIconButton(DStyle::SP_DockWidgetCloseButton, this))
+    , m_closeBtn2D(new DIconButton(this))
     , m_wmHelper(DWindowManagerHelper::instance())
 {
     m_closeBtn2D->setFixedSize(24, 24);
@@ -64,7 +64,11 @@ AppSnapshot::AppSnapshot(const WId wid, QWidget *parent)
     // m_closeBtn2D->setNormalPic(":/icons/resources/close_round_normal.svg");
     // m_closeBtn2D->setHoverPic(":/icons/resources/close_round_hover.svg");
     // m_closeBtn2D->setPressPic(":/icons/resources/close_round_press.svg");
+    m_closeBtn2D->setIcon(QIcon(":/icons/resources/close_round_normal.svg"));
     m_closeBtn2D->setVisible(false);
+    m_closeBtn2D->setFlat(true);
+    m_closeBtn2D->installEventFilter(this);
+
     m_title->setObjectName("AppSnapshotTitle");
 
     QHBoxLayout *centralLayout = new QHBoxLayout;
@@ -272,6 +276,21 @@ void AppSnapshot::mousePressEvent(QMouseEvent *e)
     QWidget::mousePressEvent(e);
 
     emit clicked(m_wid);
+}
+
+bool AppSnapshot::eventFilter(QObject *watched, QEvent *e)
+{
+    if (watched == m_closeBtn2D) {
+        if (e->type() == QEvent::HoverEnter || e->type() == QEvent::HoverMove) {
+            m_closeBtn2D->setIcon(QIcon(":/icons/resources/close_round_hover.svg"));
+        } else if (e->type() == QEvent::HoverLeave) {
+            m_closeBtn2D->setIcon(QIcon(":/icons/resources/close_round_normal.svg"));
+        } else if (e->type() == QEvent::MouseButtonPress) {
+            m_closeBtn2D->setIcon(QIcon(":/icons/resources/close_round_press.svg"));
+        }
+    }
+
+    return QWidget::eventFilter(watched, e);
 }
 
 SHMInfo *AppSnapshot::getImageDSHM()

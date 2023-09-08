@@ -30,8 +30,8 @@
 using namespace Dock;
 
 class DockItem;
+class AppItem;
 class PlaceholderItem;
-class AppDragWidget;
 class SplitterWidget;
 class MainPanelControl : public QWidget
 {
@@ -45,13 +45,16 @@ public:
     void removeFixedAreaItem(QWidget *wdg);
     void removeAppAreaItem(QWidget *wdg);
     void addWindowAreaItem(int index, QWidget *wdg);
-    void removeWindowAreaItem(QWidget *wdg);
     void addLastAreaItem(int index, QWidget *wdg);
     void setPositonValue(Position position);
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
     bool eventFilter(QObject *watched, QEvent *event) override;
+    void dragEnterEvent(QDragEnterEvent *event) override;
+    void dragMoveEvent(QDragMoveEvent *event) override;
+    void dropEvent(QDropEvent *event) override;
+    void dragLeaveEvent(QDragLeaveEvent *event) override;
 
 private:
     void init();
@@ -61,25 +64,23 @@ private:
     void startDrag(DockItem *);
     void dropTargetItem(DockItem *sourceItem, QPoint point);
     void handleDragDrop(DockItem *sourceItem, QPoint point);
-    void moveItem(DockItem *sourceItem, DockItem *targetItem);
     inline bool isHorizontal() const { return m_position == Bottom || m_position == Top; }
     void resizeDockIcon();
 
 public slots:
-    void insertItem(const int index, DockItem *item);
+    void insertItem(const int index, DockItem *item, bool animation = true);
     void removeItem(DockItem *item, bool animation = true);
-    void itemUpdated(DockItem *item);
 
 signals:
-    void itemMoved(DockItem *sourceItem, DockItem *targetItem);
+    void itemMoved(AppItem *sourceItem, AppItem *targetItem);
     void itemAdded(const QString &appDesktop, int idx);
+    void folderAdded(const QString &path);
     void itemCountChanged();
     void dirAppChanged();
     void requestConttextMenu();
     void requestResizeDockSize(int offset, bool dragging);
 
 private:
-    QWidget *m_appAreaWidget;
     QBoxLayout *m_fixedAreaLayout;
     QBoxLayout *m_appAreaLayout;
     QBoxLayout *m_windowAreaLayout;
@@ -91,7 +92,6 @@ private:
     Position m_position;
     QPointer<PlaceholderItem> m_placeholderItem;
     QString m_draggingMimeKey;
-    AppDragWidget *m_appDragWidget;
 
     friend class SplitterWidget;
 };

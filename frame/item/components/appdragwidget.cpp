@@ -61,8 +61,7 @@ private:
     QPixmap m_appPixmap;
 };
 
-AppDragWidget::AppDragWidget(QWidget *parent) :
-    QGraphicsView(parent),
+AppDragWidget::AppDragWidget(QWidget *parent) : QGraphicsView(parent),
     m_object(new AppGraphicsObject),
     m_scene(new QGraphicsScene(this)),
     m_followMouseTimer(new QTimer(this)),
@@ -84,29 +83,27 @@ AppDragWidget::AppDragWidget(QWidget *parent) :
     setMouseTracking(true);
 
     setAcceptDrops(true);
-
     initAnimations();
 
     m_followMouseTimer->setSingleShot(false);
     m_followMouseTimer->setInterval(1);
     connect(m_followMouseTimer, &QTimer::timeout, [this] {
-                QPoint destPos = QCursor::pos();
-                move(destPos.x() - width() / 2, destPos.y() - height() / 2);
-            });
+        QPoint destPos = QCursor::pos();
+        move(destPos.x() - width() / 2, destPos.y() - height() / 2);
+    });
     m_followMouseTimer->start();
 }
 
 AppDragWidget::~AppDragWidget() {
+    m_object->deleteLater();
 }
 
 void AppDragWidget::mouseMoveEvent(QMouseEvent *event)
 {
     QGraphicsView::mouseMoveEvent(event);
     // hide widget when receiving mouseMoveEvent because this means drag-and-drop has been finished
-    if (m_goBackAnim->state() != QPropertyAnimation::State::Running
-            && m_animGroup->state() != QParallelAnimationGroup::Running) {
+    if (m_goBackAnim->state() != QPropertyAnimation::State::Running && m_animGroup->state() != QParallelAnimationGroup::Running)
         hide();
-    }
 }
 
 void AppDragWidget::dragEnterEvent(QDragEnterEvent *event)
@@ -116,7 +113,7 @@ void AppDragWidget::dragEnterEvent(QDragEnterEvent *event)
 
 void AppDragWidget::dragMoveEvent(QDragMoveEvent *event)
 {
-    if (isRemoveAble() && qobject_cast<AppItem *>(event->source())) {
+    if (qobject_cast<AppItem *>(event->source()) && isRemoveAble()) {
         m_object->setOpacity(0.5);
         m_animOpacity->setStartValue(0.5);
     } else {
@@ -128,13 +125,13 @@ void AppDragWidget::dragMoveEvent(QDragMoveEvent *event)
 void AppDragWidget::dropEvent(QDropEvent *event)
 {
     m_followMouseTimer->stop();
-
     AppItem *appItem = qobject_cast<AppItem *>(event->source());
 
-    if (isRemoveAble() && appItem) {
+    if (appItem && isRemoveAble()) {
+        emit finished(true);
         showRemoveAnimation();
-        appItem->undock();
     } else {
+        emit finished(false);
         showGoBackAnimation();
     }
 }
@@ -182,16 +179,15 @@ void AppDragWidget::initAnimations()
     m_animGroup->addAnimation(m_animRotation);
     m_animGroup->addAnimation(m_animOpacity);
 
-    connect(m_animGroup, &QParallelAnimationGroup::stateChanged,
-            this, &AppDragWidget::onRemoveAnimationStateChanged);
+    connect(m_animGroup, &QParallelAnimationGroup::finished, this, &AppDragWidget::hide);
     connect(m_goBackAnim, &QPropertyAnimation::finished, this, &AppDragWidget::hide);
 }
 
 void AppDragWidget::showRemoveAnimation()
 {
-    if (m_animGroup->state() == QParallelAnimationGroup::Running) {
+    if (m_animGroup->state() == QParallelAnimationGroup::Running)
         m_animGroup->stop();
-    }
+
     m_object->resetProperty();
     m_animGroup->start();
 }
@@ -204,13 +200,6 @@ void AppDragWidget::showGoBackAnimation()
     m_goBackAnim->start();
 }
 
-void AppDragWidget::onRemoveAnimationStateChanged(QAbstractAnimation::State newState,
-        QAbstractAnimation::State oldState)
-{
-    if (newState == QAbstractAnimation::Stopped) {
-        hide();
-    }
-}
 bool AppDragWidget::isRemoveAble()
 {
     const QPoint &p = QCursor::pos();

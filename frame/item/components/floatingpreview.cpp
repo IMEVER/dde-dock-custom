@@ -35,7 +35,7 @@
 
 FloatingPreview::FloatingPreview(QWidget *parent)
     : QWidget(parent)
-    , m_closeBtn3D(new DIconButton(DStyle::SP_DockWidgetCloseButton, this))
+    , m_closeBtn3D(new DIconButton(this))
     , m_titleBtn(new DPushButton)
 {
     m_closeBtn3D->setObjectName("closebutton-3d");
@@ -45,6 +45,12 @@ FloatingPreview::FloatingPreview(QWidget *parent)
     // m_closeBtn3D->setNormalPic(":/icons/resources/close_round_normal.svg");
     // m_closeBtn3D->setHoverPic(":/icons/resources/close_round_hover.svg");
     // m_closeBtn3D->setPressPic(":/icons/resources/close_round_press.svg");
+
+    m_closeBtn3D->setIconSize(QSize(24, 24));
+    m_closeBtn3D->setIcon(QIcon(":/icons/resources/close_round_normal.svg"));
+    m_closeBtn3D->setFlat(true);
+    m_closeBtn3D->installEventFilter(this);
+
 
     m_titleBtn->setBackgroundRole(QPalette::Base);
     m_titleBtn->setForegroundRole(QPalette::Text);
@@ -165,8 +171,22 @@ void FloatingPreview::mouseReleaseEvent(QMouseEvent *e)
 
 bool FloatingPreview::eventFilter(QObject *watched, QEvent *event)
 {
-    if (watched == m_tracked && event->type() == QEvent::Destroy)
+    if (watched == m_closeBtn3D) {
+        if (event->type() == QEvent::HoverEnter || event->type() == QEvent::HoverMove) {
+            m_closeBtn3D->setIcon(QIcon(":/icons/resources/close_round_hover.svg"));
+        }
+        else if (event->type() == QEvent::HoverLeave) {
+            m_closeBtn3D->setIcon(QIcon(":/icons/resources/close_round_normal.svg"));
+        }
+        else if (event->type() == QEvent::MouseButtonPress) {
+            m_closeBtn3D->setIcon(QIcon(":/icons/resources/close_round_press.svg"));
+        }
+    }
+
+    if (watched == m_tracked && event->type() == QEvent::Destroy) {
+        m_tracked = nullptr;
         hide();
+    }
 
     return QWidget::eventFilter(watched, event);
 }

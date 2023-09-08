@@ -26,11 +26,10 @@
 #include "dockitem.h"
 #include "diritem.h"
 #include "WindowItem.h"
+#include "../taskmanager/entry.h"
 
 #include <DGuiApplicationHelper>
-#include <com_deepin_dde_daemon_dock_entry.h>
 
-using DockEntryInter = com::deepin::dde::daemon::dock::Entry;
 class DirItem;
 class WindowItem;
 class AppItem : public DockItem
@@ -38,39 +37,43 @@ class AppItem : public DockItem
     Q_OBJECT
 
 public:
-    explicit AppItem(const QString path, QWidget *parent = nullptr);
+    explicit AppItem(const Entry *entry, QWidget *parent = nullptr);
     ~AppItem();
 
-    const QString appId() const;
-    bool isValid() const;
-    void undock();
+    QString path() const { return m_itemEntry->getDesktopFile(); }
+    const QString appId() const { return m_itemEntry->getId(); }
+    bool isValid() const { return m_itemEntry->isValid() && !m_itemEntry->getId().isEmpty(); }
+    void undock() { m_itemEntry->requestUndock(); }
     QWidget *appDragWidget();
     void setDockInfo(Dock::Position dockPosition, const QRect &dockGeometry);
 
     inline ItemType itemType() const Q_DECL_OVERRIDE { return App; }
     inline QPixmap appIcon() const {
-        return m_icon.isNull() ? QPixmap(":/icons/resources/application-x-desktop.svg") : m_icon;
+        return m_icon.isNull() ? QPixmap(":/icons/resources/application-x-desktop.svg") : m_icon.pixmap(width()*.9);
     }
-    QString getDesktopFile();
+    QString getDesktopFile() const { return m_itemEntry->getDesktopFile(); }
     Place getPlace() override { return m_place; }
-    DirItem *getDirItem();
+    DirItem *getDirItem() { return m_dirItem; }
     void setDirItem(DirItem *dirItem);
     void removeDirItem();
-    void check();
-    void fetchWindowInfos();
+    void check() const { m_itemEntry->check(); }
+    void fetchWindowInfos() { updateWindowInfos(m_itemEntry->getExportWindowInfos()); }
     void removeWindowItem(bool animation = true);
     int windowCount() { return m_windowMap.size(); }
     void handleDragDrop(uint timestamp, const QStringList &uris);
+    void refreshIcon();
+    void requestActivateWindow(const WId wid);
 
 signals:
-    void requestActivateWindow(const WId wid) const;
     void requestPreviewWindow(const WId wid) const;
     void requestCancelPreview() const;
     void requestPresentWindows();
+    void requestUpdateEntryGeometries() const;
     void dragReady(QWidget *dragWidget);
 
     void windowItemInserted(WindowItem *);
     void windowItemRemoved(WindowItem *, bool animation = true);
+    void windowCountChanged();
 
 private:
     void moveEvent(QMoveEvent *e) override;
@@ -85,7 +88,7 @@ private:
 
     void showHoverTips() Q_DECL_OVERRIDE;
     void invokedMenuItem(const QString &itemId, const bool checked) Q_DECL_OVERRIDE;
-    const QString contextMenu() const Q_DECL_OVERRIDE;
+    const QString contextMenu() const Q_DECL_OVERRIDE { return m_itemEntry->getMenu(); }
     QString popupTips() Q_DECL_OVERRIDE;
     const QPoint popupMarkPoint() override;
     bool hasAttention() const;
@@ -95,24 +98,21 @@ private:
 private slots:
     void updateWindowInfos(const WindowInfoMap &info);
     void mergeModeChanged(MergeMode mode);
-    void refershIcon() Q_DECL_OVERRIDE;
     void showPreview();
     void playSwingEffect();
-    void stopSwingEffect();
 
 private:
-    DockEntryInter *m_itemEntryInter;
+    Entry *m_itemEntry;
+    bool m_isDocked;
     QVariantAnimation *m_itemAnimation;
-
-    unsigned long m_lastclickTimes;
     WindowInfoMap m_windowInfos;
-
     QTimer *m_updateIconGeometryTimer;
 
     Place m_place = DockPlace;
     DirItem *m_dirItem;
     QMap<WId, WindowItem *> m_windowMap;
 
+    QColor m_activeColor;
     QPixmap m_horizontalIndicator;
     QPixmap m_verticalIndicator;
     QPixmap m_activeHorizontalIndicator;

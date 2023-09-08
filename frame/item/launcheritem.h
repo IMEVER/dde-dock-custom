@@ -24,9 +24,7 @@
 
 #include "dockitem.h"
 
-#include <com_deepin_dde_launcher.h>
-
-using LauncherInter = com::deepin::dde::Launcher;
+#include "LauncherInter.h"
 
 class LauncherItem : public DockItem
 {
@@ -36,7 +34,6 @@ public:
     explicit LauncherItem(QWidget *parent = nullptr) ;
 
     inline ItemType itemType() const override {return Launcher;}
-    void refershIcon() override;
 
 protected:
     void mouseReleaseEvent(QMouseEvent *e) override;

@@ -46,12 +46,12 @@ namespace Dock {
 /// \brief The DisplayMode enum
 /// spec dock display mode
 ///
-enum DisplayMode {
-    Fashion     = 0,
-    Efficient   = 1,
-    // deprecreated
-//    Classic     = 2,
-};
+// enum DisplayMode {
+//     Fashion     = 0,
+//     Efficient   = 1,
+//     // deprecreated
+// //    Classic     = 2,
+// };
 
 ///
 /// \brief The HideMode enum
@@ -60,7 +60,7 @@ enum DisplayMode {
 enum HideMode {
     KeepShowing     = 0,
     KeepHidden      = 1,
-    SmartHide       = 3,
+    SmartHide       = 2
 };
 
 ///
@@ -72,7 +72,7 @@ enum Position {
     Top         = 0,
     Right       = 1,
     Bottom      = 2,
-    Left        = 3,
+    Left        = 3
 };
 
 ///
@@ -83,12 +83,12 @@ enum Position {
 enum HideState {
     Unknown     = 0,
     Show        = 1,
-    Hide        = 2,
+    Hide        = 2
 };
 
 enum MergeMode {
     MergeNone   = 0,
-    MergeDock   = 1,
+    MergeDock   = 1
 };
 
 
@@ -96,8 +96,8 @@ enum MergeMode {
 
 }
 
-Q_ENUMS(Dock::DisplayMode)
-Q_DECLARE_METATYPE(Dock::DisplayMode)
+// Q_ENUMS(Dock::DisplayMode)
+// Q_DECLARE_METATYPE(Dock::DisplayMode)
 Q_DECLARE_METATYPE(Dock::Position)
 Q_DECLARE_METATYPE(Dock::MergeMode)
 

@@ -27,9 +27,6 @@
 #include "singleton.h"
 #include "interfaces/constants.h"
 
-#include <com_deepin_daemon_display.h>
-
-using DisplayInter = com::deepin::daemon::Display;
 using namespace Dock;
 
 class QScreen;

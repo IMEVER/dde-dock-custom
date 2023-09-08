@@ -33,10 +33,8 @@
 Position DockItem::DockPosition = Position::Top;
 static DockPopupWindow *PopupWindow(nullptr);
 
-DockItem::DockItem(QWidget *parent)
-    : QWidget(parent)
+DockItem::DockItem(QWidget *parent) : QWidget(parent)
     , m_popupTipsDelayTimer(new QTimer(this))
-    , m_scale(nullptr)
     , m_animation(nullptr)
 {
     if (!PopupWindow) {
@@ -63,34 +61,10 @@ DockItem::DockItem(QWidget *parent)
     connect(m_popupTipsDelayTimer, &QTimer::timeout, this, &DockItem::showHoverTips);
 
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-
-    auto initScaleAnimation = [this](const bool enabled=false) {
-        Q_UNUSED(enabled);
-        const bool enabledScaleAnimation = DockItemManager::instance()->isEnableHoverScaleAnimation();
-        const bool enabledInoutAnimation = DockItemManager::instance()->isEnableInOutAnimation();
-        if((enabledScaleAnimation || enabledInoutAnimation) && !m_scale) {
-            m_scale = new QVariantAnimation(this);
-            m_scale->setDuration(330);
-            m_scale->setEasingCurve(QEasingCurve::Linear);
-            connect(m_scale, &QVariantAnimation::valueChanged, this, [this](const QVariant &value){
-                int size = value.toInt();
-                setFixedSize(size, size);
-            });
-            // connect(m_scaleLarger, &QVariantAnimation::finished, this, [this](){
-                // int size = DockSettings::Instance().dockWindowSize();
-                // setFixedSize(QSize(size, size));
-            // });
-        } else if (!enabledScaleAnimation && !enabledInoutAnimation && m_scale) {
-            m_scale->stop();
-            m_scale->deleteLater();
-            m_scale = nullptr;
-        }
-    };
-    connect(DockItemManager::instance(), &DockItemManager::hoverScaleChanged, this, initScaleAnimation);
-    connect(DockItemManager::instance(), &DockItemManager::inoutChanged, this, initScaleAnimation);
-    initScaleAnimation();
-
-    setFixedSize(20, 20);
+    setFixedSize(DockItemManager::instance()->itemSize()-2, DockItemManager::instance()->itemSize()-2);
+    connect(this, &WindowItem::inoutFinished, this, [this](bool in){
+        if(in == false) QTimer::singleShot(50, this, &DockItem::deleteLater);
+    });
 }
 
 DockItem::~DockItem()
@@ -104,19 +78,13 @@ void DockItem::paintEvent(QPaintEvent *e)
 
     QPainter painter(this);
 
+    QPixmap pixmap = m_icon.pixmap(width() *.9);
+
     const auto ratio = devicePixelRatioF();
-    const int iconX = rect().center().x() - m_icon.rect().center().x() / ratio;
-    const int iconY = rect().center().y() - m_icon.rect().center().y() / ratio;
+    const int iconX = rect().center().x() - pixmap.rect().center().x() / ratio;
+    const int iconY = rect().center().y() - pixmap.rect().center().y() / ratio;
 
-    painter.drawPixmap(iconX, iconY, m_icon);
-}
-
-void DockItem::resizeEvent(QResizeEvent *e)
-{
-    if(m_animation) return;
-
-    QWidget::resizeEvent(e);
-    refershIcon();
+    painter.drawPixmap(iconX, iconY, pixmap);
 }
 
 void DockItem::mousePressEvent(QMouseEvent *e)
@@ -140,7 +108,7 @@ void DockItem::enterEvent(QEvent *e)
         if(m_animation)
             m_animation->setDirection(QVariantAnimation::Forward);
         else {
-            m_animation = AppEffect::ScaleEffect(this, (m_icon.isNull() || itemType() == Window) ? grab() : m_icon, DockPosition);
+            m_animation = AppEffect::PopupEffect(this, (m_icon.isNull() || itemType() == Window) ? grab() : m_icon.pixmap(width() *.9), DockPosition);
             connect(m_animation, &QVariantAnimation::stateChanged, this, [this](const QVariantAnimation::State newState, const QVariantAnimation::State oldState) {
                 if(newState == QVariantAnimation::Running)
                     update();
@@ -193,7 +161,9 @@ void DockItem::showContextMenu()
     QJsonObject jsonMenu = jsonDocument.object();
 
     QMenu *m_contextMenu = new QMenu(this);
-    connect(m_contextMenu, &QMenu::triggered, this, &DockItem::menuActionClicked);
+    connect(m_contextMenu, &QMenu::triggered, this, [this](QAction *action){
+        invokedMenuItem(action->data().toString(), action->isChecked());
+    });
 
     QJsonArray jsonMenuItems = jsonMenu.value("items").toArray();
     for (auto item : jsonMenuItems) {
@@ -214,11 +184,6 @@ void DockItem::showContextMenu()
 
     // if(getPlace() == DockPlace)
     emit requestWindowAutoHide(true);
-}
-
-void DockItem::menuActionClicked(QAction *action)
-{
-    invokedMenuItem(action->data().toString(), true);
 }
 
 void DockItem::showHoverTips()
@@ -325,22 +290,43 @@ void DockItem::hidePopup()
         emit requestWindowAutoHide(true);
 }
 
-void DockItem::easeIn()
+void DockItem::easeIn(bool animation)
 {
-    m_scale->stop();
-
-    m_scale->setStartValue(1);
-    m_scale->setEndValue(DockItemManager::instance()->itemSize()-2);
-    m_scale->start();
+    if(animation && DockItemManager::instance()->isEnableInOutAnimation()) {
+        if(m_animation) m_animation->stop();
+        m_animation = AppEffect::ScaleEffect(this, (m_icon.isNull() || itemType() == Window) ? grab() : m_icon.pixmap(width() *.9), DockPosition);
+        connect(m_animation, &QVariantAnimation::stateChanged, this, [this](const QVariantAnimation::State newState, const QVariantAnimation::State oldState) {
+            if(newState == QVariantAnimation::Running)
+                update();
+            else if(newState == QVariantAnimation::Stopped) {
+                m_animation = nullptr;
+                update();
+                emit inoutFinished(true);
+            }
+        });
+        m_animation->start();
+    } else
+        emit inoutFinished(true);
 }
 
-void DockItem::easeOut()
+void DockItem::easeOut(bool animation)
 {
-    m_scale->stop();
-
-    m_scale->setStartValue(size().width());
-    m_scale->setEndValue(1);
-    m_scale->start();
+    if(animation && DockItemManager::instance()->isEnableInOutAnimation()) {
+        if(m_animation) m_animation->stop();
+        m_animation = AppEffect::ScaleEffect(this, (m_icon.isNull() || itemType() == Window) ? grab() : m_icon.pixmap(width() *.9), DockPosition);
+        m_animation->setDirection(QAbstractAnimation::Backward);
+        connect(m_animation, &QVariantAnimation::stateChanged, this, [this](const QVariantAnimation::State newState, const QVariantAnimation::State oldState) {
+            if(newState == QVariantAnimation::Running)
+                update();
+            else if(newState == QVariantAnimation::Stopped) {
+                m_animation = nullptr;
+                update();
+                emit inoutFinished(false);
+            }
+        });
+        m_animation->start();
+    } else
+        emit inoutFinished(false);
 }
 void DockItem::hideNonModel()
 {

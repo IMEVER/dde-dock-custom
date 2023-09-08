@@ -3,7 +3,7 @@
 
 #include "dockitem.h"
 #include "appitem.h"
-#include <com_deepin_dde_daemon_dock_entry.h>
+#include "../taskmanager/windowinfomap.h"
 
 class AppItem;
 class WindowItem : public DockItem
@@ -11,7 +11,7 @@ class WindowItem : public DockItem
     Q_OBJECT
 
     public:
-        explicit WindowItem(AppItem *appItem, WId wId, WindowInfo windowInfo, bool closeable, QWidget *parent=Q_NULLPTR);
+        explicit WindowItem(AppItem *appItem, WId wId, WindowInfo windowInfoBase, bool closeable, QWidget *parent=Q_NULLPTR);
         ~WindowItem();
         ItemType itemType() const override { return DockItem::Window; }
         void fetchSnapshot();

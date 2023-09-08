@@ -37,6 +37,7 @@
 class AppGraphicsObject;
 class AppDragWidget : public QGraphicsView
 {
+    Q_OBJECT
 public:
     AppDragWidget(QWidget *parent = Q_NULLPTR);
     virtual ~AppDragWidget();
@@ -57,8 +58,9 @@ private:
     void initAnimations();
     void showRemoveAnimation();
     void showGoBackAnimation();
-    void onRemoveAnimationStateChanged(QAbstractAnimation::State newState,
-            QAbstractAnimation::State oldState);
+
+signals:
+    void finished(bool undock);
 
 private:
     AppGraphicsObject *m_object;

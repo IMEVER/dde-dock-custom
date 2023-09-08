@@ -56,20 +56,17 @@ public:
     inline virtual ItemType itemType() const {Q_UNREACHABLE(); return App;}
     virtual Place getPlace() { return DockPlace; }
 
-public slots:
-    virtual void refershIcon() {}
-
     void hidePopup();
-    void easeIn();
-    void easeOut();
+    void easeIn(bool animation);
+    void easeOut(bool animation);
 
 signals:
     void itemDropped(QObject *destination, const QPoint &dropPoint) const;
     void requestWindowAutoHide(const bool autoHide) const;
+    void inoutFinished(bool in);
 
 protected:
     void paintEvent(QPaintEvent *) override;
-    void resizeEvent(QResizeEvent *event) override;
     void mousePressEvent(QMouseEvent *e) override;
     void enterEvent(QEvent *e) override;
     void leaveEvent(QEvent *e) override;
@@ -90,14 +87,10 @@ protected slots:
     void showContextMenu();
     bool isScaling() const { return m_animation; }
 
-private:
-    void menuActionClicked(QAction *action);
-
 protected:
     QTimer *m_popupTipsDelayTimer;
     static Position DockPosition;
-    QVariantAnimation *m_scale;
-    QPixmap m_icon;
+    QIcon m_icon;
 
 private:
     QVariantAnimation *m_animation;

@@ -27,10 +27,10 @@
 #include <QTimer>
 
 #include "../../interfaces/constants.h"
+#include "../../taskmanager/windowinfomap.h"
 #include "appsnapshot.h"
 #include "floatingpreview.h"
 
-#include <com_deepin_dde_daemon_dock_entry.h>
 #include <DWindowManagerHelper>
 
 DWIDGET_USE_NAMESPACE
@@ -41,7 +41,7 @@ class PreviewContainer : public QWidget
 
 public:
     static PreviewContainer* instance();
-    static PreviewContainer* instance(const WindowInfoMap &infos, const WindowList &allowClose, const Dock::Position dockPos);
+    static PreviewContainer* instance(const WindowInfoMap &infos, const QVector<uint> allowClose, const Dock::Position dockPos);
 
 signals:
     void requestActivateWindow(const WId wid) const;
@@ -51,7 +51,7 @@ signals:
     void requestHidePopup() const;
 
 public:
-    void setWindowInfos(const WindowInfoMap &infos, const WindowList &allowClose);
+    void setWindowInfos(const WindowInfoMap &infos, const QVector<uint> allowClose);
     void updateSnapshots();
 
 public slots:

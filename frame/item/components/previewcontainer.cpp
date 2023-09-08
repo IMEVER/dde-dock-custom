@@ -35,7 +35,7 @@ PreviewContainer *PreviewContainer::instance() {
     return preview;
 }
 
-PreviewContainer *PreviewContainer::instance(const WindowInfoMap &infos, const WindowList &allowClose, const Dock::Position dockPos)
+PreviewContainer *PreviewContainer::instance(const WindowInfoMap &infos, const QVector<uint> allowClose, const Dock::Position dockPos)
 {
     static PreviewContainer *preview = instance();
     preview->disconnect();
@@ -72,7 +72,7 @@ PreviewContainer::PreviewContainer() : QWidget(),
     connect(m_waitForShowPreviewTimer, &QTimer::timeout, this, &PreviewContainer::previewFloating);
 }
 
-void PreviewContainer::setWindowInfos(const WindowInfoMap &infos, const WindowList &allowClose)
+void PreviewContainer::setWindowInfos(const WindowInfoMap &infos, const QVector<uint> allowClose)
 {
     // check removed window
     for (auto it(m_snapshots.begin()); it != m_snapshots.end();)
@@ -93,7 +93,7 @@ void PreviewContainer::setWindowInfos(const WindowInfoMap &infos, const WindowLi
         if (!m_snapshots.contains(key))
             appendSnapWidget(key);
         m_snapshots[key]->setWindowInfo(it.value());
-        m_snapshots[key]->setCloseAble(allowClose.contains(key));
+        m_snapshots[key]->setCloseAble(allowClose.contains(key));//qInfo()<<"previewclose wId: " << key << ", closeable: " << allowClose;
     }
 
     if (m_snapshots.isEmpty())

@@ -24,9 +24,6 @@
 #define MAINWINDOW_H
 
 #include "../interfaces/constants.h"
-#include "TopPanelInterface.h"
-
-#include <com_deepin_api_xeventmonitor.h>
 #include <DPlatformWindowHandle>
 #include <DBlurEffectWidget>
 #include <DGuiApplicationHelper>
@@ -34,8 +31,6 @@
 #include <QWidget>
 
 DWIDGET_USE_NAMESPACE
-
-using namespace Dock;
 
 class MainPanelControl;
 class MultiScreenWorker;
@@ -51,19 +46,15 @@ public:
 
 public slots:
     void launch();
+    void callShow();
 
     void resizeDock(int offset, bool dragging);
-    QStringList GetLoadedPlugins();
-    QString getPluginKey(QString pluginName);
-    bool getPluginVisible(QString pluginName);
-    void setPluginVisible(QString pluginName, bool visible);
 
 protected:
     void initConnections();
     void moveEvent(QMoveEvent *event) override;
 
 signals:
-    void pluginVisibleChanged(QString pluginName, bool visible);
     void geometryChanged(QRect rect);
 
 private:
@@ -71,7 +62,6 @@ private:
     MultiScreenWorker *m_multiScreenWorker;
 
     DPlatformWindowHandle m_platformWindowHandle;
-    TopPanelInterface *m_topPanelInterface;
 };
 
 #endif // MAINWINDOW_H

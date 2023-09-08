@@ -28,9 +28,16 @@ class AppEffect : public QGraphicsView {
             AppEffect *view = new AppEffect(parent, icon, DockItemManager::Scale, position);
             return view->m_animation;
         }
+
+        static QVariantAnimation* PopupEffect(QWidget *parent, const QPixmap &icon, Position position)
+        {
+            AppEffect *view = new AppEffect(parent, icon, DockItemManager::Popup, position);
+            return view->m_animation;
+        }
     protected:
         void enterEvent(QEvent *event) override;
         void leaveEvent(QEvent *event) override;
+        bool eventFilter(QObject *object, QEvent *event) override;
 
     private:
         AppEffect(QWidget *parent, const QPixmap &icon, DockItemManager::ActivateAnimationType type, Position position=Bottom);
@@ -38,9 +45,10 @@ class AppEffect : public QGraphicsView {
         void initSwing();
         void initJump();
         void initScale();
+        void initPopup();
 
 private:
-    const QWidget *m_parent;
+    QWidget *m_parent;
     const QPixmap m_icon;
     const Position m_position;
     const DockItemManager::ActivateAnimationType m_type;

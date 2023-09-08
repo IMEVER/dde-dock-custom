@@ -126,7 +126,7 @@ WindowItem::~WindowItem() {}
 void WindowItem::paintEvent(QPaintEvent *e)
 {
     if(isScaling()) return;
-    
+
     if(m_snapshot.isNull())
         return DockItem::paintEvent(e);
 
@@ -150,7 +150,7 @@ void WindowItem::paintEvent(QPaintEvent *e)
 
     painter.restore();
     int smallIconSize = itemRect.width() / 3;
-    painter.drawPixmap(QPoint(itemRect.width() - smallIconSize - itemRect.width() * .1, itemRect.width() - smallIconSize - itemRect.width() * .1), m_icon.scaled(smallIconSize, smallIconSize));
+    painter.drawPixmap(QPoint(itemRect.width() - smallIconSize - itemRect.width() * .1, itemRect.width() - smallIconSize - itemRect.width() * .1), m_icon.pixmap(smallIconSize));
 }
 
 void WindowItem::mouseReleaseEvent(QMouseEvent *e)
@@ -180,7 +180,7 @@ void WindowItem::moveEvent(QMoveEvent *e)
 
 void WindowItem::resizeEvent(QResizeEvent *e)
 {
-    update();
+    fetchSnapshot();
     m_updateIconGeometryTimer->start();
 }
 
@@ -261,7 +261,7 @@ void WindowItem::showPreview()
 {
     WindowInfoMap map;
     map.insert(m_WId, m_windowInfo);
-    WindowList list;
+    QVector<uint> list;
     if(m_closeable)
         list.append(m_WId);
     PreviewContainer *m_appPreview = PreviewContainer::instance(map, list, DockPosition);

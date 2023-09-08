@@ -21,7 +21,8 @@
 
 #include "window/mainwindow.h"
 #include "window/dockitemmanager.h"
-#include "dbusdockadaptors.h"
+#include "dbus/dbusdockadaptors.h"
+#include "dbus/dockdaemonadaptors.h"
 #include <QDir>
 #include <DApplication>
 #include <DLog>
@@ -58,6 +59,8 @@ void RegisterDdeSession()
 
 int main(int argc, char *argv[])
 {
+    setenv("D_DXCB_FORCE_NO_TITLEBAR", "1", 1);
+
     DApplication::setAttribute(Qt::AA_EnableHighDpiScaling, true);
     DGuiApplicationHelper::setAttribute(DGuiApplicationHelper::UseInactiveColorGroup, false);
     DApplication app(argc, argv);
@@ -69,6 +72,7 @@ int main(int argc, char *argv[])
     app.loadTranslator();
     app.setAttribute(Qt::AA_UseHighDpiPixmaps, false);
 
+    DLogManager::setLogFormat("%{time}{yyyyMMdd.HH:mm:ss.zzz}[%{type:1}][%{function:-35} %{line:-4}] %{message}\n");
     DLogManager::registerConsoleAppender();
     DLogManager::registerFileAppender();
 
@@ -88,8 +92,13 @@ int main(int argc, char *argv[])
 
     MainWindow mw;
     DBusDockAdaptors adaptor(&mw);
-    QDBusConnection::sessionBus().registerService("com.deepin.dde.Dock");
-    QDBusConnection::sessionBus().registerObject("/com/deepin/dde/Dock", "com.deepin.dde.Dock", &mw);
+    DockDaemonDBusAdaptor dockDaemonAdaptor(&mw);
+
+    QDBusConnection::sessionBus().registerService("org.deepin.dde.Dock1");
+    QDBusConnection::sessionBus().registerObject("/org/deepin/dde/Dock1", "org.deepin.dde.Dock1", &mw);
+
+    QDBusConnection::sessionBus().registerService("org.deepin.dde.daemon.Dock1");
+    QDBusConnection::sessionBus().registerObject("/org/deepin/dde/daemon/Dock1", "org.deepin.dde.daemon.Dock1", &mw);
 
     mw.launch();
 

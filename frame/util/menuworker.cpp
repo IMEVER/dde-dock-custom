@@ -21,6 +21,7 @@
 #include "menuworker.h"
 #include "window/dockitemmanager.h"
 #include "utils.h"
+#include "docksettings.h"
 
 #include <QAction>
 #include <QMenu>
@@ -60,12 +61,12 @@ MenuWorker::MenuWorker(QWidget *parent) : QObject (parent)
 
 }
 
-QMenu *MenuWorker::createMenu(DBusDock *m_dockInter)
+QMenu *MenuWorker::createMenu()
 {
     DockItemManager *m_itemManager = DockItemManager::instance();
     QMenu *m_settingsMenu = new QMenu();
 
-    Dock::Position m_position = Dock::Position(m_dockInter->position());
+    Dock::Position m_position = DockSettings::instance()->getPositionMode();
     QMenu *locationSubMenu = m_settingsMenu->addMenu("位置");
     QAction *m_bottomPosAct = locationSubMenu->addAction("下");
     m_bottomPosAct->setCheckable(true);
@@ -77,7 +78,7 @@ QMenu *MenuWorker::createMenu(DBusDock *m_dockInter)
     m_rightPosAct->setCheckable(true);
     m_rightPosAct->setChecked(m_position == Right);
 
-    Dock::HideMode m_hideMode = Dock::HideMode(m_dockInter->hideMode());
+    Dock::HideMode m_hideMode = DockSettings::instance()->getHideMode();
     QMenu *statusSubMenu = m_settingsMenu->addMenu("状态");
     QAction *m_keepShownAct = statusSubMenu->addAction("一直显示");
     m_keepShownAct->setCheckable(true);
@@ -152,6 +153,7 @@ QMenu *MenuWorker::createMenu(DBusDock *m_dockInter)
         });
     }
 
+    m_settingsMenu->addSeparator();
     m_settingsMenu->addAction("设置个性化", []{
         DDBusSender().service("com.deepin.dde.ControlCenter")
         .path("/com/deepin/dde/ControlCenter")
@@ -164,18 +166,18 @@ QMenu *MenuWorker::createMenu(DBusDock *m_dockInter)
 
     connect(m_settingsMenu, &QMenu::triggered, [ = ](QAction *action){
         if(action == m_bottomPosAct)
-            return m_dockInter->setPosition(Bottom);
+            return DockSettings::instance()->setPositionMode(Bottom);
         if(action == m_leftPosAct)
-            return m_dockInter->setPosition(Left);
+            return DockSettings::instance()->setPositionMode(Left);
         if(action == m_rightPosAct)
-            return m_dockInter->setPosition(Right);
+            return DockSettings::instance()->setPositionMode(Right);
 
         if (action == m_keepShownAct)
-            return m_dockInter->setHideMode(KeepShowing);
+            return DockSettings::instance()->setHideMode(KeepShowing);
         if (action == m_keepHiddenAct)
-            return m_dockInter->setHideMode(KeepHidden);
+            return DockSettings::instance()->setHideMode(KeepHidden);
         if (action == m_smartHideAct)
-            return m_dockInter->setHideMode(SmartHide);
+            return DockSettings::instance()->setHideMode(SmartHide);
 
         if(action == m_hoverHighlightAct)
             return m_itemManager->setHoverHighlight(action->isChecked());
@@ -202,15 +204,14 @@ QMenu *MenuWorker::createMenu(DBusDock *m_dockInter)
     return m_settingsMenu;
 }
 
-void MenuWorker::showDockSettingsMenu(DBusDock *m_dockInter)
+void MenuWorker::showDockSettingsMenu()
 {
     // 菜单将要被打开
     emit autoHideChanged(false);
 
-    QMenu *menu = createMenu(m_dockInter);
+    QMenu *menu = createMenu();
     menu->exec(QCursor::pos());
     menu->deleteLater();
-    menu = nullptr;
     // 菜单已经关闭
     emit autoHideChanged(true);
 }

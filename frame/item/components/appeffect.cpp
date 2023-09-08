@@ -94,7 +94,7 @@ AppEffect::AppEffect(QWidget *parent, const QPixmap &icon, DockItemManager::Acti
         if(newState == QVariantAnimation::Running)
             show();
         else if (newState == QVariantAnimation::Stopped) {
-            if(m_type != DockItemManager::Scale or m_animation->direction() == QVariantAnimation::Backward)
+            if(m_type != DockItemManager::Popup or m_animation->direction() == QVariantAnimation::Backward)
                 deleteLater();
         }
     });
@@ -103,8 +103,10 @@ AppEffect::AppEffect(QWidget *parent, const QPixmap &icon, DockItemManager::Acti
         initSwing();
     else if(type == DockItemManager::Jump)
         initJump();
-    else
+    else if(type == DockItemManager::Scale)
         initScale();
+    else
+        initPopup();
 }
 
 void AppEffect::initSwing() {
@@ -127,8 +129,8 @@ void AppEffect::initSwing() {
 }
 
 void AppEffect::initJump() {
-
-    m_item->setPos(QPointF(m_parent->rect().center()) - QPointF(m_icon.rect().center()) / m_parent->devicePixelRatioF());
+    QPointF offset = QPointF(m_parent->rect().center()) - QPointF(m_icon.rect().center()) / m_parent->devicePixelRatioF();
+    m_item->setPos(offset);
 
     int width = m_parent->rect().width();
     int height = m_parent->rect().height();
@@ -147,17 +149,17 @@ void AppEffect::initJump() {
     });
 
     if(m_position == Left) {
-        m_animation->setStartValue(QPoint(0, 0));
-        m_animation->setKeyValueAt(.5, QPoint(width/2, 0));
-        m_animation->setEndValue(QPoint(0, 0));
+        m_animation->setStartValue(offset.toPoint());
+        m_animation->setKeyValueAt(.5, QPoint(width/2 + offset.x(), offset.y()));
+        m_animation->setEndValue(offset.toPoint());
     } else if(m_position == Right) {
-        m_animation->setStartValue(QPoint(width/2, 0));
-        m_animation->setKeyValueAt(.5, QPoint(0, 0));
-        m_animation->setEndValue(QPoint(width/2, 0));
+        m_animation->setStartValue(QPoint(width/2+offset.y(), offset.y()));
+        m_animation->setKeyValueAt(.5, offset.toPoint());
+        m_animation->setEndValue(QPoint(width/2+offset.y(), offset.y()));
     } else {
-        m_animation->setStartValue(QPoint(0, height/2));
-        m_animation->setKeyValueAt(.5, QPoint(0, 0));
-        m_animation->setEndValue(QPoint(0, height/2));
+        m_animation->setStartValue(QPoint(offset.x(), height/2 + offset.y()));
+        m_animation->setKeyValueAt(.5, +offset.toPoint());
+        m_animation->setEndValue(QPoint(offset.x(), height/2 + offset.y()));
     }
 
     if (m_position == Bottom)
@@ -169,6 +171,25 @@ void AppEffect::initJump() {
 }
 
 void AppEffect::initScale() {
+    m_parent->installEventFilter(this);
+    move(m_parent->mapToGlobal(QPoint(0, 0)));
+    m_itemScene->setSceneRect(m_parent->rect());
+    setFixedSize(m_parent->rect().size());
+
+    m_item->setPos(QPointF(m_parent->rect().center()) - QPointF(m_icon.rect().center()) / m_parent->devicePixelRatioF());
+    m_item->setTransformOriginPoint(m_parent->rect().center());
+
+    m_animation->setDuration(300);
+    m_animation->setEasingCurve(QEasingCurve::Linear);
+    connect(m_animation, &QVariantAnimation::valueChanged, this, [this](const QVariant &value){
+        m_item->setScale(value.toReal());
+    });
+
+    m_animation->setStartValue(0.2);
+    m_animation->setEndValue(1.);
+}
+
+void AppEffect::initPopup() {
     setWindowFlag(Qt::WindowStaysOnBottomHint, true);
 
     const qreal scale = .2;
@@ -222,4 +243,10 @@ void AppEffect::leaveEvent(QEvent *event) {
         m_animation->setDirection(QVariantAnimation::Backward);
         m_animation->start();
     }
+}
+
+bool AppEffect::eventFilter(QObject *object, QEvent *event) {
+    if(m_type == DockItemManager::Scale && object == m_parent && event->type() == QEvent::Move)
+        move(m_parent->mapToGlobal(QPoint(0, 0)));
+    return false;
 }

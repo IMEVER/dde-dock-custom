@@ -24,12 +24,7 @@ DirItem::DirItem(QString title, QWidget *parent) : DockItem(parent)
     setAcceptDrops(true);
 
     m_title = title.isNull() ? "集合" : title;
-
     m_popupGrid = new AppDirWidget(m_title, this);
-    m_showPopupTimer = new QTimer(this);
-    m_showPopupTimer->setSingleShot(true);
-    m_showPopupTimer->setInterval(310);
-    connect(m_showPopupTimer, &QTimer::timeout, this, &DirItem::showDirPopupWindow);
 
     connect(m_popupGrid, &AppDirWidget::updateTitle, [ this ](QString title){
         if(m_title != title)
@@ -39,21 +34,6 @@ DirItem::DirItem(QString title, QWidget *parent) : DockItem(parent)
         }
     });
     connect(m_popupGrid, &AppDirWidget::requestHidePopup, this, &DirItem::hideDirpopupWindow);
-}
-
-DirItem::~DirItem()
-{
-
-}
-
-QString DirItem::getTitle()
-{
-    return m_title;
-}
-
-void DirItem::setTitle(QString title)
-{
-    m_title = title;
 }
 
 void DirItem::setIds(QSet<QString> ids)
@@ -73,7 +53,7 @@ bool DirItem::hasId(QString id)
 
 int DirItem::getIndex()
 {
-    return parentWidget() ? parentWidget()->layout()->indexOf(this) : (m_index ? m_index : -1);
+    return parentWidget() ? parentWidget()->layout()->itemAt(1)->layout()->indexOf(this) : (m_index ? m_index : -1);
 }
 
 void DirItem::setIndex(int index)
@@ -187,17 +167,9 @@ void DirItem::paintEvent(QPaintEvent *e)
     }
 }
 
-void DirItem::enterEvent(QEvent *e)
-{
-    DockItem::enterEvent(e);
-    m_showPopupTimer->start();
-}
-
 void DirItem::leaveEvent(QEvent *e)
 {
     DockItem::leaveEvent(e);
-
-    m_showPopupTimer->stop();
     m_popupGrid->prepareHide();
 }
 

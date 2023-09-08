@@ -22,9 +22,6 @@
 #define MENUWORKER_H
 #include <QObject>
 
-#include <com_deepin_dde_daemon_dock.h>
-
-using DBusDock = com::deepin::dde::daemon::Dock;
 class QMenu;
 class QGSettings;
 /**
@@ -36,13 +33,13 @@ class MenuWorker : public QObject
 public:
     explicit MenuWorker(QWidget *parent = nullptr);
 
-    void showDockSettingsMenu(DBusDock *m_dockInter);
+    void showDockSettingsMenu();
 
 signals:
     void autoHideChanged(const bool autoHide) const;
 
 private:
-    QMenu *createMenu(DBusDock *m_dockInter);
+    QMenu *createMenu();
 };
 
 #endif // MENUWORKER_H

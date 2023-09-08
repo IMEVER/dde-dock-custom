@@ -15,15 +15,14 @@ class DirItem : public DockItem
 
 public:
     explicit DirItem(QString title = nullptr, QWidget *parent=nullptr);
-    ~DirItem();
+    ~DirItem() = default;
 
     inline ItemType itemType() const override { return DirApp; }
-
-    inline int maxCount() { return 9; }
+    inline int maxCount() const { return 9; }
     int currentCount();
 
-    QString getTitle();
-    void setTitle(QString title);
+    QString getTitle() const { return m_title; }
+    void setTitle(QString title) { m_title = title; }
 
     void setIds(QSet<QString> ids);
     void addId(QString id);
@@ -46,12 +45,12 @@ public:
 
 protected:
     void paintEvent(QPaintEvent *e) override;
-    void enterEvent(QEvent *e) override;
     void leaveEvent(QEvent *e) override;
     void mouseReleaseEvent(QMouseEvent *e) override;
     void dragEnterEvent(QDragEnterEvent *e) override;
     void dragMoveEvent(QDragMoveEvent *e) override;
     const QPoint popupDirMarkPoint();
+    QString popupTips() override { return m_title; }
 
     void showDirPopupWindow();
 
@@ -63,7 +62,6 @@ signals:
 
 private:
     AppDirWidget *m_popupGrid;
-    QTimer *m_showPopupTimer;
     int m_index;
     QString m_title;
     QSet<QString> m_ids;

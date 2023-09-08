@@ -6,6 +6,15 @@
     <method name="GetLoadedPlugins">
         <arg name="list" type="as" direction="out"/>
     </method>
+    <method name="plugins">
+        <arg type="a(sssssb)" direction="out"/>
+        <annotation value="DockItemInfos" name="org.qtproject.QtDBus.QtTypeName.Out0"/>
+    </method>
+    <method name="setItemOnDock">
+        <arg name="settingKey" type="s" direction="in"/>
+        <arg name="itemKey" type="s" direction="in"/>
+        <arg name="visible" type="b" direction="in"/>
+    </method>
     <method name="getPluginKey">
         <arg name="pluginName" type="s" direction="in"/>
         <arg name="key" type="s" direction="out"/>

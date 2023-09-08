@@ -26,11 +26,10 @@
 #include <QDebug>
 #include <QTimer>
 #include "../tipswidget.h"
+#include "../../taskmanager/windowinfomap.h"
 
 #include <DIconButton>
 #include <DWindowManagerHelper>
-
-#include <com_deepin_dde_daemon_dock_entry.h>
 
 DWIDGET_USE_NAMESPACE
 DGUI_USE_NAMESPACE
@@ -50,12 +49,12 @@ public:
     explicit AppSnapshot(const WId wid, QWidget *parent = 0);
 
     inline WId wid() const { return m_wid; }
-    inline bool attentioned() const { return m_windowInfo.attention; }
+    inline bool attentioned() { return m_windowInfo.attention; }
     inline bool closeAble() const { return m_closeAble; }
     void setCloseAble(const bool value);
     inline const QImage snapshot() const { return m_snapshot; }
     inline const QRectF snapshotGeometry() const { return m_snapshotSrcRect; }
-    inline const QString title() const { return m_windowInfo.title; }
+    inline const QString title() { return m_windowInfo.title; }
 
 signals:
     void entered(const WId wid) const;
@@ -69,12 +68,13 @@ public slots:
     void setWindowInfo(const WindowInfo &info);
 
 private:
-    void dragEnterEvent(QDragEnterEvent *e);
-    void enterEvent(QEvent *e);
-    void leaveEvent(QEvent *e);
-    void paintEvent(QPaintEvent *e);
-    void resizeEvent(QResizeEvent *e);
-    void mousePressEvent(QMouseEvent *e);
+    void dragEnterEvent(QDragEnterEvent *e) override;
+    void enterEvent(QEvent *e) override;
+    void leaveEvent(QEvent *e) override;
+    void paintEvent(QPaintEvent *e) override;
+    void resizeEvent(QResizeEvent *e) override;
+    void mousePressEvent(QMouseEvent *e) override;
+    bool eventFilter(QObject *watched, QEvent *e) override;
     SHMInfo *getImageDSHM();
     XImage * getImageXlib();
     QRect rectRemovedShadow(const QImage &qimage, unsigned char *prop_to_return_gtk);

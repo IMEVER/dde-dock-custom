@@ -11,7 +11,7 @@ AppDirWidget::AppDirWidget(QString title, QWidget *parent) : QWidget(parent)
 , m_mouseLeaveTimer(new QTimer(this))
 {
     QVBoxLayout *vbox = new QVBoxLayout(this);
-    QHBoxLayout *hbox = new QHBoxLayout;
+    vbox->setContentsMargins(10, 5, 10, 5);
 
     m_TextField = new QLineEdit(this);
     m_TextField->installEventFilter(this);
@@ -31,25 +31,20 @@ AppDirWidget::AppDirWidget(QString title, QWidget *parent) : QWidget(parent)
         }
     });
 
-    hbox->addWidget(m_TextField, 0, Qt::AlignCenter);
-    vbox->addLayout(hbox);
+    vbox->addWidget(m_TextField, 0, Qt::AlignHCenter);
 
     m_Layout = new QGridLayout;
     m_Layout->setVerticalSpacing(10);
     vbox->addLayout(m_Layout);
 
-    setLayout(vbox);
+    m_mouseLeaveTimer->setSingleShot(true);
+    m_mouseLeaveTimer->setInterval(100);
+    connect(m_mouseLeaveTimer, &QTimer::timeout, this, &AppDirWidget::checkMouseLeave);
 
     // setFixedWidth(360);
     setMinimumHeight(120);
     setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
-    vbox->setContentsMargins(10, 5, 10, 5);
     hide();
-
-    m_mouseLeaveTimer->setSingleShot(true);
-    m_mouseLeaveTimer->setInterval(100);
-
-    connect(m_mouseLeaveTimer, &QTimer::timeout, this, &AppDirWidget::checkMouseLeave);
 }
 
 void AppDirWidget::addAppItem(AppItem *item)
