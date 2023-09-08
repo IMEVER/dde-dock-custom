@@ -24,7 +24,11 @@ Build-Depends: debhelper (>= 8.0.0),
  libdde-network-utils-dev,
  libdbusmenu-qt5-dev,
  clang [mips64el],
- libdtkgui-dev
+ libdtkgui-dev,
+ libkf5windowsystem-dev,
+ libxres-dev,
+ libgsettings-qt-dev,
+ libxdo-dev
 Standards-Version: 3.9.8
 Homepage: http://www.deepin.org/
 
