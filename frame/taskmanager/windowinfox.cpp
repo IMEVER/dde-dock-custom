@@ -43,7 +43,7 @@ WindowInfoX::~WindowInfoX()
 
 bool WindowInfoX::shouldSkip()
 {
-    qInfo() << "window " << xid << " shouldSkip?";
+    qDebug() << "window " << xid << " shouldSkip?";
     if (!m_updateCalled) {
         update();
         m_updateCalled = true;
@@ -68,7 +68,7 @@ bool WindowInfoX::shouldSkip()
         || atom == XCB->getAtom("_NET_WM_WINDOW_TYPE_SPLASH")
         || atom == XCB->getAtom("_NET_WM_WINDOW_TYPE_TOOLBAR")
         || atom == XCB->getAtom("_NET_WM_WINDOW_TYPE_TOOLTIP"))
-            return true; 
+            return true;
     }
 
     return false;
@@ -414,7 +414,8 @@ bool WindowInfoX::shouldSkipWithWMClass()
         ret = true;
     else if (m_wmClass.className == "dde-launcher" ||
         m_wmClass.className == "dde-dock" ||
-        m_wmClass.className == "dde-lock") {
+        m_wmClass.className == "dde-lock" ||
+        m_wmClass.className == "dde-top-panel") {
         ret = true;
     }
 

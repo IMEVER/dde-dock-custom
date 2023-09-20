@@ -258,7 +258,7 @@ void Entries::removeLastRecent()
 {
     // 先查找最近使用的应用，删除没有使用的
     int unDockCount = 0;
-    QList<Entry *> unDockEntrys;
+    Entry *unDockEntry = nullptr;
     QList<Entry *> removeEntrys;
 
     for (Entry *entry : m_items) {
@@ -269,16 +269,14 @@ void Entries::removeLastRecent()
         if (!entry->hasWindow()) {
             if (!entry->isValid())
                 removeEntrys << entry; // 如果应用已经被卸载，那么需要删除
-            else
-                unDockEntrys << entry;
-
+            else if(!unDockEntry || unDockEntry->lastOpenTime() > entry->lastOpenTime())
+                unDockEntry = entry;
             unDockCount++;
         }
     }
-    if (unDockCount >= MAX_UNOPEN_RECENT_COUNT && unDockEntrys.size() > 0) {
+    if (unDockCount >= MAX_UNOPEN_RECENT_COUNT && unDockEntry) {
         // 只有当最近使用区域的图标大于等于某个数值（3）的时候，并且存在没有子窗口的Entry，那么就移除该Entry
-        Entry *entry = unDockEntrys[0];
-        removeEntrys << entry;
+        removeEntrys << unDockEntry;
     }
     for (Entry *entry : removeEntrys) {
         m_items.removeOne(entry);

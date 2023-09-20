@@ -17,6 +17,7 @@ public:
     friend const QDBusArgument &operator>>(const QDBusArgument &argument, WindowInfo &info);
 
     bool operator==(const WindowInfo &rhs) const;
+    bool operator!=(const WindowInfo &rhs) const;
 
 public:
     bool attention;

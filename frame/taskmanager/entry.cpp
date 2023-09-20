@@ -28,8 +28,12 @@ Entry::Entry(TaskManager *_taskmanager, AppInfo *_app, QString _innerId, QObject
     , m_current(nullptr)
     , m_currentWindow(0)
 {
+    m_lastOpenTime = 0;
+    m_openCount = 0;
+
     setAppInfo(_app);
-    m_id = m_taskmanager->allocEntryId();
+    static int entriesSum = 0;
+    m_id = QString("e%1T%2").arg(++entriesSum).arg(QString::number(QDateTime::currentSecsSinceEpoch(), 16));
     m_mode = getCurrentMode();
     m_name = getName();
     m_icon = getIcon();
@@ -132,7 +136,7 @@ void Entry::setAppInfo(AppInfo *appinfo)
     }
 
     m_appInfo.reset(appinfo);
-    m_isValid = appinfo->isValidApp();
+    m_isValid = appinfo && appinfo->isValidApp();
     m_winIconPreferred = !appinfo;
     setPropDesktopFile(appinfo ? appinfo->getFileName(): "");
     if (!m_winIconPreferred) {
@@ -366,9 +370,7 @@ void Entry::updateExportWindowInfos()
         changed = false;
         for (auto iter = infos.begin(); iter != infos.end(); iter++) {
             XWindow xid = iter.key();
-            if (infos[xid].title != m_exportWindowInfos[xid].title ||
-                    infos[xid].attention != m_exportWindowInfos[xid].attention ||
-                    infos[xid].uuid != m_exportWindowInfos[xid].uuid) {
+            if (infos[xid] != m_exportWindowInfos[xid]) {
                 changed = true;
                 break;
             }
@@ -377,10 +379,10 @@ void Entry::updateExportWindowInfos()
 
     if (changed) {
         Q_EMIT windowInfosChanged(infos);
-    }
 
-    // 更新导出的窗口信息
-    m_exportWindowInfos = infos;
+        // 更新导出的窗口信息
+        m_exportWindowInfos = infos;
+    }
 }
 
 // 分离窗口， 返回是否需要从任务栏remove
@@ -437,6 +439,10 @@ bool Entry::attachWindow(WindowInfoBase *info)
     if (m_windowInfoMap.find(winId) != m_windowInfoMap.end()) {
         return false;
     }
+
+    m_openCount++;
+    static int times = 0;
+    m_lastOpenTime = ++times;
 
     bool lastShowOnDock = isShowOnDock();
     m_windowInfoMap[winId] = info;
@@ -681,7 +687,7 @@ QVector<XWindow> Entry::getAllowedClosedWindowIds()
     return ret;
 }
 
-WindowInfoMap Entry::getExportWindowInfos()
+const WindowInfoMap &Entry::getExportWindowInfos() const
 {
     return m_exportWindowInfos;
 }

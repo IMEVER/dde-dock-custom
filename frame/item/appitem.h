@@ -86,10 +86,11 @@ private:
     void dropEvent(QDropEvent *e) override;
     void leaveEvent(QEvent *e) override;
 
+    bool isMergeWindow() const;
     void showHoverTips() Q_DECL_OVERRIDE;
+    QString popupTips() Q_DECL_OVERRIDE;
     void invokedMenuItem(const QString &itemId, const bool checked) Q_DECL_OVERRIDE;
     const QString contextMenu() const Q_DECL_OVERRIDE { return m_itemEntry->getMenu(); }
-    QString popupTips() Q_DECL_OVERRIDE;
     const QPoint popupMarkPoint() override;
     bool hasAttention() const;
 
@@ -103,9 +104,7 @@ private slots:
 
 private:
     Entry *m_itemEntry;
-    bool m_isDocked;
     QVariantAnimation *m_itemAnimation;
-    WindowInfoMap m_windowInfos;
     QTimer *m_updateIconGeometryTimer;
 
     Place m_place = DockPlace;

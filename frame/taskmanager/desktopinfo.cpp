@@ -30,7 +30,10 @@ DesktopInfo::DesktopInfo(const QString &desktopfile)
     if (!desktopFileInfo.isAbsolute()) {
         for (auto dir: QStandardPaths::standardLocations(QStandardPaths::ApplicationsLocation)) {
             QString path = dir.append("/").append(desktopfilepath);
-            if (QFile::exists(path)) desktopFileInfo.setFile(path);
+            if (QFile::exists(path)) {
+                desktopFileInfo.setFile(path);
+                break;
+            }
         }
     }
 

@@ -1,4 +1,4 @@
-<interface name="me.imever.dde.TopPanel">
+<interface name="me.imever.TopPanel">
     <method name="ActivateWindow"></method>
     <method name="ToggleMenu">
         <arg name="id" type="i" direction="in"></arg>

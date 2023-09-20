@@ -89,7 +89,6 @@ private:
     void appItemAdded(const Entry *entry, const int index, bool updateFrame=true);
     void appItemRemoved(const QString &appId);
     void appItemRemoved(AppItem *appItem, bool animation = true);
-    void manageItem(DockItem *item);
     void loadDirAppData();
     void loadFolderData();
 

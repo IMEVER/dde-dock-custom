@@ -37,7 +37,6 @@ public:
     bool dockEntry(Entry *entry, bool moveToEnd = false);
     void undockEntry(Entry *entry, bool moveToEnd = false);
 
-    QString allocEntryId();
     bool shouldShowOnDock(WindowInfoBase *info);
     void setDdeLauncherVisible(bool visible);
     void setTrayGridWidgetVisible(bool visible);
@@ -161,7 +160,6 @@ private:
     bool m_isWayland; // 判断是否为wayland环境
     bool m_showRecent;
     bool m_showMultiWindow;
-    int m_entriesSum; // 累计打开的应用数量
 
     QString m_wmName; // 窗管名称
     HideState m_hideState;    // 记录任务栏隐藏状态

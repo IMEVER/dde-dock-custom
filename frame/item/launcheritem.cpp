@@ -21,25 +21,19 @@
 
 #include "launcheritem.h"
 
-#include "util/utils.h"
 #include "window/dockitemmanager.h"
 
-#include <QPainter>
-#include <QProcess>
 #include <QMouseEvent>
-#include <DDBusSender>
-#include <QApplication>
 
 LauncherItem::LauncherItem(QWidget *parent) : DockItem(parent)
     , m_launcherInter(new LauncherInter("org.deepin.dde.Launcher1", "/org/deepin/dde/Launcher1", QDBusConnection::sessionBus(), this))
 {
-    // m_launcherInter->setSync(true, false);
     setFixedSize(DockItemManager::instance()->itemSize()-2, DockItemManager::instance()->itemSize()-2);
     m_icon = QIcon::fromTheme("deepin-launcher");
 }
 
 void LauncherItem::mouseReleaseEvent(QMouseEvent *e)
 {
-    if (e->button() == Qt::LeftButton && !m_launcherInter->IsVisible())
-        m_launcherInter->Show();
+    if (e->button() == Qt::LeftButton)
+        m_launcherInter->Toggle();
 }

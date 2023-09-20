@@ -95,8 +95,11 @@ public:
     WindowInfoBase *getWindowInfoByPid(int pid);
     WindowInfoBase *getWindowInfoByWinId(XWindow windowId);
 
-    WindowInfoMap getExportWindowInfos();
+    const WindowInfoMap &getExportWindowInfos() const;
     QVector<XWindow> getAllowedClosedWindowIds();
+
+    inline int lastOpenTime() const { return m_lastOpenTime; }
+    inline int openCount() const { return m_openCount; }
 
 public Q_SLOTS:
     QVector<WindowInfoBase *> getAllowedCloseWindows();
@@ -122,7 +125,7 @@ private:
     AppMenuItem getMenuItemLaunch();
     AppMenuItem getMenuItemCloseAll();
     AppMenuItem getMenuItemForceQuit();
-    
+
     AppMenuItem getMenuItemDock();
     AppMenuItem getMenuItemUndock();
     AppMenuItem getMenuItemAllWindows();
@@ -135,6 +138,8 @@ private:
     bool m_isDocked;
     bool m_winIconPreferred;
     int m_mode;
+    int m_lastOpenTime;
+    int m_openCount;
 
     QString m_id;
     QString m_name;

@@ -18,12 +18,17 @@ include(GNUInstallDirs)
 
 if (NOT (${CMAKE_BUILD_TYPE} MATCHES "Debug"))
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Ofast")
+    add_definitions(-DQT_NO_DEBUG_OUTPUT)
 
     # generate qm
 #     execute_process(COMMAND bash "translate_generation.sh" WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 endif ()
 
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DQT_DEBUG")
+# set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DQT_DEBUG")
+
+# if (CMAKE_BUILD_TYPE STREQUAL "RELEASE")
+#     add_definitions(-DQT_NO_DEBUG_OUTPUT)
+# endif (CMAKE_BUILD_TYPE STREQUAL "RELEASE")
 
 # Test architecture
 execute_process(COMMAND dpkg-architecture -qDEB_BUILD_ARCH OUTPUT_VARIABLE ARCHITECTURE RESULT_VARIABLE EXIT_CODE)

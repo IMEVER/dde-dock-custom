@@ -11,6 +11,7 @@
 #include <DDesktopServices>
 #include <QMessageBox>
 #include <QFileSystemWatcher>
+#include <QDBusInterface>
 
 static const QString TRASHPATH = QStandardPaths::writableLocation(QStandardPaths::HomeLocation) + "/.local/share/Trash";
 static const QString TRASHEXPUNGED = TRASHPATH + "/expunged";
@@ -77,8 +78,16 @@ void TrashItem::dragEnterEvent(QDragEnterEvent *e)
 
 void TrashItem::dropEvent(QDropEvent *e)
 {
-    foreach (auto url, e->mimeData()->urls())
-        QFile(url.toLocalFile()).moveToTrash();
+    // QDBusInterface interface("org.freedesktop.FileManager1", "/org/freedesktop/FileManager1", "org.freedesktop.FileManager1");
+    // QVariantList args;
+
+    // foreach (auto url, e->mimeData()->urls())
+        // args.append(url.toString());
+        // QFile(url.toLocalFile()).moveToTrash();
+
+    // interface.asyncCallWithArgumentList("Trash", args);
+
+    Dtk::Widget::DDesktopServices::trash(e->mimeData()->urls());
 }
 
 void TrashItem::invokedMenuItem(const QString &itemId, const bool checked)

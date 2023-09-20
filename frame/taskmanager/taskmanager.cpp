@@ -44,7 +44,6 @@ bool shouldShowEntry(Entry *entry)
 
 TaskManager::TaskManager(QObject *parent)
  : m_showRecent(DockSettings::instance()->showRecent())
- , m_entriesSum(0)
  , m_hideState(HideState::Unknown)
  , m_ddeLauncherVisible(false)
  , m_trayGridWidgetVisible(false)
@@ -134,17 +133,14 @@ bool TaskManager::dockEntry(Entry *entry, bool moveToEnd)
             return false;
         }
 
-        QFile file;
         QString newDesktopFile;
         if (appInfo) {
             QString newFile = scratchDir + appInfo->getInnerId() + ".desktop";
             // 在目标文件存在的情况下，先删除，防止出现驻留不成功的情况
             if (QFile::exists(newFile)) QFile::remove(newFile);
-            if (file.copy(appInfo->getFileName(), newFile))
+            if (QFile::copy(appInfo->getFileName(), newFile))
                 newDesktopFile = newFile;
-        } else {
-            WindowInfoBase *current = entry->getCurrentWindowInfo();
-            if (current) {
+        } else if(auto current = entry->getCurrentWindowInfo()) {
                 QString appId = current->getInnerId();
                 QString title = current->getDisplayName();
                 QString icon = current->getIcon();
@@ -152,13 +148,12 @@ bool TaskManager::dockEntry(Entry *entry, bool moveToEnd)
                 QString cmd = entry->getCmdLine() + "%U";
                 QString fileNmae = scratchDir + appId + ".desktop";
                 QString desktopContent = QString(dockedItemTemplate).arg(title).arg(cmd).arg(icon);
-                file.setFileName(fileNmae);
+                QFile file(fileNmae);
                 if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
                     file.write(desktopContent.toStdString().c_str(), desktopContent.size());
                     file.close();
                     newDesktopFile = fileNmae;
                 }
-            }
         }
 
         if (newDesktopFile.isEmpty())
@@ -205,13 +200,9 @@ void TaskManager::undockEntry(Entry *entry, bool moveToEnd)
 
     // 移除scratchDir目录下相关文件
     QString desktopFile = entry->getFileName();
-    QString filebase(desktopFile.data(), desktopFile.size() - 9);
     if (desktopFile.contains(scratchDir)) {
-        QStringList suffixs {".desktop", ".sh", ".png"};
-        for (auto &ext : suffixs) {
-            QFile file(filebase + ext);
-            if (file.exists()) file.remove();
-        }
+        QFile file(desktopFile);
+        if (file.exists()) file.remove();
     }
 
     if (entry->hasWindow()) {
@@ -250,15 +241,6 @@ void TaskManager::undockEntry(Entry *entry, bool moveToEnd)
     }
 
     saveDockedApps();
-}
-
-/**
- * @brief TaskManager::allocEntryId 分配应用实例id
- * @return
- */
-QString TaskManager::allocEntryId()
-{
-    return QString("e%1T%2").arg(++m_entriesSum).arg(QString::number(QDateTime::currentSecsSinceEpoch(), 16));
 }
 
 /**
@@ -664,7 +646,7 @@ void TaskManager::loadAppInfos()
 
     loadApps(SETTING->getDockedApps(), true);
     QStringList recentApps = SETTING->getRecentApps();
-    if (recentApps.size() > MAX_UNOPEN_RECENT_COUNT) 
+    if (recentApps.size() > MAX_UNOPEN_RECENT_COUNT)
         recentApps = recentApps.mid(0, MAX_UNOPEN_RECENT_COUNT);
     loadApps(recentApps, false);
     saveDockedApps();
@@ -988,7 +970,6 @@ void TaskManager::attachOrDetachWindow(WindowInfoBase *info)
     if (!info)
         return;
 
-    XWindow winId = info->getXid();
     bool shouldDock = shouldShowOnDock(info);
 
     // 顺序解析窗口合并或分离操作
@@ -1115,7 +1096,7 @@ void TaskManager::handleActiveWindowChanged(WindowInfoBase *info)
 {
     qDebug() << "handleActiveWindowChanged";
     if (!info) {
-        m_activeWindowOld = info;
+        m_activeWindowOld = m_activeWindow;
         m_activeWindow = nullptr;
         return;
     }

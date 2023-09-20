@@ -86,7 +86,7 @@ AppInfo *WindowIdentify::identifyWindow(WindowInfoBase *winInfo, QString &innerI
     if (!winInfo)
         return nullptr;
 
-    qInfo() << "identifyWindow: window id " << winInfo->getXid() << " innerId " << winInfo->getInnerId();
+    qDebug() << "identifyWindow: window id " << winInfo->getXid() << " innerId " << winInfo->getInnerId();
     if (winInfo->getWindowType() == "X11")
         return identifyWindowX11(static_cast<WindowInfoX *>(winInfo), innerId);
     if (winInfo->getWindowType() == "Wayland")
@@ -441,9 +441,8 @@ AppInfo *WindowIdentify::identifyWindowByScratch(TaskManager *_taskmanager, Wind
     AppInfo *ret = nullptr;
     QString desktopFile = scratchDir + winInfo->getInnerId() + ".desktop";
     qInfo() << "identifyWindowByScratch: xid " << winInfo->getXid() << " desktopFile" << desktopFile;
-    QFile file(desktopFile);
 
-    if (file.exists()) {
+    if (QFile::exists(desktopFile)) {
         ret = new AppInfo(desktopFile);
         innerId = ret->getInnerId();
     }

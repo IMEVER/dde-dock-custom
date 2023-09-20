@@ -76,7 +76,7 @@ DBusDockAdaptors::DBusDockAdaptors(MainWindow* parent)
         });
     }
 
-    m_topPanelInterface = new TopPanelInterface("me.imever.dde.TopPanel", "/me/imever/dde/TopPanel", QDBusConnection::sessionBus(), this);
+    m_topPanelInterface = new TopPanelInterface("me.imever.TopPanel", "/me/imever/TopPanel", QDBusConnection::sessionBus(), this);
     connect(m_topPanelInterface, &TopPanelInterface::pluginVisibleChanged, this, &DBusDockAdaptors::pluginVisibleChanged);
 }
 

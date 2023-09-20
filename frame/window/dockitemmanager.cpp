@@ -50,7 +50,7 @@ DockItemManager::DockItemManager() : QObject()
     // reloadAppItems();
 
     // 刷新图标
-    QMetaObject::invokeMethod(this, "refreshItemsIcon", Qt::QueuedConnection);
+    // QMetaObject::invokeMethod(this, "refreshItemsIcon", Qt::QueuedConnection);
 }
 
 
@@ -179,12 +179,6 @@ bool DockItemManager::appIsOnDock(const QString &appDesktop) const
     return m_taskmanager->isDocked(appDesktop);
 }
 
-void DockItemManager::manageItem(DockItem *item)
-{
-    // connect(item, &DockItem::requestRefreshWindowVisible, this, &DockItemManager::requestRefershWindowVisible, Qt::UniqueConnection);
-    connect(item, &DockItem::requestWindowAutoHide, this, &DockItemManager::requestWindowAutoHide, Qt::UniqueConnection);
-}
-
 void DockItemManager::itemMoved(AppItem *const sourceItem, AppItem *const targetItem)
 {
     Q_ASSERT(sourceItem != targetItem);
@@ -212,21 +206,21 @@ void DockItemManager::appItemAdded(const Entry *entry, const int index, bool upd
         return;
     }
 
-    manageItem(item);
+    m_itemList.insert(index, item);
+    m_appIDist.append(item->appId());
 
+    // connect(item, &DockItem::requestRefreshWindowVisible, this, &DockItemManager::requestRefershWindowVisible, Qt::UniqueConnection);
+    connect(item, &DockItem::requestWindowAutoHide, this, &DockItemManager::requestWindowAutoHide, Qt::UniqueConnection);
     connect(item, &AppItem::requestPreviewWindow, m_taskmanager, &TaskManager::previewWindow);
     connect(item, &AppItem::requestCancelPreview, m_taskmanager, &TaskManager::cancelPreviewWindow);
     connect(item, &AppItem::windowCountChanged, this, &DockItemManager::onAppWindowCountChanged);
     connect(this, &DockItemManager::requestUpdateDockItem, item, &AppItem::requestUpdateEntryGeometries);
 
-    m_itemList.insert(index, item);
-    m_appIDist.append(item->appId());
-
-    connect(item, &AppItem::windowItemInserted, [this](WindowItem *item){
+    connect(item, &AppItem::windowItemInserted, item, [this](WindowItem *item){
         emit itemInserted(-1, item);
         emit itemCountChanged();
     });
-    connect(item, &AppItem::windowItemRemoved, [this](WindowItem *item, bool animation){
+    connect(item, &AppItem::windowItemRemoved, item, [this](WindowItem *item, bool animation){
         emit itemRemoved(item, animation);
         if(animation)
             connect(item, &DockItem::inoutFinished, this, [this](bool in){ emit itemCountChanged(); });
@@ -239,13 +233,13 @@ void DockItemManager::appItemAdded(const Entry *entry, const int index, bool upd
         if(dirItem->hasId(item->getDesktopFile()))
         {
             dirItem->addItem(item);
-            item->fetchWindowInfos();
 
             if(index == -1 && dirItem->currentCount() == 1)
             {
                 emit itemInserted(-1, dirItem, updateFrame);
                 if(updateFrame) emit itemCountChanged();
             }
+            item->fetchWindowInfos();
             return;
         }
     }
@@ -313,10 +307,6 @@ void DockItemManager::reloadAppItems()
 
     loadDirAppData();
     for (auto entry : m_taskmanager->getEntries()) appItemAdded(entry, -1, false);
-
-    for(auto dirItem : m_dirList)
-        if(!dirItem->parentWidget() /*&& !dirItem->isEmpty()*/)
-            emit itemInserted(dirItem->getIndex(), dirItem);
 
     emit itemCountChanged();
 }

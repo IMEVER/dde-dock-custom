@@ -60,9 +60,6 @@ MainWindow::MainWindow(QWidget *parent) : DBlurEffectWidget(parent)
 void MainWindow::launch()
 {
     QTimer::singleShot(400, this, [ this ] {
-
-        DockItemManager::instance()->reloadAppItems();
-
         setMaskColor(AutoColor);
         setMaskAlpha(m_multiScreenWorker->opacity());
 
@@ -72,6 +69,7 @@ void MainWindow::launch()
         else
             m_platformWindowHandle.setBorderColor(QColor(QColor::Invalid));
 
+        DockItemManager::instance()->reloadAppItems();
         m_multiScreenWorker->initShow();
     });
 }

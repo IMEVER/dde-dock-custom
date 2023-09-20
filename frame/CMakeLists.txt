@@ -25,8 +25,8 @@ pkg_check_modules(QGSettings REQUIRED gsettings-qt)
 
 # qt5_add_dbus_adaptor(SRCS dbus/com.deepin.dde.Dock.xml window/mainwindow.h MainWindow dbusdockadaptors DBusDockAdaptors)
 
-set_source_files_properties(dbus/me.imever.dde.toppanel.xml PROPERTIES CLASSNAME TopPanelInterface NO_NAMESPACE true INCLUDE dbus/dbusdockadaptors.h)
-qt5_add_dbus_interface(SRCS dbus/me.imever.dde.toppanel.xml TopPanelInterface )
+set_source_files_properties(dbus/me.imever.toppanel.xml PROPERTIES CLASSNAME TopPanelInterface NO_NAMESPACE true INCLUDE dbus/dbusdockadaptors.h)
+qt5_add_dbus_interface(SRCS dbus/me.imever.toppanel.xml TopPanelInterface )
 
 set_source_files_properties(dbus/org.deepin.dde.Launcher1.xml PROPERTIES CLASSNAME LauncherInter)
 qt5_add_dbus_interface(SRCS dbus/org.deepin.dde.Launcher1.xml LauncherInter)

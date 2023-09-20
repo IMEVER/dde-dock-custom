@@ -11,11 +11,5 @@
   <method name="ShowByMode">
     <arg name="in0" type="x" direction="in"/>
   </method>
-  <method name="UninstallApp">
-    <arg name="appKey" type="s" direction="in"/>
-  </method>
   <method name="Toggle"></method>
-  <method name="IsVisible">
-    <arg type="b" direction="out"/>
-  </method>
 </interface>
