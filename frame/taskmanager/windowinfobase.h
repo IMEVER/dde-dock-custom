@@ -7,6 +7,7 @@
 
 #include "processinfo.h"
 #include "xcbutils.h"
+#include "appinfo.h"
 
 #include <QString>
 #include <QVector>
@@ -15,7 +16,6 @@
 #include <qscopedpointer.h>
 
 class Entry;
-class AppInfo;
 
 class WindowInfoBase : public QObject
 {
@@ -32,6 +32,7 @@ public:
     virtual void activate() = 0;
     virtual void minimize() = 0;
     virtual bool isMinimized() = 0;
+    virtual bool isMaximized() = 0;
     virtual int64_t getCreatedTime() = 0;
     virtual QString getWindowType() = 0;
     virtual QString getDisplayName() = 0;
@@ -45,12 +46,14 @@ public:
     void setEntry(Entry *value) { entry = value; }
     Entry *getEntry() { return entry; }
     QString getEntryInnerId() { return entryInnerId; }
-    void setEntryInnerId(QString value) { entryInnerId = value; }
     AppInfo *getAppInfo() { return app; }
-    void setAppInfo(AppInfo *value) { app = value; }
+    void setAppInfo(AppInfo *value) { app = value; entryInnerId = value ? value->getInnerId() : innerId; }
     int getPid() { return pid; }
     ProcessInfo *getProcess() { return m_processInfo.data(); }
     bool containAtom(QVector<XCBAtom> supports, XCBAtom ty) {return supports.indexOf(ty) != -1;}
+
+signals:
+    void titleChanged(const QString &title);
 
 protected:
     XWindow xid;            // 窗口id

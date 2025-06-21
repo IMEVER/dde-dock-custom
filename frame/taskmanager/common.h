@@ -10,22 +10,30 @@
 #include <QString>
 #include <QStandardPaths>
 
-const QString configDock              = "com.deepin.dde.dock";
+const QString launcherService = "org.deepin.dde.Launcher1";
+const QString launcherPath = "/org/deepin/dde/Launcher1";
+const QString launcherInterface = "org.deepin.dde.Launcher1";
+constexpr auto DesktopFileActionKey = u8"Desktop Action ";
+constexpr auto DDEApplicationManager1ObjectPath = u8"/org/desktopspec/ApplicationManager1";
+constexpr auto ApplicationManager1DBusName= u8"org.desktopspec.ApplicationManager1";
+
+const QString configAppName               = "org.deepin.ds.dock";
+const QString configDock              = "org.deepin.ds.dock";
+const QString configDockApps              = "org.deepin.ds.dock.taskmanager";
 const QString configAppearance        = "com.deepin.dde.appearance";
 
 const QString keyOpacity              = "Opacity";
 const QString keyPosition             = "Position";
-const QString keyIconSize             = "Icon_Size";
+const QString keyIconSize             = "Dock_Size";
 const QString keyHideMode             = "Hide_Mode";
 const QString keyRecentApp            = "Recent_App";
 const QString keyShowRecent           = "Show_Recent";
-const QString keyDockedApps           = "Docked_Apps";
+const QString keyDockedApps           = "Docked_Items";
 const QString keyShowTimeout          = "Show_Timeout";
 const QString keyHideTimeout          = "Hide_Timeout";
 const QString keyForceQuitApp         = "Force_Quit_App";
 const QString keyShowMultiWindow      = "Show_MultiWindow";
-const QString keyWindowSizeFashion    = "Window_Size_Fashion";
-const QString keyWinIconPreferredApps = "Win_Icon_Preferred_Apps";
+const QString keyShowInPrimary        = "Show_In_Primary";
 
 const QString keyShowWindowName      = "Dock_Show_Window_Name";
 
@@ -46,6 +54,8 @@ StartupNotify=false
 )";
 
 const QString frontendWindowWmClass     = "dde-dock";
+const QString desktopWmClass            = "dde-desktop";
+const QString ddeTopPanelWmClass        = "dde-top-panel";
 const QString ddeLauncherWMClass        = "dde-launcher";
 
 const int smartHideTimerDelay           = 400;

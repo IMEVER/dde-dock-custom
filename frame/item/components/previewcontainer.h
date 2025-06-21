@@ -29,11 +29,6 @@
 #include "../../interfaces/constants.h"
 #include "../../taskmanager/windowinfomap.h"
 #include "appsnapshot.h"
-#include "floatingpreview.h"
-
-#include <DWindowManagerHelper>
-
-DWIDGET_USE_NAMESPACE
 
 class PreviewContainer : public QWidget
 {
@@ -41,18 +36,18 @@ class PreviewContainer : public QWidget
 
 public:
     static PreviewContainer* instance();
-    static PreviewContainer* instance(const WindowInfoMap &infos, const QVector<uint> allowClose, const Dock::Position dockPos);
+    static PreviewContainer* instance(const WindowInfoMap &infos, const Dock::Position dockPos);
 
 signals:
     void requestActivateWindow(const WId wid) const;
     void requestPreviewWindow(const WId wid) const;
+    void requestClose(const WId wid) const;
     void requestCheckWindows() const;
     void requestCancelPreviewWindow() const;
     void requestHidePopup() const;
 
 public:
-    void setWindowInfos(const WindowInfoMap &infos, const QVector<uint> allowClose);
-    void updateSnapshots();
+    void setWindowInfos(const WindowInfoMap &infos);
 
 public slots:
     void updateLayoutDirection(const Dock::Position dockPos);
@@ -71,20 +66,13 @@ private:
 
 private slots:
     void onSnapshotClicked(const WId wid);
-    void previewEntered(const WId wid);
-    void previewFloating();
 
 private:
-    bool m_needActivate;
     QMap<WId, AppSnapshot *> m_snapshots;
 
-    FloatingPreview *m_floatingPreview;
     QBoxLayout *m_windowListLayout;
 
     QTimer *m_mouseLeaveTimer;
-    DWindowManagerHelper *m_wmHelper;
-    QTimer *m_waitForShowPreviewTimer;
-    WId m_currentWId;
 };
 
 #endif // PREVIEWCONTAINER_H

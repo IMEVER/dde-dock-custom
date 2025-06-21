@@ -1,6 +1,7 @@
 #include "folderitem.h"
 
 #include "util/dockpopupwindow.h"
+#include "../window/dockitemmanager.h"
 
 #include <QMouseEvent>
 #include <QGuiApplication>
@@ -239,6 +240,7 @@ FolderItem::FolderItem(QString path, QWidget *parent) : DockItem(parent)
         dirPopupWindow->setShadowXOffset(0);
         dirPopupWindow->setArrowWidth(18);
         dirPopupWindow->setArrowHeight(10);
+        connect(dirPopupWindow, &DockPopupWindow::requestWindowAutoHide, DockItemManager::instance(), &DockItemManager::requestWindowAutoHide);
     }
 
     m_popupGrid = new FolderWidget(m_path);
@@ -331,8 +333,6 @@ const QString FolderItem::contextMenu() const
 
 void FolderItem::showDirPopupWindow()
 {
-    emit requestWindowAutoHide(false);
-
     switch (DockPosition) {
     case Top:
     case Bottom: dirPopupWindow->setArrowDirection(DockPopupWindow::ArrowBottom);  break;
@@ -342,8 +342,6 @@ void FolderItem::showDirPopupWindow()
 
     dirPopupWindow->setContent(m_popupGrid);
     dirPopupWindow->show(popupMarkPoint(), true);
-
-    connect(dirPopupWindow, &DockPopupWindow::accept, this, &FolderItem::hideDirpopupWindow, Qt::UniqueConnection);
 }
 
 void FolderItem::hideDirpopupWindow()

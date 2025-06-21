@@ -148,7 +148,7 @@ Geometry XCBUtils::getWindowGeometry(XWindow xid)
 
     xcb_screen_iterator_t xcbScreenIterator = xcb_setup_roots_iterator(xcbSetup);
     std::shared_ptr<xcb_translate_coordinates_reply_t> translateReply(
-        xcb_translate_coordinates_reply(m_connect, 
+        xcb_translate_coordinates_reply(m_connect,
             xcb_translate_coordinates(m_connect, xid, xcbScreenIterator.data->root, 0, 0),
             nullptr),
         [=](xcb_translate_coordinates_reply_t* translateReply){free(translateReply);});
@@ -572,7 +572,7 @@ XWindow XCBUtils::getWMTransientFor(XWindow xid)
     XWindow ret;
     xcb_get_property_cookie_t cookie = xcb_icccm_get_wm_transient_for(m_connect, xid);
     if (!xcb_icccm_get_wm_transient_for_reply(m_connect, cookie, &ret, nullptr)) {
-        std::cout << xid << " getWMTransientFor error" << std::endl;
+        // std::cout << xid << " getWMTransientFor error" << std::endl;
     }
 
     return ret;

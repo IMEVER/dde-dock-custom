@@ -80,7 +80,7 @@ void BamfDesktop::loadDesktopFiles()
             QStringList part = line.split("\t");
             BamfData bamf;
             bamf.directory = direction;
-            if (part.size() > 2)
+            if (part.size() > 3)
                 bamf.instanceName = part[2].trimmed();
             bamf.lineData = line;
             m_bamfLineData << bamf;

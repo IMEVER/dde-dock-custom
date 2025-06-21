@@ -21,13 +21,13 @@ public:
 
     bool isValidApp() {return m_isValid;}
     bool isInstalled() {return m_installed;}
-    
+    bool shouldShow() const {return m_shouldShow;}
 
-    QString getId() {return m_id;}
     QString getIcon() {return m_icon;}
     QString getName() {return m_name;}
     QString getInnerId() {return m_innerId;}
     QString getFileName() {return m_fileName;}
+    QString getBaseFileName() {return m_baseFileName; }
     QString getIdentifyMethod() {return m_identifyMethod;}
 
     QVector<DesktopAction> getActions() {return m_actions;}
@@ -39,12 +39,13 @@ private:
 
     bool m_installed;
     bool m_isValid;
-    
-    QString m_id;
+    bool m_shouldShow;
+
     QString m_name;
     QString m_icon;
     QString m_innerId;
     QString m_fileName;
+    QString m_baseFileName;
     QString m_identifyMethod;
     QVector<DesktopAction> m_actions;
 

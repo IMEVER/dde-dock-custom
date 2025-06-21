@@ -24,6 +24,9 @@ protected:
     const QString contextMenu() const Q_DECL_OVERRIDE;
 
 private:
+    void openTrash();
+
+private:
     QFileSystemWatcher *m_watcher;
     int m_count;
 };

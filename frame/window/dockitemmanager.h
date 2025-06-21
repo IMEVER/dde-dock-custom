@@ -36,49 +36,24 @@ class DockItemManager : public QObject
 {
     Q_OBJECT
 public:
-    enum ActivateAnimationType {
-        Swing = 0,
-        Jump = 1,
-        Scale = 2,
-        Popup = 3,
-        No = 4
-    };
-
     static DockItemManager *instance();
 
-    const QList<QPointer<AppItem> > itemList();
     DirItem *createDir(const QString title={});
     FolderItem *createFolder(const QString path);
     bool appIsOnDock(const QString &appDesktop) const;
-    MergeMode getDockMergeMode();
-    void saveDockMergeMode(MergeMode mode);
-    bool isEnableHoverScaleAnimation();
-    bool isEnableInOutAnimation();
-    bool isEnableDragAnimation();
-    bool isEnableHoverHighlight();
-    void setHoverScaleAnimation(bool enable);
-    void setInOutAnimation(bool enable);
-    void setDragAnimation(bool enable);
-    void setHoverHighlight(bool enable);
-    ActivateAnimationType animationType();
-    void setAnimationType(ActivateAnimationType type);
-    bool hasWindowItem();
     int itemSize();
-    int itemCount();
 
 signals:
-    void itemInserted(const int index, DockItem *item, bool animation = true) const;
-    void itemRemoved(DockItem *item, bool animation = true) const;
+    void itemInserted(const int index, DockItem *item) const;
+    void itemRemoved(DockItem *item) const;
     void requestWindowAutoHide(const bool autoHide) const;
-    void mergeModeChanged(MergeMode mode);
     void itemCountChanged();
-    void hoverHighlighted(bool enabled);
     void requestUpdateDockItem() const;
 
 
 public slots:
     void reloadAppItems();
-    void itemMoved(AppItem *const sourceItem, AppItem *const targetItem);
+    void itemMoved(QStringList&);
     void itemAdded(const QString &appDesktop, int idx);
     void folderAdded(const QString &path);
     void updateDirApp();
@@ -86,11 +61,10 @@ public slots:
 private:
     explicit DockItemManager();
     void refreshItemsIcon();
-    void appItemAdded(const Entry *entry, const int index, bool updateFrame=true);
+    void appItemAdded(const Entry *entry, int index);
     void appItemRemoved(const QString &appId);
-    void appItemRemoved(AppItem *appItem, bool animation = true);
+    void appItemRemoved(AppItem *appItem);
     void loadDirAppData();
-    void loadFolderData();
 
     void onAppWindowCountChanged();
     // void onShowMultiWindowChanged();
@@ -102,14 +76,11 @@ private:
 
 private:
     TaskManager *m_taskmanager;
-    QSettings *m_qsettings;
+    QTimer *m_timer;
 
-    QList<QPointer<AppItem>> m_itemList;
-    QList<QString> m_appIDist;
-    QList<QPointer<DirItem>> m_dirList;
+    QMap<QString, AppItem*> m_itemList;
+    QList<DirItem*> m_dirList;
     QList<FolderItem*> m_folderList;
 };
-
-Q_DECLARE_METATYPE(DockItemManager::ActivateAnimationType);
 
 #endif // DOCKITEMMANAGER_H

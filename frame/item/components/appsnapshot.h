@@ -25,19 +25,12 @@
 #include <QWidget>
 #include <QDebug>
 #include <QTimer>
-#include "../tipswidget.h"
-#include "../../taskmanager/windowinfomap.h"
 
-#include <DIconButton>
-#include <DWindowManagerHelper>
-
-DWIDGET_USE_NAMESPACE
-DGUI_USE_NAMESPACE
+#include <QPushButton>
 
 #define SNAP_WIDTH       200
 #define SNAP_HEIGHT      130
 
-struct SHMInfo;
 struct _XImage;
 typedef _XImage XImage;
 
@@ -47,51 +40,37 @@ class AppSnapshot : public QWidget
 
 public:
     explicit AppSnapshot(const WId wid, QWidget *parent = 0);
-
-    inline WId wid() const { return m_wid; }
-    inline bool attentioned() { return m_windowInfo.attention; }
-    inline bool closeAble() const { return m_closeAble; }
     void setCloseAble(const bool value);
-    inline const QImage snapshot() const { return m_snapshot; }
-    inline const QRectF snapshotGeometry() const { return m_snapshotSrcRect; }
-    inline const QString title() { return m_windowInfo.title; }
 
 signals:
     void entered(const WId wid) const;
+    void dragEntered(const WId wid) const;
     void clicked(const WId wid) const;
+    void requestClose(const WId wid) const;
     void requestCheckWindow() const;
 
 public slots:
-    void fetchSnapshot();
-    void closeWindow() const;
-    void compositeChanged() const;
-    void setWindowInfo(const WindowInfo &info);
+    void setTitle(const QString &title);
 
 private:
     void dragEnterEvent(QDragEnterEvent *e) override;
     void enterEvent(QEvent *e) override;
     void leaveEvent(QEvent *e) override;
     void paintEvent(QPaintEvent *e) override;
-    void resizeEvent(QResizeEvent *e) override;
     void mousePressEvent(QMouseEvent *e) override;
     bool eventFilter(QObject *watched, QEvent *e) override;
-    SHMInfo *getImageDSHM();
+    void fetchSnapshot();
     XImage * getImageXlib();
     QRect rectRemovedShadow(const QImage &qimage, unsigned char *prop_to_return_gtk);
 
 private:
     const WId m_wid;
-    WindowInfo m_windowInfo;
-
-    bool m_closeAble;
 
     QImage m_snapshot;
     QRectF m_snapshotSrcRect;
 
-    TipsWidget *m_title;
-    QTimer *m_waitLeaveTimer;
-    DIconButton *m_closeBtn2D;
-    DWindowManagerHelper *m_wmHelper;
+    QString m_title;
+    QPushButton *m_closeBtn2D;
 };
 
 #endif // APPSNAPSHOT_H

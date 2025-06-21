@@ -21,6 +21,7 @@
 
 #include "displaymanager.h"
 #include "utils.h"
+#include "dockscreen.h"
 
 #include <QScreen>
 #include <QApplication>
@@ -29,8 +30,12 @@
 
 DisplayManager::DisplayManager(QObject *parent) : QObject(parent)
     , m_gsettings(Utils::SettingsPtr("com.deepin.dde.dock.mainwindow", "/com/deepin/dde/dock/mainwindow/", this))
-    , m_onlyInPrimary(Utils::SettingValue("com.deepin.dde.dock.mainwindow", "/com/deepin/dde/dock/mainwindow/", "onlyShowPrimary", false).toBool())
 {
+    m_onlyInPrimary = false;
+
+    if(m_gsettings and m_gsettings->keys().contains("onlyShowPrimary"))
+        m_onlyInPrimary = m_gsettings->get("onlyShowPrimary").toBool();
+
     connect(qApp, &QApplication::primaryScreenChanged, this, &DisplayManager::primaryScreenChanged);
     connect(qApp, &QApplication::primaryScreenChanged, this, &DisplayManager::dockInfoChanged);
     connect(qApp, &QGuiApplication::screenAdded, this, &DisplayManager::screenCountChanged);
@@ -39,9 +44,7 @@ DisplayManager::DisplayManager(QObject *parent) : QObject(parent)
     if (m_gsettings)
         connect(m_gsettings, &QGSettings::changed, this, &DisplayManager::onGSettingsChanged);
 
-    screenCountChanged();
-
-    QTimer::singleShot(0, this, &DisplayManager::screenInfoChanged);
+    QTimer::singleShot(0, this, &DisplayManager::screenCountChanged);
 }
 
 /**
@@ -324,15 +327,15 @@ void DisplayManager::screenCountChanged()
                                     | Qt::InvertedPortraitOrientation);
 
         // 显示器信息发生任何变化时，都应该重新刷新一次任务栏的显示位置
-        connect(s, &QScreen::geometryChanged, this, &DisplayManager::dockInfoChanged);
-        connect(s, &QScreen::availableGeometryChanged, this, &DisplayManager::dockInfoChanged);
-        connect(s, &QScreen::physicalSizeChanged, this, &DisplayManager::dockInfoChanged);
-        connect(s, &QScreen::physicalDotsPerInchChanged, this, &DisplayManager::dockInfoChanged);
-        connect(s, &QScreen::logicalDotsPerInchChanged, this, &DisplayManager::dockInfoChanged);
-        connect(s, &QScreen::virtualGeometryChanged, this, &DisplayManager::dockInfoChanged);
-        connect(s, &QScreen::primaryOrientationChanged, this, &DisplayManager::dockInfoChanged);
-        connect(s, &QScreen::orientationChanged, this, &DisplayManager::dockInfoChanged);
-        connect(s, &QScreen::refreshRateChanged, this, &DisplayManager::dockInfoChanged);
+        // connect(s, &QScreen::geometryChanged, this, &DisplayManager::dockInfoChanged);
+        // connect(s, &QScreen::availableGeometryChanged, this, &DisplayManager::dockInfoChanged);
+        // connect(s, &QScreen::physicalSizeChanged, this, &DisplayManager::dockInfoChanged);
+        // connect(s, &QScreen::physicalDotsPerInchChanged, this, &DisplayManager::dockInfoChanged);
+        // connect(s, &QScreen::logicalDotsPerInchChanged, this, &DisplayManager::dockInfoChanged);
+        // connect(s, &QScreen::virtualGeometryChanged, this, &DisplayManager::dockInfoChanged);
+        // connect(s, &QScreen::primaryOrientationChanged, this, &DisplayManager::dockInfoChanged);
+        // connect(s, &QScreen::orientationChanged, this, &DisplayManager::dockInfoChanged);
+        // connect(s, &QScreen::refreshRateChanged, this, &DisplayManager::dockInfoChanged);
 
         m_screens.append(s);
     }
@@ -345,9 +348,7 @@ void DisplayManager::dockInfoChanged()
 {
     updateScreenDockInfo();
 
-#ifdef QT_DEBUG
-    qInfo() << m_screenPositionMap;
-#endif
+    DockScreen::instance()->updatePrimary(primary());
 
     Q_EMIT screenInfoChanged();
 }
@@ -360,8 +361,7 @@ void DisplayManager::dockInfoChanged()
 void DisplayManager::onGSettingsChanged(const QString &key)
 {
     if (key == "onlyShowPrimary") {
-        m_onlyInPrimary = Utils::SettingValue("com.deepin.dde.dock.mainwindow", "/com/deepin/dde/dock/mainwindow/", "onlyShowPrimary", false).toBool();
-
+        m_onlyInPrimary = m_gsettings->get("onlyShowPrimary").toBool();
         dockInfoChanged();
     }
 }

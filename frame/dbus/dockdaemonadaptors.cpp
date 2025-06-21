@@ -11,12 +11,9 @@ DockDaemonDBusAdaptor::DockDaemonDBusAdaptor(QObject *parent)
 {
     // constructor
     setAutoRelaySignals(true);
-    connect(TaskManager::instance(), &TaskManager::entryAdded, this, &DockDaemonDBusAdaptor::EntryAdded);
-    connect(TaskManager::instance(), &TaskManager::entryRemoved, this, &DockDaemonDBusAdaptor::EntryRemoved);
     connect(TaskManager::instance(), &TaskManager::hideStateChanged, this, &DockDaemonDBusAdaptor::HideStateChanged);
     connect(TaskManager::instance(), &TaskManager::frontendWindowRectChanged, this, &DockDaemonDBusAdaptor::FrontendWindowRectChanged);
     connect(TaskManager::instance(), &TaskManager::showRecentChanged, this, &DockDaemonDBusAdaptor::showRecentChanged);
-    connect(TaskManager::instance(), &TaskManager::showMultiWindowChanged, this, &DockDaemonDBusAdaptor::ShowMultiWindowChanged);
 }
 
 DockDaemonDBusAdaptor::~DockDaemonDBusAdaptor()
@@ -31,11 +28,6 @@ int DockDaemonDBusAdaptor::displayMode() const
 
 void DockDaemonDBusAdaptor::setDisplayMode(int value)
 {
-}
-
-QStringList DockDaemonDBusAdaptor::dockedApps() const
-{
-    return TaskManager::instance()->getDockedApps();
 }
 
 int DockDaemonDBusAdaptor::hideMode() const
@@ -146,63 +138,12 @@ bool DockDaemonDBusAdaptor::showRecent() const
 
 bool DockDaemonDBusAdaptor::showMultiWindow() const
 {
-    return TaskManager::instance()->showMultiWindow();
-}
-
-void DockDaemonDBusAdaptor::CloseWindow(uint win)
-{
-    TaskManager::instance()->closeWindow(win);
-}
-
-// for debug
-QStringList DockDaemonDBusAdaptor::GetEntryIDs()
-{
-    return TaskManager::instance()->getEntryIDs();
+    return false;
 }
 
 bool DockDaemonDBusAdaptor::IsDocked(const QString &desktopFile)
 {
     return TaskManager::instance()->isDocked(desktopFile);
-}
-
-bool DockDaemonDBusAdaptor::IsOnDock(const QString &desktopFile)
-{
-    return TaskManager::instance()->isOnDock(desktopFile);
-}
-
-void DockDaemonDBusAdaptor::MoveEntry(int index, int newIndex)
-{
-    TaskManager::instance()->moveEntry(index, newIndex);
-}
-
-QString DockDaemonDBusAdaptor::QueryWindowIdentifyMethod(uint win)
-{
-    return TaskManager::instance()->queryWindowIdentifyMethod(win);
-}
-
-QStringList DockDaemonDBusAdaptor::GetDockedAppsDesktopFiles()
-{
-    return TaskManager::instance()->getDockedAppsDesktopFiles();
-}
-
-QString DockDaemonDBusAdaptor::GetPluginSettings()
-{
-    return ""; //TaskManager::instance()->getPluginSettings();
-}
-
-void DockDaemonDBusAdaptor::SetPluginSettings(QString jsonStr)
-{
-    // TaskManager::instance()->setPluginSettings(jsonStr);
-}
-
-void DockDaemonDBusAdaptor::MergePluginSettings(QString jsonStr)
-{
-    // TaskManager::instance()->mergePluginSettings(jsonStr);
-}
-
-void DockDaemonDBusAdaptor::RemovePluginSettings(QString key1, QStringList key2List)
-{
-    // TaskManager::instance()->removePluginSettings(key1, key2List);
 }
 
 bool DockDaemonDBusAdaptor::RequestDock(const QString &desktopFile, int index)
@@ -222,10 +163,5 @@ void DockDaemonDBusAdaptor::SetShowRecent(bool visible)
 
 void DockDaemonDBusAdaptor::SetShowMultiWindow(bool showMultiWindow)
 {
-    TaskManager::instance()->setShowMultiWindow(showMultiWindow);
-}
 
-void DockDaemonDBusAdaptor::SetFrontendWindowRect(int x, int y, uint width, uint height)
-{
-    TaskManager::instance()->setFrontendWindowRect(x, y, width, height);
 }

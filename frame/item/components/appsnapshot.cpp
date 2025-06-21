@@ -20,160 +20,73 @@
  */
 
 #include "appsnapshot.h"
-#include "previewcontainer.h"
 
-#include <DStyle>
-
+#include <QEvent>
 #include <X11/Xlib.h>
 #include <X11/X.h>
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
-#include <sys/shm.h>
 
 #include <QX11Info>
 #include <QPainter>
-#include <QVBoxLayout>
 #include <QSizeF>
-#include <QTimer>
-
-struct SHMInfo {
-    long shmid;
-    long width;
-    long height;
-    long bytesPerLine;
-    long format;
-
-    struct Rect {
-        long x;
-        long y;
-        long width;
-        long height;
-    } rect;
-};
 
 AppSnapshot::AppSnapshot(const WId wid, QWidget *parent)
     : QWidget(parent)
     , m_wid(wid)
-    , m_title(new TipsWidget)
-    , m_waitLeaveTimer(new QTimer(this))
-    , m_closeBtn2D(new DIconButton(this))
-    , m_wmHelper(DWindowManagerHelper::instance())
+    , m_closeBtn2D(nullptr)
 {
-    m_closeBtn2D->setFixedSize(24, 24);
-    m_closeBtn2D->setObjectName("closebutton-2d");
-    // m_closeBtn2D->setNormalPic(":/icons/resources/close_round_normal.svg");
-    // m_closeBtn2D->setHoverPic(":/icons/resources/close_round_hover.svg");
-    // m_closeBtn2D->setPressPic(":/icons/resources/close_round_press.svg");
-    m_closeBtn2D->setIcon(QIcon(":/icons/resources/close_round_normal.svg"));
-    m_closeBtn2D->setVisible(false);
-    m_closeBtn2D->setFlat(true);
-    m_closeBtn2D->installEventFilter(this);
-
-    m_title->setObjectName("AppSnapshotTitle");
-
-    QHBoxLayout *centralLayout = new QHBoxLayout;
-    centralLayout->addWidget(m_title);
-    centralLayout->addWidget(m_closeBtn2D);
-    centralLayout->setSpacing(5);
-    centralLayout->setMargin(0);
-
-    centralLayout->setAlignment(m_closeBtn2D, Qt::AlignRight);
-
-    setLayout(centralLayout);
     setAcceptDrops(true);
-    resize(SNAP_WIDTH, SNAP_HEIGHT);
-
-    connect(m_closeBtn2D, &DIconButton::clicked, this, &AppSnapshot::closeWindow, Qt::QueuedConnection);
-    connect(m_wmHelper, &DWindowManagerHelper::hasCompositeChanged, this, &AppSnapshot::compositeChanged, Qt::QueuedConnection);
-    QTimer::singleShot(1, this, &AppSnapshot::compositeChanged);
-}
-
-void AppSnapshot::setCloseAble(const bool value) {
-    m_closeAble = value;
-}
-
-void AppSnapshot::closeWindow() const
-{
-    const auto display = QX11Info::display();
-
-    XEvent e;
-
-    memset(&e, 0, sizeof(e));
-    e.xclient.type = ClientMessage;
-    e.xclient.window = m_wid;
-    e.xclient.message_type = XInternAtom(display, "WM_PROTOCOLS", true);
-    e.xclient.format = 32;
-    e.xclient.data.l[0] = XInternAtom(display, "WM_DELETE_WINDOW", false);
-    e.xclient.data.l[1] = CurrentTime;
-
-    XSendEvent(display, m_wid, false, NoEventMask, &e);
-    XFlush(display);
-}
-
-void AppSnapshot::compositeChanged() const
-{
-    const bool composite = m_wmHelper->hasComposite();
-
-    m_title->setVisible(!composite);
+    setFixedSize(SNAP_WIDTH, SNAP_HEIGHT);
 
     QTimer::singleShot(1, this, &AppSnapshot::fetchSnapshot);
 }
 
-void AppSnapshot::setWindowInfo(const WindowInfo &info)
+void AppSnapshot::setCloseAble(const bool value) {
+    if(value and !m_closeBtn2D) {
+        m_closeBtn2D = new QPushButton(this);
+        m_closeBtn2D->setFixedSize(32, 32);
+        m_closeBtn2D->setIconSize(QSize(28, 28));
+        m_closeBtn2D->setIcon(QIcon(":/icons/resources/close_round_normal.svg"));
+        m_closeBtn2D->setVisible(false);
+        m_closeBtn2D->setFlat(true);
+        m_closeBtn2D->installEventFilter(this);
+        connect(m_closeBtn2D, &QPushButton::clicked, this, [this]{emit requestClose(m_wid);}, Qt::QueuedConnection);
+    } else if(!value and m_closeBtn2D) {
+        m_closeBtn2D->deleteLater();
+        m_closeBtn2D = nullptr;
+    }
+}
+
+void AppSnapshot::setTitle(const QString &title)
 {
-    m_windowInfo = info;
-    QFontMetrics fm(m_title->font());
-    QString strTtile = m_title->fontMetrics().elidedText(m_windowInfo.title, Qt::ElideRight, width());
-    m_title->setText(strTtile);
+    m_title = fontMetrics().elidedText(title, Qt::ElideRight, width()-30);
+    if(isVisible()) update();
 }
 
 void AppSnapshot::dragEnterEvent(QDragEnterEvent *e)
 {
     QWidget::dragEnterEvent(e);
-
-    if (m_wmHelper->hasComposite())
-        emit entered(m_wid);
+    emit dragEntered(m_wid);
 }
 
 void AppSnapshot::fetchSnapshot()
 {
-    if (!m_wmHelper->hasComposite())
-        return;
-
     QImage qimage;
-    SHMInfo *info = nullptr;
-    uchar *image_data = nullptr;
     XImage *ximage = nullptr;
     unsigned char *prop_to_return_gtk = nullptr;
 
     do {
-        // get window image from shm(only for deepin app)
-        info = getImageDSHM();
-        if (info) {
-            qDebug() << "get Image from dxcbplugin SHM...";
-            //qDebug() << info->shmid << info->width << info->height << info->bytesPerLine << info->format << info->rect.x << info->rect.y << info->rect.width << info->rect.height;
-            image_data = (uchar *)shmat(info->shmid, 0, 0);
-            if ((qint64)image_data != -1) {
-                m_snapshot = QImage(image_data, info->width, info->height, info->bytesPerLine, (QImage::Format)info->format);
-                m_snapshotSrcRect = QRect(info->rect.x, info->rect.y, info->rect.width, info->rect.height);
-                break;
-            }
-            qDebug() << "invalid pointer of shm!";
-            image_data = nullptr;
+        // get window image from XGetImage(a little slow)
+        qDebug() << "get Image from dxcbplugin SHM failed!";
+        qDebug() << "get Image from Xlib...";
+        ximage = getImageXlib();
+        if (!ximage) {
+            qDebug() << "get Image from Xlib failed! giving up...";
+            emit requestCheckWindow();
+            return;
         }
-
-        if (!image_data || qimage.isNull()) {
-            // get window image from XGetImage(a little slow)
-            qDebug() << "get Image from dxcbplugin SHM failed!";
-            qDebug() << "get Image from Xlib...";
-            ximage = getImageXlib();
-            if (!ximage) {
-                qDebug() << "get Image from Xlib failed! giving up...";
-                emit requestCheckWindow();
-                return;
-            }
-            qimage = QImage((const uchar *)(ximage->data), ximage->width, ximage->height, ximage->bytes_per_line, QImage::Format_RGB32);
-        }
+        qimage = QImage((const uchar *)(ximage->data), ximage->width, ximage->height, ximage->bytes_per_line, QImage::Format_RGB32);
 
         Q_ASSERT(!qimage.isNull());
 
@@ -187,16 +100,14 @@ void AppSnapshot::fetchSnapshot()
     size = m_snapshotSrcRect.size().scaled(size * ratio, Qt::KeepAspectRatio);
     qreal scale = qreal(size.width()) / m_snapshotSrcRect.width();
     m_snapshot = m_snapshot.scaled(qRound(m_snapshot.width() * scale), qRound(m_snapshot.height() * scale),
-                                   Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+                                Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
     m_snapshotSrcRect.moveTop(m_snapshotSrcRect.top() * scale + 0.5);
     m_snapshotSrcRect.moveLeft(m_snapshotSrcRect.left() * scale + 0.5);
     m_snapshotSrcRect.setWidth(size.width() - 0.5);
     m_snapshotSrcRect.setHeight(size.height() - 0.5);
     m_snapshot.setDevicePixelRatio(ratio);
 
-    if (image_data) shmdt(image_data);
     if (ximage) XDestroyImage(ximage);
-    if (info) XFree(info);
     if (prop_to_return_gtk) XFree(prop_to_return_gtk);
 
     update();
@@ -206,12 +117,12 @@ void AppSnapshot::enterEvent(QEvent *e)
 {
     QWidget::enterEvent(e);
 
-    if (!m_wmHelper->hasComposite()) {
-        m_closeBtn2D->setVisible(m_closeAble);
-    } else {
-        emit entered(wid());
+    if(m_closeBtn2D) {
+        m_closeBtn2D->setVisible(true);
+        m_closeBtn2D->move(width() - m_closeBtn2D->width()-2, 2);
     }
 
+    emit entered(m_wid);
     update();
 }
 
@@ -219,7 +130,7 @@ void AppSnapshot::leaveEvent(QEvent *e)
 {
     QWidget::leaveEvent(e);
 
-    m_closeBtn2D->setVisible(false);
+    if(m_closeBtn2D) m_closeBtn2D->setVisible(false);
 
     update();
 }
@@ -228,23 +139,11 @@ void AppSnapshot::paintEvent(QPaintEvent *e)
 {
     QPainter painter(this);
 
-    if (!m_wmHelper->hasComposite()) {
-        if (underMouse())
-            painter.fillRect(rect(), QColor(255, 255, 255, 255 * .2));
-        return;
-    }
-
     if (m_snapshot.isNull())
         return;
 
     const auto ratio = devicePixelRatioF();
-
-    // draw attention background
-    if (m_windowInfo.attention) {
-        painter.setBrush(QColor(241, 138, 46, 255 * .8));
-        painter.setPen(Qt::NoPen);
-        painter.drawRoundedRect(rect(), 5, 5);
-    }
+    const int radius = 5;
 
     // draw image
     const QImage &im = m_snapshot;
@@ -252,35 +151,44 @@ void AppSnapshot::paintEvent(QPaintEvent *e)
     const qreal offset_x = width() / 2.0 - m_snapshotSrcRect.width() / ratio / 2 - m_snapshotSrcRect.left() / ratio;
     const qreal offset_y = height() / 2.0 - m_snapshotSrcRect.height() / ratio / 2 - m_snapshotSrcRect.top() / ratio;
 
-    DStyleHelper dstyle(style());
-    const int radius = dstyle.pixelMetric(DStyle::PM_FrameRadius);
 
     QBrush brush;
     brush.setTextureImage(im);
+    painter.save();
     painter.setBrush(brush);
     painter.setPen(Qt::NoPen);
     painter.scale(1 / ratio, 1 / ratio);
     painter.translate(QPoint(offset_x * ratio, offset_y * ratio));
     painter.drawRoundedRect(m_snapshotSrcRect, radius * ratio, radius * ratio);
-}
+    painter.restore();
+    // draw attention background
+    if (underMouse()) {
+        // painter.setBrush(QColor(241, 138, 46, 255 * .8));
+        painter.setPen(Qt::blue);
+        painter.drawRoundedRect(rect().marginsRemoved({7, 7, 7, 7}), 2, 2);
 
-void AppSnapshot::resizeEvent(QResizeEvent *e)
-{
-    QWidget::resizeEvent(e);
+        QRect titleRect{15, height() - 50, width() - 30, 30};
 
-    QTimer::singleShot(1, this, &AppSnapshot::fetchSnapshot);
+        painter.setBrush(palette().base());
+        painter.setPen(Qt::NoPen);
+        painter.drawRoundedRect(titleRect, 4, 4);
+
+        painter.setPen(QPen(palette().brightText(), 2));
+        QTextOption option;
+        option.setAlignment(Qt::AlignCenter);
+        painter.drawText(titleRect, m_title, option);
+    }
 }
 
 void AppSnapshot::mousePressEvent(QMouseEvent *e)
 {
     QWidget::mousePressEvent(e);
-
     emit clicked(m_wid);
 }
 
 bool AppSnapshot::eventFilter(QObject *watched, QEvent *e)
 {
-    if (watched == m_closeBtn2D) {
+    if (watched == m_closeBtn2D and m_closeBtn2D) {
         if (e->type() == QEvent::HoverEnter || e->type() == QEvent::HoverMove) {
             m_closeBtn2D->setIcon(QIcon(":/icons/resources/close_round_hover.svg"));
         } else if (e->type() == QEvent::HoverLeave) {
@@ -291,30 +199,6 @@ bool AppSnapshot::eventFilter(QObject *watched, QEvent *e)
     }
 
     return QWidget::eventFilter(watched, e);
-}
-
-SHMInfo *AppSnapshot::getImageDSHM()
-{
-    const auto display = QX11Info::display();
-
-    Atom atom_prop = XInternAtom(display, "_DEEPIN_DXCB_SHM_INFO", true);
-    if (!atom_prop) {
-        return nullptr;
-    }
-
-    Atom actual_type_return_deepin_shm;
-    int actual_format_return_deepin_shm;
-    unsigned long nitems_return_deepin_shm;
-    unsigned long bytes_after_return_deepin_shm;
-    unsigned char *prop_return_deepin_shm;
-
-    XGetWindowProperty(display, m_wid, atom_prop, 0, 32 * 9, false, AnyPropertyType,
-                       &actual_type_return_deepin_shm, &actual_format_return_deepin_shm, &nitems_return_deepin_shm,
-                       &bytes_after_return_deepin_shm, &prop_return_deepin_shm);
-
-    //qDebug() << actual_type_return_deepin_shm << actual_format_return_deepin_shm << nitems_return_deepin_shm << bytes_after_return_deepin_shm << prop_return_deepin_shm;
-
-    return reinterpret_cast<SHMInfo *>(prop_return_deepin_shm);
 }
 
 XImage *AppSnapshot::getImageXlib()

@@ -13,25 +13,25 @@ class AppEffect : public QGraphicsView {
     public:
         static QVariantAnimation* SwingEffect(QWidget *parent, const QPixmap &icon)
         {
-            AppEffect *view = new AppEffect(parent, icon, DockItemManager::Swing);
+            AppEffect *view = new AppEffect(parent, icon, DockSettings::Swing);
             return view->m_animation;
         }
 
         static QVariantAnimation* JumpEffect(QWidget *parent, const QPixmap &icon, Position position)
         {
-            AppEffect *view = new AppEffect(parent, icon, DockItemManager::Jump, position);
+            AppEffect *view = new AppEffect(parent, icon, DockSettings::Jump, position);
             return view->m_animation;
         }
 
         static QVariantAnimation* ScaleEffect(QWidget *parent, const QPixmap &icon, Position position)
         {
-            AppEffect *view = new AppEffect(parent, icon, DockItemManager::Scale, position);
+            AppEffect *view = new AppEffect(parent, icon, DockSettings::Scale, position);
             return view->m_animation;
         }
 
         static QVariantAnimation* PopupEffect(QWidget *parent, const QPixmap &icon, Position position)
         {
-            AppEffect *view = new AppEffect(parent, icon, DockItemManager::Popup, position);
+            AppEffect *view = new AppEffect(parent, icon, DockSettings::Popup, position);
             return view->m_animation;
         }
     protected:
@@ -40,7 +40,7 @@ class AppEffect : public QGraphicsView {
         bool eventFilter(QObject *object, QEvent *event) override;
 
     private:
-        AppEffect(QWidget *parent, const QPixmap &icon, DockItemManager::ActivateAnimationType type, Position position=Bottom);
+        AppEffect(QWidget *parent, const QPixmap &icon, DockSettings::ActivateAnimationType type, Position position=Bottom);
 
         void initSwing();
         void initJump();
@@ -51,7 +51,7 @@ private:
     QWidget *m_parent;
     const QPixmap m_icon;
     const Position m_position;
-    const DockItemManager::ActivateAnimationType m_type;
+    const DockSettings::ActivateAnimationType m_type;
     QGraphicsScene *m_itemScene;
     QGraphicsPixmapItem *m_item;
     QVariantAnimation *m_animation;

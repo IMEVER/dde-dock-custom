@@ -25,7 +25,6 @@
 #include "interfaces/constants.h"
 
 #include "org_deepin_dde_xeventmonitor1.h"
-#include "LauncherInter.h"
 #include <DWindowManagerHelper>
 #include <QObject>
 #include <QFlag>
@@ -40,6 +39,7 @@ DGUI_USE_NAMESPACE
 using namespace Dock;
 class QTimer;
 class MainWindow;
+class MainPanelControl;
 
 class MultiScreenWorker : public QObject
 {
@@ -71,7 +71,7 @@ public:
 
     typedef QFlags<RunState> RunStates;
 
-    MultiScreenWorker(MainWindow *parent);
+    MultiScreenWorker(MainWindow *parent, MainPanelControl *panel);
 
     void initShow();
 
@@ -85,8 +85,6 @@ public:
 
 signals:
     void opacityChanged(const quint8 value) const;
-    // 更新监视区域
-    void requestUpdateFrontendGeometry();                       //!!! 给后端的区域不能为是或宽度为0的区域,否则会带来HideState死循环切换的bug
 
 public slots:
     void onAutoHideChanged(bool autoHide);
@@ -98,6 +96,7 @@ public slots:
 private:
     QRect getDockShowGeometry(const QString &screenName, const Position &pos, bool withoutScale = false);
     QRect getDockHideGeometry(const QRect showRect, const Position &pos);
+    void updateMaxSize();
 
     // 初始化数据信息
     void initConnection();
@@ -106,6 +105,8 @@ private:
     void displayAnimation(AniAction act);
     void changeDockPosition(QString lastScreen, QString deskScreen, const Position &fromPos, const Position &toPos);
 
+    // 更新监视区域
+    void updateFrontendGeometry();                       //!!! 给后端的区域不能为是或宽度为0的区域,否则会带来HideState死循环切换的bug
     QString getValidScreen();
     void resetDockScreen();
 
@@ -122,14 +123,13 @@ private:
 
 private:
     MainWindow *m_parent;
+    MainPanelControl *m_panel;
     QPropertyAnimation *ani;
 
     // monitor screen
     XEventMonitorInter *m_eventInter;
     XEventMonitorInter *m_extralEventInter;
 
-    // DBus interface
-    LauncherInter *m_launcherInter;
     QTimer *m_delayWakeTimer;                   // sp3需求，切换屏幕显示延时，默认2秒唤起任务栏
 
     // 任务栏属性
@@ -142,8 +142,6 @@ private:
     /***************不和其他流程产生交互,尽量不要动这里的变量***************/
     QString m_registerKey;
     QString m_extralRegisterKey;
-    QList<MonitRect> m_monitorRectList;         // 监听唤起任务栏区域
-    QList<MonitRect> m_extralRectList;          // 任务栏外部区域,随m_monitorRectList一起更新
     QString m_delayScreen;                      // 任务栏将要切换到的屏幕名
     RunStates m_state;
     /*****************************************************************/

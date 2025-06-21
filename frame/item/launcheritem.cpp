@@ -21,9 +21,12 @@
 
 #include "launcheritem.h"
 
+// #include "../taskmanager/common.h"
 #include "window/dockitemmanager.h"
 
 #include <QMouseEvent>
+// #include <QtConcurrent>
+// #include <DDBusSender>
 
 LauncherItem::LauncherItem(QWidget *parent) : DockItem(parent)
     , m_launcherInter(new LauncherInter("org.deepin.dde.Launcher1", "/org/deepin/dde/Launcher1", QDBusConnection::sessionBus(), this))
@@ -36,4 +39,15 @@ void LauncherItem::mouseReleaseEvent(QMouseEvent *e)
 {
     if (e->button() == Qt::LeftButton)
         m_launcherInter->Toggle();
+
+    // QtConcurrent::run([=] {
+    //     DDBusSender dbusSender = DDBusSender()
+    //         .service(launcherService)
+    //         .path(launcherPath)
+    //         .interface(launcherInterface);
+
+    //     QDBusPendingReply<bool> visibleReply = dbusSender.property("Visible").get();
+    //     if (!visibleReply.value())
+    //     dbusSender.method("Toggle").call();
+    // });
 }

@@ -30,28 +30,23 @@ public:
     void removeLastRecent();
     void updateShowRecent();
     void updateEntriesMenu();
-    void append(Entry *entry);
+    void append(Entry *entry, bool beforeRecent=false);
     void remove(Entry *entry);
     void moveEntryToLast(Entry *entry);
     void insert(Entry *entry, int index);
     void move(int oldIndex, int newIndex);
+    void updateOrder(QStringList &apps);
     void handleActiveWindowChanged(XWindow activeWindId);
 
     QString queryWindowIdentifyMethod(XWindow windowId);
-    QStringList getEntryIDs();
 
     Entry *getByWindowPid(int pid);
     Entry *getByInnerId(QString innerId);
     Entry *getByWindowId(XWindow windowId);
-    Entry *getByDesktopFilePath(const QString &filePath);
-    Entry *getDockedEntryByDesktopFile(const QString &desktopFile);
+    Entry *getEntryById(const QString &appId, bool needDocked=false);
 
     QList<Entry*> getEntries();
     QVector<Entry *> filterDockedEntries();
-
-private:
-    void insertCb(Entry *entry, int index);
-    void removeCb(Entry *entry);
 
 private:
     QList<Entry *> m_items;

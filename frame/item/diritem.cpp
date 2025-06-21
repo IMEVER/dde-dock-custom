@@ -19,6 +19,7 @@ DirItem::DirItem(QString title, QWidget *parent) : DockItem(parent)
         dirPopupWindow->setShadowXOffset(0);
         dirPopupWindow->setArrowWidth(18);
         dirPopupWindow->setArrowHeight(10);
+        connect(dirPopupWindow, &DockPopupWindow::requestWindowAutoHide, DockItemManager::instance(), &DockItemManager::requestWindowAutoHide);
     }
 
     setAcceptDrops(true);
@@ -43,7 +44,10 @@ void DirItem::setIds(QSet<QString> ids)
 
 void DirItem::addId(QString id)
 {
-    m_ids.insert(id);
+    if(m_ids.contains(id) == false) {
+        m_ids.insert(id);
+        Q_EMIT updateContent();
+    }
 }
 
 bool DirItem::hasId(QString id)
@@ -69,17 +73,23 @@ void DirItem::addItem(AppItem *appItem)
     appItem->setFixedSize(QSize(DockItemManager::instance()->itemSize(), DockItemManager::instance()->itemSize()));
     m_appList.append(appItem);
     m_popupGrid->addAppItem(appItem);
-    m_ids.insert(appItem->getDesktopFile());
     appItem->setDirItem(this);
     update();
+
+    if(m_ids.contains(appItem->appId()) == false) {
+        m_ids.insert(appItem->appId());
+        Q_EMIT updateContent();
+    }
 }
 
 void DirItem::removeItem(AppItem *appItem, bool removeId)
 {
     m_appList.removeOne(appItem);
     m_popupGrid->removeAppItem(appItem);
-    if(removeId)
-        m_ids.remove(appItem->getDesktopFile());
+    if(removeId) {
+        m_ids.remove(appItem->appId());
+        emit updateContent();
+    }
     appItem->removeDirItem();
     update();
 }
@@ -131,15 +141,16 @@ void DirItem::paintEvent(QPaintEvent *e)
     DockItem::paintEvent(e);
 
     QPainter painter(this);
-    painter.setPen(QPen(Qt::darkCyan, 2));
-    // painter.setOpacity(.7);
+    // painter.setPen(QPen(Qt::darkCyan, 2));
+    painter.setPen(QPen(palette().highlight(), 2));
+    painter.setOpacity(.5);
 
     QRect border = rect().adjusted(2, 2, -2, -2);
     QRect line(3, 3, border.width()-2, border.height()-2);
     painter.setRenderHint(QPainter::Antialiasing);
     painter.drawRoundedRect(line, 6, 6, Qt::AbsoluteSize);
 
-    // painter.setOpacity(.9);
+    painter.setOpacity(.9);
 
     int padding = 8;
     int spacing = 4;
@@ -201,6 +212,10 @@ void DirItem::dragEnterEvent(QDragEnterEvent *e)
     e->accept();
 }
 
+QPixmap DirItem::itemPixmap() {
+    return grab();
+}
+
 void DirItem::dragMoveEvent(QDragMoveEvent *e)
 {
     DockItem::dragMoveEvent(e);
@@ -211,8 +226,6 @@ void DirItem::dragMoveEvent(QDragMoveEvent *e)
 
 void DirItem::showDirPopupWindow()
 {
-    emit requestWindowAutoHide(false);
-
     switch (DockPosition) {
     case Top:
     case Bottom: dirPopupWindow->setArrowDirection(DockPopupWindow::ArrowBottom);  break;
@@ -222,8 +235,6 @@ void DirItem::showDirPopupWindow()
 
     dirPopupWindow->setContent(m_popupGrid);
     dirPopupWindow->show(popupMarkPoint(), true);
-
-    connect(dirPopupWindow, &DockPopupWindow::accept, this, &DirItem::hideDirpopupWindow, Qt::UniqueConnection);
 }
 
 void DirItem::hideDirpopupWindow()

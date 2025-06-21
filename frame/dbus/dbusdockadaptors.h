@@ -28,7 +28,6 @@
 /*
  * Adaptor class for interface org.deepin.dde.Dock1
  */
-class QGSettings;
 class MainWindow;
 class TopPanelInterface;
 
@@ -38,8 +37,7 @@ struct DockItemInfo
     QString displayName;
     QString itemKey;
     QString settingKey;
-    QByteArray iconLight;
-    QByteArray iconDark;
+    QString dccIcon;
     bool visible;
 };
 
@@ -133,7 +131,6 @@ signals:
     void pluginVisibleChanged(const QString &pluginName, bool visible);
 
 private:
-    QGSettings *m_gsettings;
     MainWindow *m_window;
     TopPanelInterface *m_topPanelInterface;
 };

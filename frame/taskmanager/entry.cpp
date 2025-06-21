@@ -11,41 +11,112 @@
 
 #include <QDebug>
 #include <QDBusInterface>
-
+#include <QX11Info>
 #include <algorithm>
 #include <signal.h>
 
 #define XCB XCBUtils::instance()
 
-Entry::Entry(TaskManager *_taskmanager, AppInfo *_app, QString _innerId, QObject *parent)
+class MprisMap : public QObject {
+    Q_OBJECT
+    public:
+        MprisMap() {
+
+            auto interface = QDBusConnection::sessionBus().interface();
+            connect(interface, &QDBusConnectionInterface::serviceOwnerChanged, this, &MprisMap::onNameOwnerChanged);
+
+            QStringList serviceNames = interface->registeredServiceNames();
+            for ( auto service : serviceNames) {
+                if (m_rx.exactMatch(service))
+                    checkIdentity(service);
+            }
+        }
+
+    bool hasIdentity(QString identity) const {
+        return m_identities.contains(identity);
+    }
+
+    private:
+        void checkIdentity(const QString service, const bool sig = false) {
+            // MprisController controller(service, QDBusConnection::sessionBus(), this);
+            // auto identity = controller.identity();
+
+            QDBusInterface interface(service, QStringLiteral("/org/mpris/MediaPlayer2"), QStringLiteral("org.freedesktop.DBus.Properties"));
+
+            QDBusReply<QDBusVariant> reply = interface.call("Get", QString("org.mpris.MediaPlayer2"), "Identity");
+
+            auto identity = reply.value().variant().toString();
+
+            // qInfo()<<"mpris::"<<service<<"\t"<<identity<<"\t"<<reply.error().message();
+            if(identity.isEmpty() == false) {
+                m_identities.insert(identity);
+                m_serviceToIdentity.insert(service, identity);
+
+                if(sig) emit identityChanged(identity);
+            }
+        }
+
+        void onNameOwnerChanged(const QString &service, const QString &oldOwner, const QString &newOwner) {
+            if (!m_rx.exactMatch(service))
+                return;
+
+            if (oldOwner.isEmpty()) {
+                checkIdentity(service, true);
+                return;
+            }
+
+            if (newOwner.isEmpty() and m_serviceToIdentity.contains(service)) {
+                auto identity = m_serviceToIdentity.take(service);
+                m_identities.remove(identity);
+                emit identityChanged(identity);
+                return;
+            }
+        }
+
+    signals:
+        void identityChanged(const QString &identity);
+
+    private:
+        const QRegExp m_rx = QRegExp(QStringLiteral("org.mpris.MediaPlayer2.*"), Qt::CaseSensitive, QRegExp::Wildcard);
+        QSet<QString> m_identities;
+        QMap<QString, QString> m_serviceToIdentity;
+};
+static MprisMap mprisMap;
+
+Entry::Entry(TaskManager *_taskmanager, WindowInfoBase *window, QObject *parent) : Entry(_taskmanager, window->getAppInfo(), parent){
+    m_current = window;
+}
+
+Entry::Entry(TaskManager *_taskmanager, AppInfo *_app, QObject *parent)
     : QObject(parent)
     , m_isActive(false)
     , m_isDocked(false)
-    , m_winIconPreferred(false)
-    , m_innerId(_innerId)
     , m_adapterEntry(nullptr)
     , m_taskmanager(_taskmanager)
     , m_current(nullptr)
     , m_currentWindow(0)
 {
-    m_lastOpenTime = 0;
-    m_openCount = 0;
+    m_lastUpdateTime = 0;
 
     setAppInfo(_app);
-    static int entriesSum = 0;
-    m_id = QString("e%1T%2").arg(++entriesSum).arg(QString::number(QDateTime::currentSecsSinceEpoch(), 16));
-    m_mode = getCurrentMode();
+    // static int entriesSum = 0;
+    // m_id = QString("e%1T%2").arg(++entriesSum).arg(QString::number(QDateTime::currentSecsSinceEpoch(), 16));
     m_name = getName();
     m_icon = getIcon();
+
+    connect(&mprisMap, &MprisMap::identityChanged, this, [this](const QString &identity){
+        if(identity == m_name) emit mprisChanged();
+    });
+}
+
+bool Entry::hasMpris() {
+    return mprisMap.hasIdentity(m_name);
 }
 
 Entry::~Entry()
 {
-    for (auto winInfo : m_windowInfoMap) {
-        if (winInfo) winInfo->deleteLater();
-    }
-    m_windowInfoMap.clear();
-
+    for (auto winInfo : m_windowInfoMap)
+        winInfo->deleteLater();
 }
 
 bool Entry::isValid()
@@ -62,10 +133,9 @@ QString Entry::getId() const
 
 QString Entry::getName()
 {
-    QString ret = m_current ? m_current->getDisplayName() : QString();
-    if (m_appInfo.isNull()) return ret;
-    ret = m_appInfo->getName();
-    return ret;
+    if (m_appInfo)
+        return m_appInfo->getName();
+    return m_current ? m_current->getDisplayName() : QString();
 }
 
 void Entry::updateName()
@@ -76,47 +146,13 @@ void Entry::updateName()
 QString Entry::getIcon()
 {
     QString ret;
-    if (hasWindow()) {
-        if (!m_current) {
-            return ret;
-        }
+    if (m_appInfo)
+        ret = m_appInfo->getIcon();
 
-        // has window && current not nullptr
-        if (m_winIconPreferred) {
-            // try current window icon first
-            ret = m_current->getIcon();
-            if (ret.size() > 0) {
-                return ret;
-            }
-        }
-
-        if (m_appInfo) {
-            m_icon = m_appInfo->getIcon();
-            if (m_icon.size() > 0) {
-                return m_icon;
-            }
-        }
-
-        return m_current->getIcon();
-    }
-
-    if (m_appInfo) {
-        // no window
-        return m_appInfo->getIcon();
-    }
+    if(ret.isEmpty() and m_current)
+        ret = m_current->getIcon();
 
     return ret;
-}
-
-QString Entry::getInnerId()
-{
-    return m_innerId;
-}
-
-void Entry::setInnerId(QString _innerId)
-{
-    qDebug() << "setting innerID from: " << m_innerId << " to: " << _innerId;
-    m_innerId = _innerId;
 }
 
 QString Entry::getFileName()
@@ -131,22 +167,13 @@ AppInfo *Entry::getAppInfo()
 
 void Entry::setAppInfo(AppInfo *appinfo)
 {
-    if (m_appInfo.data() == appinfo) {
+    if (m_appInfo.data() == appinfo)
         return;
-    }
 
     m_appInfo.reset(appinfo);
     m_isValid = appinfo && appinfo->isValidApp();
-    m_winIconPreferred = !appinfo;
-    setPropDesktopFile(appinfo ? appinfo->getFileName(): "");
-    if (!m_winIconPreferred) {
-        QString id = m_appInfo->getId();
-        auto perferredApps = m_taskmanager->getWinIconPreferredApps();
-        if (perferredApps.contains(id)|| appinfo->getIcon().size() == 0) {
-            m_winIconPreferred = true;
-            return;
-        }
-    }
+
+    m_id = m_isValid ? appinfo->getBaseFileName() : QString();
 }
 
 bool Entry::getIsDocked() const
@@ -184,12 +211,9 @@ void Entry::updateMenu()
     appMenu->appendItem(m_isDocked? getMenuItemUndock(): getMenuItemDock());
 
     if (hasWindow()) {
-        if (m_taskmanager->getForceQuitAppStatus() != ForceQuitAppMode::Disabled) {
-            appMenu->appendItem(m_appInfo && m_appInfo->getIdentifyMethod() == "Andriod" ?
-                    getMenuItemForceQuitAndroid() : getMenuItemForceQuit());
-        }
+        appMenu->appendItem(getMenuItemForceQuit());
 
-        if (getAllowedCloseWindows().size() > 0)
+        if (hasCloseableWindow())
             appMenu->appendItem(getMenuItemCloseAll());
     }
 
@@ -201,44 +225,12 @@ void Entry::updateIcon()
     setPropIcon(getIcon());
 }
 
-int Entry::getCurrentMode()
-{
-    // 只要当前应用是已经驻留的应用，则让其显示为Normal
-    if (getIsDocked())
-        return ENTRY_NORMAL;
-
-    // 时尚模式下对未驻留应用做如下处理
-    // 如果开启了最近打开应用的功能，则显示到最近打开区域（ENTRY_RECENT）
-    if (DockSettings::instance()->showRecent())
-        return ENTRY_RECENT;
-
-    // 未开启最近使用应用的功能，如果有子窗口，则显示成通用的(ENTRY_NORMAL)，如果没有子窗口，则不显示(ENTRY_NONE)
-    return hasWindow() ? ENTRY_NORMAL : ENTRY_NONE;
-}
-
-void Entry::updateMode()
-{
-    int currentMode = getCurrentMode();
-    if (m_mode != currentMode) {
-        m_mode = currentMode;
-        Q_EMIT modeChanged(m_mode);
-    }
-}
-
-void Entry::forceUpdateIcon()
-{
-    m_icon = getIcon();
-    Q_EMIT iconChanged(m_icon);
-}
-
 void Entry::updateIsActive()
 {
     bool isActive = false;
-    auto activeWin = m_taskmanager->getActiveWindow();
-    if (activeWin) {
+    if(auto activeWin = m_taskmanager->getActiveWindow())
         // 判断活跃窗口是否属于当前应用
         isActive = m_windowInfoMap.find(activeWin->getXid()) != m_windowInfoMap.end();
-    }
 
     setPropIsActive(isActive);
 }
@@ -295,7 +287,8 @@ void Entry::setPropCurrentWindow(XWindow value)
 {
     if (value != m_currentWindow) {
         m_currentWindow = value;
-        Q_EMIT currentWindowChanged(value);
+        if(m_isActive and !m_windowInfoMap.isEmpty())
+            Q_EMIT currentWindowChanged(value);
     }
 }
 
@@ -350,117 +343,74 @@ bool Entry::hasWindow()
     return m_windowInfoMap.size() > 0;
 }
 
-/**
- * @brief Entry::updateExportWindowInfos 同步更新导出窗口信息
- */
-void Entry::updateExportWindowInfos()
-{
-    WindowInfoMap infos;
+bool Entry::hasCloseableWindow() {
     for (auto info : m_windowInfoMap) {
-        WindowInfo winInfo;
-        XWindow xid = info->getXid();
-        winInfo.title = info->getTitle();
-        winInfo.attention = info->isDemandingAttention();
-        winInfo.uuid = info->uuid();
-        infos[xid] = winInfo;
-    }
-
-    bool changed = true;
-    if (infos.size() == m_exportWindowInfos.size()) {
-        changed = false;
-        for (auto iter = infos.begin(); iter != infos.end(); iter++) {
-            XWindow xid = iter.key();
-            if (infos[xid] != m_exportWindowInfos[xid]) {
-                changed = true;
-                break;
-            }
-        }
-    }
-
-    if (changed) {
-        Q_EMIT windowInfosChanged(infos);
-
-        // 更新导出的窗口信息
-        m_exportWindowInfos = infos;
-    }
-}
-
-// 分离窗口， 返回是否需要从任务栏remove
-bool Entry::detachWindow(WindowInfoBase *info)
-{
-    info->setEntry(nullptr);
-    XWindow winId = info->getXid();
-    if (m_windowInfoMap.contains(winId)) {
-        m_windowInfoMap.remove(winId);
-        info->deleteLater();
-    }
-
-    if (m_windowInfoMap.isEmpty()) {
-        if (!m_isDocked) {
-            // 既无窗口也非驻留应用，并且不是最近打开，无需在任务栏显示
+        if (info->allowClose())
             return true;
-        }
-
-        Q_EMIT windowInfosChanged(WindowInfoMap());
-        setCurrentWindowInfo(nullptr);
-    } else {
-        for (auto window : m_windowInfoMap) {
-            if (window) {   // 选择第一个窗口作为当前窗口
-                setCurrentWindowInfo(window);
-                break;
-            }
-        }
     }
-
-    updateExportWindowInfos();
-    updateIcon();
-    updateMenu();
 
     return false;
 }
 
-bool Entry::isShowOnDock() const
+// 分离窗口， 返回是否需要从任务栏remove
+static int times = 0;
+bool Entry::detachWindow(WindowInfoBase *info, bool del)
 {
-    // 当前应用显示图标的条件是
-    // 如果该图标已经固定在任务栏上，则始终显示
-    if (getIsDocked())
-        return true;
+    info->setEntry(nullptr);
+    info->disconnect(this);
+    XWindow winId = info->getXid();
+    if (m_windowInfoMap.remove(winId) > 0) {
+        if(del) info->deleteLater();
+        auto winInfo = m_exportWindowInfos.take(winId);
+        emit windowInfoRemoved(winInfo);
+    }
 
-    // 1.时尚模式下，如果开启了显示最近使用，则不管是否有子窗口，都在任务栏上显示
-    // 如果没有开启显示最近使用，则只显示有子窗口的
-    return (DockSettings::instance()->showRecent() || m_exportWindowInfos.size() > 0);
+    setCurrentWindowInfo(m_windowInfoMap.isEmpty() ? nullptr : m_windowInfoMap.first());
+
+    m_lastUpdateTime = ++times;
+    updateIcon();
+    updateMenu();
+
+    return m_windowInfoMap.isEmpty() and !m_isDocked;
 }
 
 bool Entry::attachWindow(WindowInfoBase *info)
 {
     XWindow winId = info->getXid();
+
+    if (m_windowInfoMap.contains(winId))
+        return false;
+
+    m_lastUpdateTime = ++times;
     info->setEntry(this);
 
-    if (m_windowInfoMap.find(winId) != m_windowInfoMap.end()) {
-        return false;
-    }
-
-    m_openCount++;
-    static int times = 0;
-    m_lastOpenTime = ++times;
-
-    bool lastShowOnDock = isShowOnDock();
     m_windowInfoMap[winId] = info;
-    updateExportWindowInfos();
+
+    WindowInfo winInfo;
+    winInfo.wid = winId;
+    winInfo.title = info->getTitle();
+    winInfo.attention = info->isDemandingAttention();
+    winInfo.closable = info->allowClose();
+    winInfo.uuid = info->uuid();
+    m_exportWindowInfos.insert(winId, winInfo);
+    emit windowInfoAdded(winInfo);
+
     updateIsActive();
 
-    if (!m_current) {
+    // if (!m_current) {
         // from no window to has window
         setCurrentWindowInfo(info);
-    }
+    // }
 
     updateIcon();
     updateMenu();
 
-    if (!lastShowOnDock && isShowOnDock()) {
-        // 新打开的窗口始终显示到最后
-        Q_EMIT m_taskmanager->entryAdded(this, -1);
-    }
+    connect(info, &WindowInfoBase::titleChanged, [this, winId](const QString &title){
+        if(m_exportWindowInfos.contains(winId)) {
+            m_exportWindowInfos[winId].title = title;
+            emit titleChanged(winId, title);
+        }
+    });
 
     return true;
 }
@@ -479,13 +429,15 @@ bool Entry::containsWindow(XWindow xid)
 // 处理菜单项
 void Entry::handleMenuItem(uint32_t timestamp, QString itemId)
 {
-    m_appMenu->handleAction(timestamp, itemId);
+    if(m_appMenu)
+        m_appMenu->handleAction(timestamp, itemId);
 }
 
 // 处理拖拽事件
 void Entry::handleDragDrop(uint32_t timestamp, QStringList files)
 {
-    m_taskmanager->launchApp(m_appInfo->getFileName(), timestamp, files);
+    if (m_appInfo)
+        m_taskmanager->launchApp(m_appInfo->getFileName(), timestamp, files);
 }
 
 // 驻留
@@ -502,33 +454,27 @@ void Entry::requestUndock(bool dockToEnd)
     m_taskmanager->undockEntry(this, dockToEnd);
 }
 
-void Entry::newInstance(uint32_t timestamp)
-{
-    QStringList files;
-    m_taskmanager->launchApp(m_appInfo->getFileName(), timestamp, files);
+void Entry::close(const XWindow wid) {
+    if(auto window = m_windowInfoMap.value(wid))
+        window->close(QX11Info::getTimestamp());
 }
 
 // 检查应用窗口分离、合并状态
 void Entry::check()
 {
-    QList<WindowInfoBase *> windows = m_windowInfoMap.values();
-    for (WindowInfoBase *window : windows) {
+    for (auto window : m_windowInfoMap)
         m_taskmanager->attachOrDetachWindow(window);
-    }
 }
 
 // 强制退出
 void Entry::forceQuit()
 {
     QMap<int, QVector<WindowInfoBase*>> pidWinInfoMap;
-    QList<WindowInfoBase *> windows = m_windowInfoMap.values();
-    for (WindowInfoBase *window : windows) {
-        int pid = window->getPid();
-        if (pid != 0) {
+    for (auto window : m_windowInfoMap) {
+        if(int pid = window->getPid())
             pidWinInfoMap[pid].push_back(window);
-        } else {
+        else
             window->killClient();
-        }
     }
 
     for (auto iter = pidWinInfoMap.begin(); iter != pidWinInfoMap.end(); iter++) {
@@ -538,11 +484,11 @@ void Entry::forceQuit()
             }
         }
     }
-    // 所有的窗口已经退出后，清空m_windowInfoMap内容
-    m_windowInfoMap.clear();
-    // 退出所有的进程后，及时更新当前剩余的窗口数量
-    updateExportWindowInfos();
-    m_taskmanager->removeEntryFromDock(this);
+    // // 所有的窗口已经退出后，清空m_windowInfoMap内容
+    // m_windowInfoMap.clear();
+    // // 退出所有的进程后，及时更新当前剩余的窗口数量
+    // updateExportWindowInfos();
+    // m_taskmanager->removeEntryFromDock(this);
 }
 
 void Entry::presentWindows()
@@ -584,11 +530,8 @@ void Entry::active(uint32_t timestamp)
                 winInfo->activate();
             } else if (m_windowInfoMap.size() == 1) {
                 winInfo->minimize();
-            } else {
-                WindowInfoBase *nextWin = findNextLeader();
-                if (nextWin) {
-                    nextWin->activate();
-                }
+            } else if(auto nextWin = findNextLeader()) {
+                nextWin->activate();
             }
         }
     } else {
@@ -613,11 +556,9 @@ void Entry::active(uint32_t timestamp)
             } else if (m_windowInfoMap.size() == 1) {
                 // 窗口图标化
                 XCB->minimizeWindow(xid);
-            } else if (m_taskmanager->getActiveWindow() && m_taskmanager->getActiveWindow()->getXid() == xid) {
-                WindowInfoBase *nextWin = findNextLeader();
-                if (nextWin) {
+            } else if (activeWin && activeWin->getXid() == xid) {
+                if(auto nextWin = findNextLeader())
                     nextWin->activate();
-                }
             }
         }
     }
@@ -625,44 +566,48 @@ void Entry::active(uint32_t timestamp)
 
 void Entry::activeWindow(quint32 winId)
 {
-    if (m_taskmanager->isWaylandEnv()) {
-        if (!m_windowInfoMap.contains(winId))
-            return;
+    if (!m_windowInfoMap.contains(winId))
+        return;
 
-        WindowInfoBase *winInfo = m_windowInfoMap[winId];
+    auto winInfo = m_windowInfoMap[winId];
+
+    if (m_taskmanager->isWaylandEnv()) {
         if (m_taskmanager->isActiveWindow(winInfo)) {
             bool showing = m_taskmanager->isShowingDesktop();
-            if (showing || winInfo->isMinimized()) {
+            if (showing || winInfo->isMinimized())
                 winInfo->activate();
-            } else if (m_windowInfoMap.size() == 1) {
+            else
                 winInfo->minimize();
-            } else {
-                WindowInfoBase *nextWin = findNextLeader();
-                if (nextWin) {
-                    nextWin->activate();
-                }
-            }
         } else {
             winInfo->activate();
         }
     } else {
-        m_taskmanager->doActiveWindow(winId);
-    }
-}
+        WindowInfoBase *activeWin = m_taskmanager->getActiveWindow();
+        if (activeWin && winId != activeWin->getXid())
+            m_taskmanager->doActiveWindow(winId);
+        else {
+            bool found = false;
+            XWindow hiddenAtom = XCB->getAtom("_NET_WM_STATE_HIDDEN");
+            for (auto state : XCB->getWMState(winId)) {
+                if (hiddenAtom == state) {
+                    found = true;
+                    break;
+                }
+            }
 
-int Entry::mode()
-{
-    return m_mode;
+            if (found)
+                // 激活隐藏窗口
+                m_taskmanager->doActiveWindow(winId);
+            else
+                // 窗口图标化
+                XCB->minimizeWindow(winId);
+        }
+    }
 }
 
 XWindow Entry::getCurrentWindow()
 {
     return m_currentWindow;
-}
-
-QString Entry::getDesktopFile()
-{
-    return m_desktopFile;
 }
 
 bool Entry::getIsActive() const
@@ -672,7 +617,7 @@ bool Entry::getIsActive() const
 
 QString Entry::getMenu() const
 {
-    return m_appMenu->getMenuJsonStr();
+    return m_appMenu ? m_appMenu->getMenuJsonStr() : QString();
 }
 
 QVector<XWindow> Entry::getAllowedClosedWindowIds()
@@ -680,7 +625,7 @@ QVector<XWindow> Entry::getAllowedClosedWindowIds()
     QVector<XWindow> ret;
     for (auto iter = m_windowInfoMap.begin(); iter != m_windowInfoMap.end(); iter++) {
         WindowInfoBase *info = iter.value();
-        if (info && info->allowClose())
+        if (info->allowClose())
             ret.push_back(iter.key());
     }
 
@@ -692,37 +637,22 @@ const WindowInfoMap &Entry::getExportWindowInfos() const
     return m_exportWindowInfos;
 }
 
-QVector<WindowInfoBase *> Entry::getAllowedCloseWindows()
-{
-    QVector<WindowInfoBase *> ret;
-    for (auto iter = m_windowInfoMap.begin(); iter != m_windowInfoMap.end(); iter++) {
-        WindowInfoBase *info = iter.value();
-        if (info && info->allowClose()) {
-            ret.push_back(info);
-        }
-    }
-
-    return ret;
-}
-
 QVector<AppMenuItem> Entry::getMenuItemDesktopActions()
 {
     QVector<AppMenuItem> ret;
-    if (!m_appInfo) {
-        return ret;
-    }
 
-    for (auto action : m_appInfo->getActions()) {
-        AppMenuAction fn = [=](uint32_t timestamp) {
-            m_taskmanager->launchAppAction(m_appInfo->getFileName(), action.section, timestamp);
-        };
+    if (m_appInfo)
+        for (auto action : m_appInfo->getActions()) {
+            AppMenuAction fn = [=](uint32_t timestamp) {
+                m_taskmanager->launchAppAction(m_appInfo->getFileName(), action.section, timestamp);
+            };
 
-        AppMenuItem item;
-        item.text = action.name;
-        item.action = fn;
-        item.isActive = true;
-        ret.push_back(item);
-    }
+            AppMenuItem item;
+            item.text = action.name;
+            item.action = fn;
+            item.isActive = true;
+            ret.push_back(item);
+        }
 
     return ret;
 }
@@ -733,11 +663,11 @@ AppMenuItem Entry::getMenuItemLaunch()
     if (hasWindow()) {
         itemName = getName();
     } else {
-        itemName = tr("Open");
+        itemName = tr("打开");
     }
 
     AppMenuAction fn = [this](uint32_t timestamp) {
-        this->launchApp(timestamp);
+        launchApp(timestamp);
     };
 
     AppMenuItem item;
@@ -750,7 +680,7 @@ AppMenuItem Entry::getMenuItemLaunch()
 AppMenuItem Entry::getMenuItemCloseAll()
 {
     AppMenuAction fn = [this](uint32_t timestamp) {
-        auto winInfos = getAllowedCloseWindows();
+        auto winInfos = m_windowInfoMap.values();
 
         // 根据创建时间从大到小排序， 方便后续关闭窗口
         for (int i = 0; i < winInfos.size() - 1; i++) {
@@ -763,16 +693,15 @@ AppMenuItem Entry::getMenuItemCloseAll()
             }
         }
 
-        for (auto info : winInfos) {
-            info->close(timestamp);
-        }
+        for (auto info : winInfos)
+            if(info->allowClose()) info->close(timestamp);
 
         // 关闭窗口后，主动刷新事件
         XCB->flush();
     };
 
     AppMenuItem item;
-    item.text = tr("Close All");
+    item.text = tr("关闭所有");
     item.action = fn;
     item.isActive = true;
     return item;
@@ -780,43 +709,21 @@ AppMenuItem Entry::getMenuItemCloseAll()
 
 AppMenuItem Entry::getMenuItemForceQuit()
 {
-    bool active = m_taskmanager->getForceQuitAppStatus() != ForceQuitAppMode::Deactivated;
     AppMenuAction fn = [this](uint32_t) {
         forceQuit();
     };
 
     AppMenuItem item;
-    item.text = tr("Force Quit");
+    item.text = tr("强制退出");
     item.action = fn;
-    item.isActive = active;
-    return item;
-}
-
-//dock栏上Android程序的Force Quit功能
-AppMenuItem Entry::getMenuItemForceQuitAndroid()
-{
-    bool active = m_taskmanager->getForceQuitAppStatus() != ForceQuitAppMode::Deactivated;
-    auto allowedCloseWindows = getAllowedCloseWindows();
-    AppMenuAction fn = [](uint32_t){};
-    if (allowedCloseWindows.size() > 0) {
-        AppMenuAction fn = [&](uint32_t timestamp) {
-            for (auto info : allowedCloseWindows) {
-                info->close(timestamp);
-            }
-        };
-    }
-
-    AppMenuItem item;
-    item.text = tr("Force Quit");
-    item.action = fn;
-    item.isActive = active;
+    item.isActive = true;
     return item;
 }
 
 AppMenuItem Entry::getMenuItemDock()
 {
     AppMenuItem item;
-    item.text = tr("Dock");
+    item.text = tr("驻留");
     item.action = [this](uint32_t) {
         requestDock(true);
     };
@@ -828,7 +735,7 @@ AppMenuItem Entry::getMenuItemDock()
 AppMenuItem Entry::getMenuItemUndock()
 {
     AppMenuItem item;
-    item.text = tr("Undock");
+    item.text = tr("取消驻留");
     item.action = [this](uint32_t) {
         requestUndock(true);
     };
@@ -840,7 +747,7 @@ AppMenuItem Entry::getMenuItemUndock()
 AppMenuItem Entry::getMenuItemAllWindows()
 {
     AppMenuItem item;
-    item.text = tr("All Windows");
+    item.text = tr("所有窗口");
     item.action = [this](uint32_t) {
         presentWindows();
     };
@@ -855,13 +762,4 @@ bool Entry::killProcess(int pid)
     return  !kill(pid, SIGTERM);
 }
 
-bool Entry::setPropDesktopFile(QString value)
-{
-    if (value != m_desktopFile) {
-        m_desktopFile = value;
-        Q_EMIT desktopFileChanged(value);
-        return true;
-    }
-
-    return false;
-}
+#include "entry.moc"

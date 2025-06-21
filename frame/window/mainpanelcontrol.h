@@ -40,6 +40,9 @@ public:
     MainPanelControl(QWidget *parent = 0);
     ~MainPanelControl();
 
+    bool hasWindow() const { return !m_windowAreaLayout->isEmpty(); }
+    int itemCount() const { return m_fixedAreaLayout->count() + m_appAreaLayout->count() + m_windowAreaLayout->count() + m_lastAreaLayout->count(); }
+
     void addFixedAreaItem(int index, QWidget *wdg);
     void addAppAreaItem(int index, QWidget *wdg);
     void removeFixedAreaItem(QWidget *wdg);
@@ -68,11 +71,11 @@ private:
     void resizeDockIcon();
 
 public slots:
-    void insertItem(const int index, DockItem *item, bool animation = true);
-    void removeItem(DockItem *item, bool animation = true);
+    void insertItem(const int index, DockItem *item);
+    void removeItem(DockItem *item);
 
 signals:
-    void itemMoved(AppItem *sourceItem, AppItem *targetItem);
+    void itemMoved(QStringList&);
     void itemAdded(const QString &appDesktop, int idx);
     void folderAdded(const QString &path);
     void itemCountChanged();

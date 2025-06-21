@@ -1,43 +1,19 @@
 #include "WindowItem.h"
 
-#include "components/appsnapshot.h"
 #include "components/previewcontainer.h"
 #include "util/XUtils.h"
 #include "xcb/xcb_misc.h"
-
-#include <dtkwidget_global.h>
 
 #include <QX11Info>
 #include <X11/Xlib.h>
 #include <X11/X.h>
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
-#include <sys/shm.h>
-#include <KWindowSystem>
+#include <KX11Extras>
 #include <QMouseEvent>
 #include <QDragEnterEvent>
-
-SHMInfo *getImageDSHM(WId wId)
-{
-    const auto display = QX11Info::display();
-
-    Atom atom_prop = XInternAtom(display, "_DEEPIN_DXCB_SHM_INFO", true);
-    if (!atom_prop) {
-        return nullptr;
-    }
-
-    Atom actual_type_return_deepin_shm;
-    int actual_format_return_deepin_shm;
-    unsigned long nitems_return_deepin_shm;
-    unsigned long bytes_after_return_deepin_shm;
-    unsigned char *prop_return_deepin_shm;
-
-    XGetWindowProperty(display, wId, atom_prop, 0, 32 * 9, false, AnyPropertyType,
-                    &actual_type_return_deepin_shm, &actual_format_return_deepin_shm, &nitems_return_deepin_shm,
-                    &bytes_after_return_deepin_shm, &prop_return_deepin_shm);
-
-    return reinterpret_cast<SHMInfo *>(prop_return_deepin_shm);
-}
+#include <QPainter>
+#include <QPainterPath>
 
 XImage *getImageXlib(WId wId)
 {
@@ -62,7 +38,6 @@ QRect rectRemovedShadow(WId wId, const QImage &qimage, unsigned char *prop_to_re
     const auto r = XGetWindowProperty(display, wId, gtk_frame_extents, 0, 4, false, XA_CARDINAL,
                                     &actual_type_return_gtk, &actual_format_return_gtk, &n_items_return_gtk, &bytes_after_return_gtk, &prop_to_return_gtk);
     if (!r && prop_to_return_gtk && n_items_return_gtk == 4 && actual_format_return_gtk == 32) {
-        qDebug() << "remove shadow frame...";
         const unsigned long *extents = reinterpret_cast<const unsigned long *>(prop_to_return_gtk);
         const int left = extents[0];
         const int right = extents[1];
@@ -72,32 +47,16 @@ QRect rectRemovedShadow(WId wId, const QImage &qimage, unsigned char *prop_to_re
         const int height = qimage.height();
 
         return QRect(left, top, width - left - right, height - top - bottom);
-    } else {
+    } else
         return QRect(0, 0, qimage.width(), qimage.height());
-    }
 }
 
-struct SHMInfo {
-    long shmid;
-    long width;
-    long height;
-    long bytesPerLine;
-    long format;
-
-    struct Rect {
-        long x;
-        long y;
-        long width;
-        long height;
-    } rect;
-};
-
-WindowItem::WindowItem(AppItem *appItem, WId wId, WindowInfo windowInfo, bool closeable, QWidget *parent) :
+WindowItem::WindowItem(AppItem *appItem, WindowInfo windowInfo, QWidget *parent) :
     DockItem(parent)
     , m_appItem(appItem)
-    , m_WId(wId)
+    , m_WId(windowInfo.wid)
     , m_windowInfo(windowInfo)
-    , m_closeable(closeable)
+    , m_isActive(false)
 {
     m_icon = m_appItem->appIcon();
 
@@ -105,23 +64,34 @@ WindowItem::WindowItem(AppItem *appItem, WId wId, WindowInfo windowInfo, bool cl
     timer->setSingleShot(false);
     timer->setInterval(10000);
     connect(timer, &QTimer::timeout, this, &WindowItem::fetchSnapshot);
-    timer->start();
 
     m_updateIconGeometryTimer = new QTimer(this);
     m_updateIconGeometryTimer->setInterval(500);
     m_updateIconGeometryTimer->setSingleShot(true);
-    m_updateIconGeometryTimer->start();
     connect(m_updateIconGeometryTimer, &QTimer::timeout, this, [this]{
         const QRect r(mapToGlobal(QPoint(0, 0)), mapToGlobal(QPoint(width(), height())));
         XcbMisc::instance()->set_window_icon_geometry(m_WId, r);
     });
 
-    update();
+    connect(m_appItem, &AppItem::windowActiveChanged, this, [this](bool active, WId wid) {
+        setActive(active &&  wid == m_WId);
+    });
 
-    QTimer::singleShot(2000, this, &WindowItem::fetchSnapshot);
+    QTimer::singleShot(500, this, &WindowItem::fetchSnapshot);
 }
 
 WindowItem::~WindowItem() {}
+
+void WindowItem::setActive(bool active) {
+    if(m_isActive != active) {
+        m_isActive = active;
+        update(indicatorRect());
+    }
+}
+
+void WindowItem::updateTitle(const QString &title) {
+    m_windowInfo.title = title;
+}
 
 void WindowItem::paintEvent(QPaintEvent *e)
 {
@@ -131,17 +101,31 @@ void WindowItem::paintEvent(QPaintEvent *e)
         return DockItem::paintEvent(e);
 
     QPainter painter(this);
-    painter.save();
 
-    const QRectF itemRect = rect();
+    QRect indicator = indicatorRect();
+    if (m_isActive and e->rect().contains(indicator))
+    {
+        QRadialGradient radialGrad(indicator.center(), qMax(indicator.width(), indicator.height())/2);
+        // radialGrad.setColorAt(0, QColor("#0b74dd"));
+        // radialGrad.setColorAt(.8, QColor("#70209cff"));
+        radialGrad.setColorAt(0, palette().highlight().color());
+        radialGrad.setColorAt(.5, palette().highlight().color());
+        radialGrad.setColorAt(1, Qt::transparent);
+        painter.fillRect(indicator, QBrush(radialGrad));
+    }
+
+    if(e->rect() == indicator) return;
+
+    if(e->rect() != QRect(width() - 20, 0, 20, 20)) {
+
     const auto ratio = devicePixelRatioF();
-
     const qreal offset_x = width() / 2.0 - m_snapshotSrcRect.width() / ratio / 2 - m_snapshotSrcRect.left() / ratio;
     const qreal offset_y = height() / 2.0 - m_snapshotSrcRect.height() / ratio / 2 - m_snapshotSrcRect.top() / ratio;
 
     int radius = 3;
     QBrush brush;
     brush.setTextureImage(m_snapshot);
+    painter.save();
     painter.setBrush(brush);
     painter.setPen(Qt::NoPen);
     painter.scale(1 / ratio, 1 / ratio);
@@ -149,19 +133,38 @@ void WindowItem::paintEvent(QPaintEvent *e)
     painter.drawRoundedRect(m_snapshotSrcRect, radius * ratio, radius * ratio);
 
     painter.restore();
+    const QRectF itemRect = rect();
     int smallIconSize = itemRect.width() / 3;
     painter.drawPixmap(QPoint(itemRect.width() - smallIconSize - itemRect.width() * .1, itemRect.width() - smallIconSize - itemRect.width() * .1), m_icon.pixmap(smallIconSize));
+    }
+
+    if(m_appItem->hasMpris() and e->rect().contains(QRect(width() - 20, 0, 20, 20))) {
+        painter.translate(width() - 20, 0);
+
+        QPainterPath path;
+        path.addRect(0, 6, 4, 8);
+        path.addPolygon(QPolygon({QPoint(4, 6), QPoint(10, 0), QPoint(10, 20), QPoint(4, 14)}));
+
+        path.moveTo(12, 6);
+        path.cubicTo(QPoint(14, 10), QPoint(16, 10), QPoint(12, 14));
+
+        path.moveTo(14, 2);
+        path.cubicTo(QPoint(20, 10), QPoint(20, 10), QPoint(14, 18));
+
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(palette().highlight());
+        painter.drawPath(path);
+
+        painter.translate(QPoint(0, 0));
+    }
 }
 
 void WindowItem::mouseReleaseEvent(QMouseEvent *e)
 {
-    if(e->button() == Qt::LeftButton) {
-        if(XUtils::getFocusWindowId() != m_WId)
-            m_appItem->requestActivateWindow(m_WId);
-        else
-            KWindowSystem::minimizeWindow(m_WId);
-    } else if(e->button() == Qt::MiddleButton)
-        closeWindow();
+    if(e->button() == Qt::LeftButton)
+        m_appItem->requestActivateWindow(m_WId);
+    else if(e->button() == Qt::MiddleButton)
+        m_appItem->close(m_WId);
 }
 
 void WindowItem::wheelEvent(QWheelEvent *e)
@@ -180,16 +183,15 @@ void WindowItem::moveEvent(QMoveEvent *e)
 
 void WindowItem::resizeEvent(QResizeEvent *e)
 {
-    fetchSnapshot();
+    // fetchSnapshot();
     m_updateIconGeometryTimer->start();
 }
 
 void WindowItem::enterEvent(QEvent *e)
 {
     DockItem::enterEvent(e);
-    timer->stop();
-    fetchSnapshot();
     timer->start();
+    fetchSnapshot();
 }
 
 void WindowItem::leaveEvent(QEvent *e)
@@ -198,6 +200,16 @@ void WindowItem::leaveEvent(QEvent *e)
     PreviewContainer *m_appPreview = PreviewContainer::instance();
     if(m_appPreview->isVisible())
         m_appPreview->prepareHide();
+}
+
+void WindowItem::hideEvent(QHideEvent *e) {
+    timer->stop();
+    DockItem::hideEvent(e);
+}
+
+void WindowItem::showEvent(QShowEvent *e) {
+    timer->start();
+    DockItem::showEvent(e);
 }
 
 void WindowItem::dragEnterEvent(QDragEnterEvent *e)
@@ -211,15 +223,7 @@ void WindowItem::dragEnterEvent(QDragEnterEvent *e)
         return e->ignore();
 
     e->accept();
-    hidePopup();
-}
-
-void WindowItem::dragMoveEvent(QDragMoveEvent *e)
-{
-    DockItem::dragMoveEvent(e);
-
-    if (!popupVisible())
-        showPreview();
+    showPreview();
 }
 
 void WindowItem::dropEvent(QDropEvent *e)
@@ -233,24 +237,26 @@ void WindowItem::dropEvent(QDropEvent *e)
     m_appItem->handleDragDrop(QX11Info::getTimestamp(), uriList);
 }
 
-void WindowItem::closeWindow() {
-    if(!m_closeable) return;
-
-    const auto display = QX11Info::display();
-
-    XEvent e;
-
-    memset(&e, 0, sizeof(e));
-    e.xclient.type = ClientMessage;
-    e.xclient.window = m_WId;
-    e.xclient.message_type = XInternAtom(display, "WM_PROTOCOLS", true);
-    e.xclient.format = 32;
-    e.xclient.data.l[0] = XInternAtom(display, "WM_DELETE_WINDOW", false);
-    e.xclient.data.l[1] = CurrentTime;
-
-    XSendEvent(display, m_WId, false, NoEventMask, &e);
-    XFlush(display);
+QPixmap WindowItem::itemPixmap() {
+    return grab();
 }
+
+// void WindowItem::closeWindow() {
+//     const auto display = QX11Info::display();
+
+//     XEvent e;
+
+//     memset(&e, 0, sizeof(e));
+//     e.xclient.type = ClientMessage;
+//     e.xclient.window = m_WId;
+//     e.xclient.message_type = XInternAtom(display, "WM_PROTOCOLS", true);
+//     e.xclient.format = 32;
+//     e.xclient.data.l[0] = XInternAtom(display, "WM_DELETE_WINDOW", false);
+//     e.xclient.data.l[1] = CurrentTime;
+
+//     XSendEvent(display, m_WId, false, NoEventMask, &e);
+//     XFlush(display);
+// }
 
 void WindowItem::showHoverTips()
 {
@@ -261,58 +267,39 @@ void WindowItem::showPreview()
 {
     WindowInfoMap map;
     map.insert(m_WId, m_windowInfo);
-    QVector<uint> list;
-    if(m_closeable)
-        list.append(m_WId);
-    PreviewContainer *m_appPreview = PreviewContainer::instance(map, list, DockPosition);
-
+    PreviewContainer *m_appPreview = PreviewContainer::instance(map, DockPosition);
     connect(m_appPreview, &PreviewContainer::requestActivateWindow, m_appItem, &AppItem::requestActivateWindow, Qt::QueuedConnection);
     connect(m_appPreview, &PreviewContainer::requestPreviewWindow, m_appItem, &AppItem::requestPreviewWindow, Qt::QueuedConnection);
     connect(m_appPreview, &PreviewContainer::requestCancelPreviewWindow, m_appItem, &AppItem::requestCancelPreview);
     connect(m_appPreview, &PreviewContainer::requestCheckWindows, m_appItem, &AppItem::check);
-    connect(m_appPreview, &PreviewContainer::requestHidePopup, this, &AppItem::hidePopup);
+    connect(m_appPreview, &PreviewContainer::requestClose, m_appItem, &AppItem::close);
+    connect(m_appPreview, &PreviewContainer::requestHidePopup, this, [this]{
+        emit m_appItem->requestCancelPreview();
+        hidePopup();
+    });
 
     showPopupWindow(m_appPreview, true);
 }
 
 void WindowItem::fetchSnapshot()
 {
-    if(this->window()->isVisible() == false) return;
+    if(window()->isVisible() == false) return;
 
     QImage qimage;
-    SHMInfo *info = nullptr;
-    uchar *image_data = nullptr;
     XImage *ximage = nullptr;
     unsigned char *prop_to_return_gtk = nullptr;
 
     do {
-        // get window image from shm(only for deepin app)
-        info = getImageDSHM(m_WId);
-        if (info) {
-            // qInfo() << "get Image from dxcbplugin SHM...";
-            //qDebug() << info->shmid << info->width << info->height << info->bytesPerLine << info->format << info->rect.x << info->rect.y << info->rect.width << info->rect.height;
-            image_data = (uchar *)shmat(info->shmid, 0, 0);
-            if ((qint64)image_data != -1) {
-                m_snapshot = QImage(image_data, info->width, info->height, info->bytesPerLine, (QImage::Format)info->format);
-                m_snapshotSrcRect = QRect(info->rect.x, info->rect.y, info->rect.width, info->rect.height);
-                break;
-            }
-            // qInfo() << "invalid pointer of shm!";
-            image_data = nullptr;
+        // get window image from XGetImage(a little slow)
+        // qInfo() << "get Image from dxcbplugin SHM failed!";
+        // qInfo() << "get Image from Xlib...";
+        ximage = getImageXlib(m_WId);
+        if (!ximage) {
+            // qInfo() << "get Image from Xlib failed! giving up...";
+            // m_appItem->check();
+            return;
         }
-
-        if (!image_data || qimage.isNull()) {
-            // get window image from XGetImage(a little slow)
-            // qInfo() << "get Image from dxcbplugin SHM failed!";
-            // qInfo() << "get Image from Xlib...";
-            ximage = getImageXlib(m_WId);
-            if (!ximage) {
-                // qInfo() << "get Image from Xlib failed! giving up...";
-                m_appItem->check();
-                return;
-            }
-            qimage = QImage((const uchar *)(ximage->data), ximage->width, ximage->height, ximage->bytes_per_line, QImage::Format_RGB32);
-        }
+        qimage = QImage((const uchar *)(ximage->data), ximage->width, ximage->height, ximage->bytes_per_line, QImage::Format_RGB32);
 
         Q_ASSERT(!qimage.isNull());
 
@@ -322,31 +309,45 @@ void WindowItem::fetchSnapshot()
     } while (false);
 
 
-    QSizeF size(rect().marginsRemoved(QMargins(rect().width() * .1,  rect().height() * .1, rect().width() * .1, rect().height() * .1)).size());
+    QSizeF size(rect().marginsRemoved(QMargins(rect().width() * .14,  rect().height() * .14, rect().width() * .14, rect().height() * .14)).size());
     const auto ratio = devicePixelRatioF();
     size = m_snapshotSrcRect.size().scaled(size * ratio, Qt::KeepAspectRatio);
 
     qreal scale = qreal(size.width()) / m_snapshotSrcRect.width();
     m_snapshot = m_snapshot.scaled(qRound(m_snapshot.width() * scale), qRound(m_snapshot.height() * scale), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
 
-    m_snapshotSrcRect.moveTop(m_snapshotSrcRect.top() * scale + 0.5);
-    m_snapshotSrcRect.moveLeft(m_snapshotSrcRect.left() * scale + 0.5);
-    m_snapshotSrcRect.setWidth(size.width() - 0.5);
-    m_snapshotSrcRect.setHeight(size.height() - 0.5);
+    m_snapshotSrcRect.moveTop(m_snapshotSrcRect.top() * scale + 1);
+    m_snapshotSrcRect.moveLeft(m_snapshotSrcRect.left() * scale + 1);
+    m_snapshotSrcRect.setWidth(size.width() - 1);
+    m_snapshotSrcRect.setHeight(size.height() - 1);
 
     m_snapshot.setDevicePixelRatio(ratio);
 
-    if (image_data) shmdt(image_data);
     if (ximage) XDestroyImage(ximage);
-    if (info) XFree(info);
     if (prop_to_return_gtk) XFree(prop_to_return_gtk);
 
-    update();
+
+    auto r = rect();
+    switch (DockPosition)
+    {
+    case Top:
+    case Bottom:
+        r.setBottom(3);
+        break;
+    case Left:
+        r.setX(3);
+        break;
+    case Right:
+        r.setRight(3);
+        break;
+    }
+
+    update(r);
 }
 
 void WindowItem::invokedMenuItem(const QString &itemId, const bool checked) {
     if(itemId == "close")
-        closeWindow();
+        m_appItem->close(m_WId);
     else if(itemId == "max") {
         if(XUtils::checkIfWinMaximum(m_WId))
             XUtils::unmaximizeWindow(m_WId);
@@ -354,7 +355,7 @@ void WindowItem::invokedMenuItem(const QString &itemId, const bool checked) {
             XUtils::maximizeWindow(m_WId);
         XUtils::checkIfWinMaximum(m_WId);
     } else if(itemId == "min")
-        KWindowSystem::minimizeWindow(m_WId);
+        KX11Extras::minimizeWindow(m_WId);
     else if(itemId == "active")
         m_appItem->requestActivateWindow(m_WId);
 }
@@ -366,7 +367,7 @@ const QString WindowItem::contextMenu() const {
     QJsonObject item;
     item.insert("itemText", "激活窗口");
     item.insert("itemId", "active");
-    item.insert("isActive", XUtils::getFocusWindowId() != m_WId);
+    item.insert("isActive", !m_isActive);
     items.append(item);
 
     const bool isMax = XUtils::checkIfWinMaximum(m_WId);
@@ -385,7 +386,7 @@ const QString WindowItem::contextMenu() const {
     QJsonObject closeItem;
     closeItem.insert("itemText", "关闭窗口");
     closeItem.insert("itemId", "close");
-    closeItem.insert("isActive", m_closeable ? true : false);
+    closeItem.insert("isActive", m_windowInfo.closable);
     items.append(closeItem);
 
     menu.insert("items", items);

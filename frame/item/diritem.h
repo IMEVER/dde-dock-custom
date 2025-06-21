@@ -18,7 +18,6 @@ public:
     ~DirItem() = default;
 
     inline ItemType itemType() const override { return DirApp; }
-    inline int maxCount() const { return 9; }
     int currentCount();
 
     QString getTitle() const { return m_title; }
@@ -27,6 +26,7 @@ public:
     void setIds(QSet<QString> ids);
     void addId(QString id);
     bool hasId(QString id);
+    QSet<QString> getIds() const { return m_ids; }
 
     int getIndex();
     void setIndex(int index);
@@ -49,6 +49,8 @@ protected:
     void mouseReleaseEvent(QMouseEvent *e) override;
     void dragEnterEvent(QDragEnterEvent *e) override;
     void dragMoveEvent(QDragMoveEvent *e) override;
+
+    QPixmap itemPixmap() override;
     const QPoint popupDirMarkPoint();
     QString popupTips() override { return m_title; }
 

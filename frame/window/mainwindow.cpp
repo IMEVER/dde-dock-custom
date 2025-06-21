@@ -36,7 +36,7 @@
 
 MainWindow::MainWindow(QWidget *parent) : DBlurEffectWidget(parent)
     , m_mainPanel(new MainPanelControl(this))
-    , m_multiScreenWorker(new MultiScreenWorker(this))
+    , m_multiScreenWorker(new MultiScreenWorker(this, m_mainPanel))
     , m_platformWindowHandle(this)
 {
     setWindowFlag(Qt::WindowDoesNotAcceptFocus);
@@ -59,6 +59,7 @@ MainWindow::MainWindow(QWidget *parent) : DBlurEffectWidget(parent)
 
 void MainWindow::launch()
 {
+    DockItemManager::instance();
     QTimer::singleShot(400, this, [ this ] {
         setMaskColor(AutoColor);
         setMaskAlpha(m_multiScreenWorker->opacity());

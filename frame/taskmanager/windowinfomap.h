@@ -5,10 +5,11 @@
 #ifndef WINDOWINFOLIST_H
 #define WINDOWINFOLIST_H
 
+#include "xcbutils.h"
+
 #include <QDebug>
 #include <QList>
 #include <QDBusArgument>
-
 class WindowInfo
 {
 public:
@@ -20,7 +21,9 @@ public:
     bool operator!=(const WindowInfo &rhs) const;
 
 public:
+    XWindow wid;
     bool attention;
+    bool closable;
     QString title;
     QString uuid;
 };

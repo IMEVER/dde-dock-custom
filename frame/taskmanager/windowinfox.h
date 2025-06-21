@@ -30,6 +30,7 @@ public:
     virtual void activate() override;
     virtual void minimize() override;
     virtual bool isMinimized() override;
+    virtual bool isMaximized() override;
     virtual int64_t getCreatedTime() override;
     virtual QString getDisplayName() override;
     virtual QString getWindowType() override;
@@ -69,7 +70,6 @@ private:
     bool hasWmStateDemandsAttention();
     bool hasWmStateSkipTaskBar();
     bool hasWmStateModal();
-    bool isValidModal();
     bool shouldSkipWithWMClass();
 
 private:

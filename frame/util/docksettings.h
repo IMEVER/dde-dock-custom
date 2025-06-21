@@ -88,45 +88,15 @@ public:
     }
 };
 
-// 强制退出应用菜单状态
-enum class ForceQuitAppMode {
-    Enabled,        // 开启
-    Disabled,       // 关闭
-    Deactivated,    // 置灰
-};
+struct DirData {
+    QString title;
+    int index;
+    QSet<QString> ids;
 
-class ForceQuitAppModeHandler {
-    ForceQuitAppMode modeEnum;
-    QString modeStr;
-
-public:
-    ForceQuitAppModeHandler(ForceQuitAppMode mode) : modeEnum(mode), modeStr("") {}
-    ForceQuitAppModeHandler(QString mode) : modeEnum(ForceQuitAppMode::Enabled), modeStr(mode) {}
-
-    bool equal(ForceQuitAppModeHandler displayMode) {
-        return toString() == displayMode.toString() || toEnum() == displayMode.toEnum();
-    }
-
-    QString toString() {
-        switch (modeEnum) {
-        case ForceQuitAppMode::Enabled:
-            return "enabled";
-        case ForceQuitAppMode::Disabled:
-            return "disabled";
-        case ForceQuitAppMode::Deactivated:
-            return "deactivated";
-        default:
-            return "enabled";
-        }
-    }
-
-    ForceQuitAppMode toEnum() {
-        if (modeStr == "disabled")
-            return ForceQuitAppMode::Disabled;
-        if (modeStr == "deactivated")
-            return ForceQuitAppMode::Deactivated;
-
-        return ForceQuitAppMode::Enabled;
+    DirData(QString title, int index, QSet<QString> ids) {
+        this->title = title;
+        this->index = index;
+        this->ids = ids;
     }
 };
 
@@ -143,22 +113,28 @@ using namespace Dtk::Core;
 class DockSettings: public QObject
 {
     Q_OBJECT
-
 public:
+    enum ActivateAnimationType {
+        Swing = 0,
+        Jump = 1,
+        Scale = 2,
+        Popup = 3,
+        No = 4
+    };
+
     static inline DockSettings *instance() {
         static DockSettings instance;
         return &instance;
     }
-    void init();
 
     HideMode getHideMode();
     void setHideMode(HideMode mode);
     Position getPositionMode();
     void setPositionMode(Position mode);
-    ForceQuitAppMode getForceQuitAppMode();
-    void setForceQuitAppMode(ForceQuitAppMode mode);
     uint getIconSize();
     void setIconSize(uint size);
+    bool showInPrimary();
+    void setShowInPrimary(bool show);
     uint getShowTimeout();
     void setShowTimeout(uint time);
     uint getHideTimeout();
@@ -169,7 +145,6 @@ public:
     void setDockedApps(const QStringList &apps);
     QStringList getRecentApps() const;
     void setRecentApps(const QStringList &apps);
-    QVector<QString> getWinIconPreferredApps();
     void setShowRecent(bool visible);
     bool showRecent() const;
 
@@ -179,13 +154,31 @@ public:
     void setShowMultiWindow(bool showMultiWindow);
     bool showMultiWindow() const;
 
+    QList<DirData> loadDirDatas() const;
+    void setDirDatas(QList<DirData> &dirDatas);
+    void addFolder(const QString &path, int index);
+    void updateFolders(const QStringList &paths);
+    QStringList loadLoaders();
+
+    bool isEnableHoverScaleAnimation();
+    bool isEnableInOutAnimation();
+    bool isEnableDragAnimation();
+    bool isEnableHoverHighlight();
+    void setHoverScaleAnimation(bool enable);
+    void setInOutAnimation(bool enable);
+    void setDragAnimation(bool enable);
+    void setHoverHighlight(bool enable);
+
+    MergeMode getDockMergeMode();
+    void saveDockMergeMode(MergeMode mode);
+    ActivateAnimationType animationType();
+    void setAnimationType(ActivateAnimationType type);
+
 Q_SIGNALS:
     // 隐藏模式改变
     void hideModeChanged(HideMode mode);
     // 显示位置改变
     void positionModeChanged(Position mode);
-    // 强制退出应用开关改变
-    void forceQuitAppChanged(ForceQuitAppMode mode);
     // 是否显示最近打开应用改变
     void showRecentChanged(bool);
     // 是否显示多开应用改变
@@ -194,6 +187,9 @@ Q_SIGNALS:
     void windowNameShowModeChanged(int mode);
     // 时尚模式下，dock尺寸信息改变
     void windowSizeFashionChanged(uint size);
+
+    void mergeModeChanged(MergeMode mode);
+    void hoverHighlighted(bool enabled);
 
 private:
     DockSettings(QObject *paret = nullptr);
@@ -204,6 +200,9 @@ private:
 
 private:
     DConfig *m_dockSettings;
+    DConfig *m_dockApps;
+    QSettings *m_qsettings;
 };
 
+Q_DECLARE_METATYPE(DockSettings::ActivateAnimationType);
 #endif // DOCKSETTINGS_H

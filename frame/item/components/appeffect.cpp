@@ -63,7 +63,7 @@ const static qreal Frames[] = { 0,
                                 0,
                             };
 
-AppEffect::AppEffect(QWidget *parent, const QPixmap &icon, DockItemManager::ActivateAnimationType type, Position position) : QGraphicsView()
+AppEffect::AppEffect(QWidget *parent, const QPixmap &icon, DockSettings::ActivateAnimationType type, Position position) : QGraphicsView()
     , m_parent(parent)
     , m_icon(icon)
     , m_position(position)
@@ -71,6 +71,8 @@ AppEffect::AppEffect(QWidget *parent, const QPixmap &icon, DockItemManager::Acti
     setWindowFlags(Qt::X11BypassWindowManagerHint | Qt::WindowStaysOnTopHint | Qt::WindowDoesNotAcceptFocus);
     setAttribute(Qt::WA_TransparentForMouseEvents);
     setAttribute( Qt::WA_TranslucentBackground);
+    setAttribute(Qt::WA_QuitOnClose, false);
+    setAttribute(Qt::WA_DeleteOnClose, true);
     viewport()->setAutoFillBackground(false);
     setFrameShape(QFrame::NoFrame);
     setAlignment(Qt::AlignCenter);
@@ -94,16 +96,16 @@ AppEffect::AppEffect(QWidget *parent, const QPixmap &icon, DockItemManager::Acti
         if(newState == QVariantAnimation::Running)
             show();
         else if (newState == QVariantAnimation::Stopped) {
-            if(m_type != DockItemManager::Popup or m_animation->direction() == QVariantAnimation::Backward)
-                deleteLater();
+            if(m_type != DockSettings::Popup or m_animation->direction() == QVariantAnimation::Backward)
+                close();
         }
     });
 
-    if(type == DockItemManager::Swing)
+    if(type == DockSettings::Swing)
         initSwing();
-    else if(type == DockItemManager::Jump)
+    else if(type == DockSettings::Jump)
         initJump();
-    else if(type == DockItemManager::Scale)
+    else if(type == DockSettings::Scale)
         initScale();
     else
         initPopup();
@@ -233,20 +235,20 @@ void AppEffect::initPopup() {
 
 void AppEffect::enterEvent(QEvent *event) {
     QGraphicsView::enterEvent(event);
-    if(m_type == DockItemManager::Scale)
+    if(m_type == DockSettings::Scale)
         m_animation->setDirection(QVariantAnimation::Forward);
 }
 
 void AppEffect::leaveEvent(QEvent *event) {
     QGraphicsView::leaveEvent(event);
-    if(m_type == DockItemManager::Scale) {
+    if(m_type == DockSettings::Scale) {
         m_animation->setDirection(QVariantAnimation::Backward);
         m_animation->start();
     }
 }
 
 bool AppEffect::eventFilter(QObject *object, QEvent *event) {
-    if(m_type == DockItemManager::Scale && object == m_parent && event->type() == QEvent::Move)
+    if(m_type == DockSettings::Scale && object == m_parent && event->type() == QEvent::Move)
         move(m_parent->mapToGlobal(QPoint(0, 0)));
     return false;
 }

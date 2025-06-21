@@ -57,19 +57,22 @@ public:
     virtual Place getPlace() { return DockPlace; }
 
     void hidePopup();
-    void easeIn(bool animation);
-    void easeOut(bool animation);
+    void easeIn();
+    void easeOut();
 
 signals:
     void itemDropped(QObject *destination, const QPoint &dropPoint) const;
     void requestWindowAutoHide(const bool autoHide) const;
-    void inoutFinished(bool in);
+    void outFinished();
 
 protected:
     void paintEvent(QPaintEvent *) override;
     void mousePressEvent(QMouseEvent *e) override;
     void enterEvent(QEvent *e) override;
     void leaveEvent(QEvent *e) override;
+
+    QRect indicatorRect() const;
+    virtual QPixmap itemPixmap();
 
     const QRect perfectIconRect() const;
     virtual const QPoint popupMarkPoint() ;

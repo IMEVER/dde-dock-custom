@@ -27,7 +27,7 @@ const QString getWindowPatternsFile(){
     }
 
     return QString();
-} 
+}
 
 bool contains(QString key, QString value) {
     return key.contains(value);
@@ -171,7 +171,7 @@ QString WindowPatterns::match(WindowInfoX *winInfo)
 
 void WindowPatterns::loadWindowPatterns()
 {
-    qInfo() << "---loadWindowPatterns";
+    // qInfo() << "---loadWindowPatterns";
     QFile file(getWindowPatternsFile());
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
         return;
@@ -212,10 +212,10 @@ void WindowPatterns::loadWindowPatterns()
                 }
             }
         }
-        qInfo() << pattern.result;
-        for (const auto &item : pattern.rules) {
-            qInfo() << item[0] << " " << item[1];
-        }
+        // qInfo() << pattern.result;
+        // for (const auto &item : pattern.rules) {
+        //     qInfo() << item[0] << " " << item[1];
+        // }
         m_patterns.push_back(pattern);
      }
 

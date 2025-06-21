@@ -40,9 +40,9 @@ public:
     explicit AppItem(const Entry *entry, QWidget *parent = nullptr);
     ~AppItem();
 
-    QString path() const { return m_itemEntry->getDesktopFile(); }
     const QString appId() const { return m_itemEntry->getId(); }
     bool isValid() const { return m_itemEntry->isValid() && !m_itemEntry->getId().isEmpty(); }
+    bool hasMpris() const { return m_itemEntry->hasMpris(); }
     void undock() { m_itemEntry->requestUndock(); }
     QWidget *appDragWidget();
     void setDockInfo(Dock::Position dockPosition, const QRect &dockGeometry);
@@ -51,18 +51,18 @@ public:
     inline QPixmap appIcon() const {
         return m_icon.isNull() ? QPixmap(":/icons/resources/application-x-desktop.svg") : m_icon.pixmap(width()*.9);
     }
-    QString getDesktopFile() const { return m_itemEntry->getDesktopFile(); }
+
     Place getPlace() override { return m_place; }
     DirItem *getDirItem() { return m_dirItem; }
     void setDirItem(DirItem *dirItem);
     void removeDirItem();
     void check() const { m_itemEntry->check(); }
-    void fetchWindowInfos() { updateWindowInfos(m_itemEntry->getExportWindowInfos()); }
-    void removeWindowItem(bool animation = true);
+    void removeWindowItem();
     int windowCount() { return m_windowMap.size(); }
     void handleDragDrop(uint timestamp, const QStringList &uris);
     void refreshIcon();
     void requestActivateWindow(const WId wid);
+    void close(const WId wid);
 
 signals:
     void requestPreviewWindow(const WId wid) const;
@@ -72,8 +72,9 @@ signals:
     void dragReady(QWidget *dragWidget);
 
     void windowItemInserted(WindowItem *);
-    void windowItemRemoved(WindowItem *, bool animation = true);
+    void windowItemRemoved(WindowItem *);
     void windowCountChanged();
+    void windowActiveChanged(bool active, WId wid);
 
 private:
     void moveEvent(QMoveEvent *e) override;
@@ -83,10 +84,12 @@ private:
     void resizeEvent(QResizeEvent *e) override;
     void dragEnterEvent(QDragEnterEvent *e) override;
     void dragMoveEvent(QDragMoveEvent *e) override;
+    void dragLeaveEvent(QDragLeaveEvent *e) override;
     void dropEvent(QDropEvent *e) override;
     void leaveEvent(QEvent *e) override;
 
     bool isMergeWindow() const;
+    QPixmap itemPixmap() override;
     void showHoverTips() Q_DECL_OVERRIDE;
     QString popupTips() Q_DECL_OVERRIDE;
     void invokedMenuItem(const QString &itemId, const bool checked) Q_DECL_OVERRIDE;
@@ -97,7 +100,8 @@ private:
     QPoint appIconPosition() const;
 
 private slots:
-    void updateWindowInfos(const WindowInfoMap &info);
+    void addWindowInfo(const WindowInfo &info);
+    void removeWindowInfo(const WindowInfo &info);
     void mergeModeChanged(MergeMode mode);
     void showPreview();
     void playSwingEffect();
@@ -109,13 +113,7 @@ private:
 
     Place m_place = DockPlace;
     DirItem *m_dirItem;
-    QMap<WId, WindowItem *> m_windowMap;
-
-    QColor m_activeColor;
-    QPixmap m_horizontalIndicator;
-    QPixmap m_verticalIndicator;
-    QPixmap m_activeHorizontalIndicator;
-    QPixmap m_activeVerticalIndicator;
+    QMap<XWindow, WindowItem *> m_windowMap;
 };
 
 #endif // APPITEM_H

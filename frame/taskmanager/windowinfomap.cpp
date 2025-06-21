@@ -31,7 +31,7 @@ const QDBusArgument &operator>>(const QDBusArgument &argument, WindowInfo &info)
 
 bool WindowInfo::operator==(const WindowInfo &rhs) const
 {
-    return attention == rhs.attention && title == rhs.title && uuid == rhs.uuid;
+    return wid == rhs.wid && attention == rhs.attention && title == rhs.title && uuid == rhs.uuid;
 }
 
 bool WindowInfo::operator!=(const WindowInfo &rhs) const

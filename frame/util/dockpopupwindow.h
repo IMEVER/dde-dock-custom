@@ -42,17 +42,19 @@ public:
     void setContent(QWidget *content);
     void setExtendWidget(QWidget *widget);
     QWidget *extendWidget() const;
+    using Dtk::Widget::DArrowRectangle::show;
 
 public slots:
     void show(const QPoint &pos, const bool model = false);
-    void show(const int x, const int y);
     void hide();
 
 signals:
-    void accept() const;
+    void requestWindowAutoHide(const bool autoHide) const;
 
 protected:
-    bool eventFilter(QObject *o, QEvent *e);
+    bool eventFilter(QObject *o, QEvent *e) override;
+    void showEvent(QShowEvent *event) override;
+    void hideEvent(QHideEvent *event) override;
 
 private slots:
     void onButtonPress(int type, int x, int y, const QString &key);
@@ -60,11 +62,11 @@ private slots:
 private:
     bool m_enableMouseRelease;
     bool m_model;
-    QPoint m_lastPoint;
 
     XEventMonitorInter *m_eventInter;
     QString m_registerKey;
     QWidget *m_extendWidget;
+    QWidget *m_parent;
 };
 
 #endif // DOCKPOPUPWINDOW_H

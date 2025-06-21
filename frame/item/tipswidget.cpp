@@ -50,7 +50,6 @@ void TipsWidget::paintEvent(QPaintEvent *event)
     QPainter painter(this);
     painter.setPen(QPen(palette().brightText(), 1));
     QTextOption option;
-    int fontHeight = fontMetrics().height();
     option.setAlignment(Qt::AlignCenter);
 
     switch (m_type) {
@@ -59,6 +58,7 @@ void TipsWidget::paintEvent(QPaintEvent *event)
         break;
     case MultiLine:
         int y = 0;
+        int fontHeight = fontMetrics().height();
         if (m_textList.size() != 1)
             option.setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
         for (QString text : m_textList) {

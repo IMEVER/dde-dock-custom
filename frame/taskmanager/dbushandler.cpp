@@ -12,16 +12,21 @@ DBusHandler::DBusHandler(TaskManager *taskmanager, QObject *parent)
     : QObject(parent)
     , m_taskmanager(taskmanager)
     , m_wm(new com::deepin::wm("com.deepin.wm", "/com/deepin/wm", QDBusConnection::sessionBus(), this))
-    , m_wmSwitcher(new org::deepin::dde::WMSwitcher1("org.deepin.dde.WMSwitcher1", "/org/deepin/dde/WMSwitcher1", QDBusConnection::sessionBus(), this))
     , m_kwaylandManager(nullptr)
     , m_xEventMonitor(nullptr)
+    , m_launcher(new org::deepin::dde::Launcher1(launcherService, launcherPath, QDBusConnection::sessionBus(), this))
 {
-    connect(m_wmSwitcher, &org::deepin::dde::WMSwitcher1::WMChanged, this, [&](QString name) {m_taskmanager->setWMName(name);});
     if (!isWaylandSession()) {
         m_xEventMonitor = new org::deepin::dde::XEventMonitor1("org.deepin.dde.XEventMonitor1", "/org/deepin/dde/XEventMonitor1", QDBusConnection::sessionBus(), this);
         m_activeWindowMonitorKey = m_xEventMonitor->RegisterFullScreen();
         connect(m_xEventMonitor, &org::deepin::dde::XEventMonitor1::ButtonRelease, this, &DBusHandler::onActiveWindowButtonRelease);
     }
+
+    connect(m_launcher,static_cast<void (org::deepin::dde::Launcher1::*)(bool)>(&org::deepin::dde::Launcher1::VisibleChanged), this, [=] (const bool visible){
+        m_taskmanager->setDdeLauncherVisible(visible);
+        m_taskmanager->updateHideState(true);
+    });
+
 }
 
 void DBusHandler::listenWaylandWMSignals()
@@ -47,30 +52,58 @@ void DBusHandler::loadClientList()
         m_taskmanager->registerWindowWayland(windowPath.toString());
 }
 
-QString DBusHandler::getCurrentWM()
-{
-    return m_wmSwitcher->CurrentWM().value();
-}
-
 void DBusHandler::launchApp(QString desktopFile, uint32_t timestamp, QStringList files)
 {
-    QDBusInterface *interface = new QDBusInterface("org.deepin.dde.Application1.Manager", "/org/deepin/dde/Application1/Manager", "org.deepin.dde.Application1.Manager");
-    interface->call("LaunchApp", desktopFile, timestamp, files);
-    interface->deleteLater();
+    if (newStartManagerAvaliable()) {
+        auto objPath = desktopEscapeToObjectPath(desktopFile);
+        launchAppUsingApplicationManager1(QString{DDEApplicationManager1ObjectPath} + '/' + objPath, timestamp, files);
+    } else {
+        launchAppUsingApplication1Manager(desktopFile, timestamp, files);
+    }
+
 }
 
 void DBusHandler::launchAppAction(QString desktopFile, QString action, uint32_t timestamp)
 {
-    QDBusInterface *interface = new QDBusInterface("org.deepin.dde.Application1.Manager", "/org/deepin/dde/Application1/Manager", "org.deepin.dde.Application1.Manager");
-    interface->call("LaunchAppAction", desktopFile, action, timestamp);
-    interface->deleteLater();
+    if (newStartManagerAvaliable()) {
+        auto objPath = desktopEscapeToObjectPath(desktopFile);
+        launchAppActionUsingApplicationManager1(QString{DDEApplicationManager1ObjectPath} + '/' + objPath, action, timestamp);
+    } else {
+        launchAppActionUsingApplication1Manager(desktopFile, action, timestamp);
+    }
+
+}
+
+void DBusHandler::launchAppUsingApplication1Manager(QString desktopFile, uint32_t timestamp, QStringList files)
+{
+    QDBusInterface interface("org.deepin.dde.Application1.Manager", "/org/deepin/dde/Application1/Manager", "org.deepin.dde.Application1.Manager");
+    interface.call("LaunchApp", desktopFile, timestamp, files);
+}
+
+void DBusHandler::launchAppActionUsingApplication1Manager(QString desktopFile, QString action, uint32_t timestamp)
+{
+    QDBusInterface interface("org.deepin.dde.Application1.Manager", "/org/deepin/dde/Application1/Manager", "org.deepin.dde.Application1.Manager");
+    interface.call("LaunchAppAction", desktopFile, action, timestamp);
+}
+
+// 新AM启动接口
+void DBusHandler::launchAppUsingApplicationManager1(QString dbusObjectPath, uint32_t timestamp, QStringList files)
+{
+    QDBusInterface interface(ApplicationManager1DBusName, dbusObjectPath, "org.desktopspec.ApplicationManager1.Application");
+    interface.call("Launch", "", QStringList(), QMap<QString, QVariant>());
+}
+
+void DBusHandler::launchAppActionUsingApplicationManager1(QString dbusObjectPath, QString action, uint32_t timestamp)
+{
+    action = action.right(action.size() - strlen(DesktopFileActionKey));
+    QDBusInterface interface(ApplicationManager1DBusName, dbusObjectPath, "org.desktopspec.ApplicationManager1.Application");
+    interface.call("Launch", action, QStringList(), QMap<QString, QVariant>());
 }
 
 void DBusHandler::markAppLaunched(const QString &filePath)
 {
-    QDBusInterface *interface = new QDBusInterface("org.deepin.dde.AlRecorder1", "/org/deepin/dde/AlRecorder1", "org.deepin.dde.AlRecorder1");
-    interface->call("MarkLaunched", filePath);
-    interface->deleteLater();
+    QDBusInterface interface("org.deepin.dde.AlRecorder1", "/org/deepin/dde/AlRecorder1", "org.deepin.dde.AlRecorder1");
+    interface.call("MarkLaunched", filePath);
 }
 
 bool DBusHandler::wlShowingDesktop()
@@ -150,10 +183,6 @@ void DBusHandler::listenKWindowSignals(WindowInfoK *windowInfo)
     // DemandingAttention changed
     connect(window, &PlasmaWindow::DemandsAttentionChanged, this, [=] {
         windowInfo->updateDemandingAttention();
-        auto entry = m_taskmanager->getEntryByWindowId(windowInfo->getXid());
-        if (!entry) return;
-
-        entry->updateExportWindowInfos();
     });
 
     // Geometry changed
@@ -211,4 +240,53 @@ QString DBusHandler::getDesktopFromWindowByBamf(XWindow windowId)
         return replyDesktopFile.value();
 
     return "";
+}
+
+// 新的AM调用
+QString DBusHandler::desktopEscapeToObjectPath(QString desktopFilePath)
+{
+    // to desktop id
+    QString objectPath;
+    decltype(auto) desktopSuffix = ".desktop";
+    auto tmp = desktopFilePath.chopped(sizeof(desktopSuffix) - 1);
+    auto components = tmp.split(QDir::separator());
+    auto it = std::find(components.cbegin(), components.cend(), "applications");
+    if (it == components.cend()) return "_";
+    QString FileId;
+    ++it;
+    while (it != components.cend()) {
+        FileId += (*(it++) + "-");
+    }
+    objectPath = FileId.chopped(1);
+
+    if (objectPath.isEmpty()) {
+        return "_";
+    }
+
+    // desktop id to objectPath
+    QRegularExpression re{R"([^a-zA-Z0-9])"};
+    auto matcher = re.globalMatch(objectPath);
+    while (matcher.hasNext()) {
+        auto replaceList = matcher.next().capturedTexts();
+        replaceList.removeDuplicates();
+        for (const auto &c : replaceList) {
+            auto hexStr = QString::number(static_cast<uint>(c.front().toLatin1()), 16);
+            objectPath.replace(c, QString{R"(_%1)"}.arg(hexStr));
+        }
+    }
+
+    return objectPath;
+}
+
+bool DBusHandler::newStartManagerAvaliable()
+{
+    static bool isAvaiable = false;
+    std::call_once(m_isNewStartManagerAvaliableInited, []{
+        auto services = QDBusConnection::sessionBus().interface()->registeredServiceNames().value();
+        isAvaiable = std::any_of(services.begin(), services.end(), [](const QString &name){
+            return name == ApplicationManager1DBusName;
+        });
+    });
+
+    return isAvaiable;
 }

@@ -15,31 +15,25 @@
 #include <QObject>
 #include <qscopedpointer.h>
 
-#define ENTRY_NONE      0
-#define ENTRY_NORMAL    1
-#define ENTRY_RECENT    2
-
 // 单个应用类
 class TaskManager;
 class DBusAdaptorEntry;
 class WindowInfo;
 
-typedef QMap<quint32, WindowInfo> WindowInfoMap;
+typedef QMap<XWindow, WindowInfo> WindowInfoMap;
 
 class Entry: public QObject
 {
     Q_OBJECT
 public:
-    Entry(TaskManager *_taskmanager, AppInfo *_app, QString _innerId, QObject *parent = nullptr);
+    Entry(TaskManager *_taskmanager, AppInfo *_app, QObject *parent = nullptr);
+    Entry(TaskManager *_taskmanager, WindowInfoBase *window, QObject *parent = nullptr);
     ~Entry();
 
     void updateName();
     void updateMenu();
     void updateIcon();
-    void updateMode();
     void updateIsActive();
-    void forceUpdateIcon();
-    void updateExportWindowInfos();
     void launchApp(uint32_t timestamp);
 
     void setIsDocked(bool value);
@@ -47,7 +41,6 @@ public:
     void setPropIcon(QString value);
     void setPropName(QString value);
     void setPropIsActive(bool active);
-    void setInnerId(QString _innerId);
     void setAppInfo(AppInfo *appinfo);
     void setPropCurrentWindow(XWindow value);
     void setCurrentWindowInfo(WindowInfoBase *windowInfo);
@@ -57,14 +50,14 @@ public:
     void presentWindows();
     void active(uint32_t timestamp);
     void activeWindow(quint32 winId);
-    void newInstance(uint32_t timestamp);
+    void close(const XWindow wId);
     void requestDock(bool dockToEnd = false);
     void requestUndock(bool dockToEnd = false);
     void handleMenuItem(uint32_t timestamp, QString itemId);
     void handleDragDrop(uint32_t timestamp, QStringList files);
 
     bool containsWindow(XWindow xid);
-    bool detachWindow(WindowInfoBase *info);
+    bool detachWindow(WindowInfoBase *info, bool del);
     bool attachWindow(WindowInfoBase *info);
 
     bool getIsDocked() const;
@@ -75,14 +68,13 @@ public:
 
     bool isValid();
     bool hasWindow();
-
-    int mode();
+    bool hasCloseableWindow();
+    bool hasMpris();
 
     QString getName();
     QString getIcon();
-    QString getInnerId();
+    QString getInnerId() const { return m_isValid ? m_appInfo->getInnerId() : (m_current ? m_current->getInnerId() : ""); }
     QString getFileName();
-    QString getDesktopFile();
     QString getExec();
     QString getCmdLine();
 
@@ -98,29 +90,23 @@ public:
     const WindowInfoMap &getExportWindowInfos() const;
     QVector<XWindow> getAllowedClosedWindowIds();
 
-    inline int lastOpenTime() const { return m_lastOpenTime; }
-    inline int openCount() const { return m_openCount; }
-
-public Q_SLOTS:
-    QVector<WindowInfoBase *> getAllowedCloseWindows();
+    inline int lastUpdateTime() const { return m_lastUpdateTime; }
 
 Q_SIGNALS:
-    void modeChanged(int);
     void isActiveChanged(bool);
     void isDockedChanged(bool);
     void menuChanged(QString);
     void iconChanged(QString);
     void nameChanged(QString);
-    void desktopFileChanged(QString);
+    void titleChanged(XWindow wid, const QString &title);
     void currentWindowChanged(uint32_t);
-    void windowInfosChanged(const WindowInfoMap&);
+    void windowInfoAdded(const WindowInfo&);
+    void windowInfoRemoved(const WindowInfo&);
+    void mprisChanged();
 
 private:
     // 右键菜单项
     bool killProcess(int pid);
-    bool setPropDesktopFile(QString value);
-    bool isShowOnDock() const;
-    int getCurrentMode();
 
     AppMenuItem getMenuItemLaunch();
     AppMenuItem getMenuItemCloseAll();
@@ -136,16 +122,11 @@ private:
     bool m_isActive;
     bool m_isValid;
     bool m_isDocked;
-    bool m_winIconPreferred;
-    int m_mode;
-    int m_lastOpenTime;
-    int m_openCount;
+    int m_lastUpdateTime;
 
     QString m_id;
     QString m_name;
     QString m_icon;
-    QString m_innerId;
-    QString m_desktopFile;
 
     DBusAdaptorEntry *m_adapterEntry;
     TaskManager *m_taskmanager;

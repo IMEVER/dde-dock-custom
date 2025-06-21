@@ -33,6 +33,7 @@
 #include <DDBusSender>
 #include <QPainter>
 
+#define SETTING DockSettings::instance()
 class MenuProxyStyle: public QProxyStyle{
 public:
     using QProxyStyle::QProxyStyle;
@@ -66,7 +67,7 @@ QMenu *MenuWorker::createMenu()
     DockItemManager *m_itemManager = DockItemManager::instance();
     QMenu *m_settingsMenu = new QMenu();
 
-    Dock::Position m_position = DockSettings::instance()->getPositionMode();
+    Dock::Position m_position = SETTING->getPositionMode();
     QMenu *locationSubMenu = m_settingsMenu->addMenu("位置");
     QAction *m_bottomPosAct = locationSubMenu->addAction("下");
     m_bottomPosAct->setCheckable(true);
@@ -78,7 +79,7 @@ QMenu *MenuWorker::createMenu()
     m_rightPosAct->setCheckable(true);
     m_rightPosAct->setChecked(m_position == Right);
 
-    Dock::HideMode m_hideMode = DockSettings::instance()->getHideMode();
+    Dock::HideMode m_hideMode = SETTING->getHideMode();
     QMenu *statusSubMenu = m_settingsMenu->addMenu("状态");
     QAction *m_keepShownAct = statusSubMenu->addAction("一直显示");
     m_keepShownAct->setCheckable(true);
@@ -95,33 +96,33 @@ QMenu *MenuWorker::createMenu()
 
     QAction *m_hoverHighlightAct = animationSubMenu->addAction("悬停高亮");
     m_hoverHighlightAct->setCheckable(true);
-    m_hoverHighlightAct->setChecked(m_itemManager->isEnableHoverHighlight());
+    m_hoverHighlightAct->setChecked(SETTING->isEnableHoverHighlight());
     QAction *m_inoutAct = animationSubMenu->addAction("淡入淡出");
     m_inoutAct->setCheckable(true);
-    m_inoutAct->setChecked(m_itemManager->isEnableInOutAnimation());
+    m_inoutAct->setChecked(SETTING->isEnableInOutAnimation());
     QAction *m_hoverScaleAct = animationSubMenu->addAction("悬停缩放");
     m_hoverScaleAct->setCheckable(true);
-    m_hoverScaleAct->setChecked(m_itemManager->isEnableHoverScaleAnimation());
+    m_hoverScaleAct->setChecked(SETTING->isEnableHoverScaleAnimation());
     QAction *m_dragAct = animationSubMenu->addAction("拖动动画");
     m_dragAct->setCheckable(true);
-    m_dragAct->setChecked(m_itemManager->isEnableDragAnimation());
+    m_dragAct->setChecked(SETTING->isEnableDragAnimation());
 
     animationSubMenu->addSection("提醒动画");
     QActionGroup *group = new QActionGroup(this);
     QAction *swingAction = animationSubMenu->addAction("摆动");
     swingAction->setCheckable(true);
-    swingAction->setChecked(m_itemManager->animationType() == DockItemManager::Swing);
+    swingAction->setChecked(SETTING->animationType() == DockSettings::Swing);
     group->addAction(swingAction);
     QAction *jumpAction = animationSubMenu->addAction("跳动");
     jumpAction->setCheckable(true);
-    jumpAction->setChecked(m_itemManager->animationType() == DockItemManager::Jump);
+    jumpAction->setChecked(SETTING->animationType() == DockSettings::Jump);
     group->addAction(jumpAction);
     QAction *noAction = animationSubMenu->addAction("无动画");
     noAction->setCheckable(true);
-    noAction->setChecked(m_itemManager->animationType() == DockItemManager::No);
+    noAction->setChecked(SETTING->animationType() == DockSettings::No);
     group->addAction(noAction);
 
-    MergeMode mode = m_itemManager->getDockMergeMode();
+    MergeMode mode = SETTING->getDockMergeMode();
     QMenu *mergeSubMenu = m_settingsMenu->addMenu("窗口");
     QAction *m_mergeNoneAct = mergeSubMenu->addAction("从不合并");
     m_mergeNoneAct->setCheckable(true);
@@ -180,25 +181,25 @@ QMenu *MenuWorker::createMenu()
             return DockSettings::instance()->setHideMode(SmartHide);
 
         if(action == m_hoverHighlightAct)
-            return m_itemManager->setHoverHighlight(action->isChecked());
+            return SETTING->setHoverHighlight(action->isChecked());
         if(action == m_inoutAct)
-            return m_itemManager->setInOutAnimation(action->isChecked());
+            return SETTING->setInOutAnimation(action->isChecked());
         if(action == m_dragAct)
-            return m_itemManager->setDragAnimation(action->isChecked());
+            return SETTING->setDragAnimation(action->isChecked());
         if(action == m_hoverScaleAct)
-            return m_itemManager->setHoverScaleAnimation(action->isChecked());
+            return SETTING->setHoverScaleAnimation(action->isChecked());
 
         if(action == m_mergeNoneAct)
-            return m_itemManager->saveDockMergeMode(MergeNone);
+            return SETTING->saveDockMergeMode(MergeNone);
         else if(action == m_mergeDockAct)
-            return m_itemManager->saveDockMergeMode(MergeDock);
+            return SETTING->saveDockMergeMode(MergeDock);
 
         if(action == swingAction)
-            return m_itemManager->setAnimationType(DockItemManager::Swing);
+            return SETTING->setAnimationType(DockSettings::Swing);
         if(action == jumpAction)
-            return m_itemManager->setAnimationType(DockItemManager::Jump);
+            return SETTING->setAnimationType(DockSettings::Jump);
         if(action == noAction)
-            return m_itemManager->setAnimationType(DockItemManager::No);
+            return SETTING->setAnimationType(DockSettings::No);
     });
 
     return m_settingsMenu;

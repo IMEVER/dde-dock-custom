@@ -17,7 +17,7 @@
 class AppInfo;
 class TaskManager;
 
-typedef AppInfo *(*IdentifyFunc)(TaskManager *, WindowInfoX*, QString &innerId);
+typedef AppInfo *(*IdentifyFunc)(TaskManager *, WindowInfoX*);
 
 // 应用窗口识别类
 class WindowIdentify : public QObject
@@ -27,27 +27,24 @@ class WindowIdentify : public QObject
 public:
     explicit WindowIdentify(TaskManager *_taskmanager, QObject *parent = nullptr);
 
-    AppInfo *identifyWindow(WindowInfoBase *winInfo, QString &innerId);
-    AppInfo *identifyWindowX11(WindowInfoX *winInfo, QString &innerId);
-    AppInfo *identifyWindowWayland(WindowInfoK *winInfo, QString &innerId);
+    AppInfo *identifyWindow(WindowInfoBase *winInfo);
+    AppInfo *identifyWindowX11(WindowInfoX *winInfo);
+    AppInfo *identifyWindowWayland(WindowInfoK *winInfo);
 
-    static AppInfo *identifyWindowAndroid(TaskManager *_dock, WindowInfoX *winInfo, QString &innerId);
-    static AppInfo *identifyWindowByPidEnv(TaskManager *_dock, WindowInfoX *winInfo, QString &innerId);
-    static AppInfo *identifyWindowByCmdlineTurboBooster(TaskManager *_dock, WindowInfoX *winInfo, QString &innerId);
-    static AppInfo *identifyWindowByCmdlineXWalk(TaskManager *_dock, WindowInfoX *winInfo, QString &innerId);
-    static AppInfo *identifyWindowByFlatpakAppID(TaskManager *_dock, WindowInfoX *winInfo, QString &innerId);
-    static AppInfo *identifyWindowByCrxId(TaskManager *_dock, WindowInfoX *winInfo, QString &innerId);
-    static AppInfo *identifyWindowByRule(TaskManager *_dock, WindowInfoX *winInfo, QString &innerId);
-    static AppInfo *identifyWindowByBamf(TaskManager *_dock, WindowInfoX *winInfo, QString &innerId);
-    static AppInfo *identifyWindowByPid(TaskManager *_dock, WindowInfoX *winInfo, QString &innerId);
-    static AppInfo *identifyWindowByScratch(TaskManager *_dock, WindowInfoX *winInfo, QString &innerId);
-    static AppInfo *identifyWindowByGtkAppId(TaskManager *_dock, WindowInfoX *winInfo, QString &innerId);
-    static AppInfo *identifyWindowByWmClass(TaskManager *_dock, WindowInfoX *winInfo, QString &innerId);
+    static AppInfo *identifyWindowByPidEnv(TaskManager *_dock, WindowInfoX *winInfo);
+    static AppInfo *identifyWindowByCmdlineTurboBooster(TaskManager *_dock, WindowInfoX *winInfo);
+    static AppInfo *identifyWindowByCmdlineXWalk(TaskManager *_dock, WindowInfoX *winInfo);
+    static AppInfo *identifyWindowByFlatpakAppID(TaskManager *_dock, WindowInfoX *winInfo);
+    static AppInfo *identifyWindowByCrxId(TaskManager *_dock, WindowInfoX *winInfo);
+    static AppInfo *identifyWindowByRule(TaskManager *_dock, WindowInfoX *winInfo);
+    static AppInfo *identifyWindowByBamf(TaskManager *_dock, WindowInfoX *winInfo);
+    static AppInfo *identifyWindowByPid(TaskManager *_dock, WindowInfoX *winInfo);
+    static AppInfo *identifyWindowByScratch(TaskManager *_dock, WindowInfoX *winInfo);
+    static AppInfo *identifyWindowByGtkAppId(TaskManager *_dock, WindowInfoX *winInfo);
+    static AppInfo *identifyWindowByWmClass(TaskManager *_dock, WindowInfoX *winInfo);
 
 private:
     AppInfo *fixAutostartAppInfo(QString fileName);
-    static int32_t getAndroidUengineId(XWindow winId);
-    static QString getAndroidUengineName(XWindow winId);
 
 private:
     TaskManager *m_taskmanager;

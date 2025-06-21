@@ -7,6 +7,7 @@
 
 #include "com_deepin_wm.h"
 #include "org_deepin_dde_wmswitcher1.h"
+#include "LauncherInter.h"
 #include "org_deepin_dde_xeventmonitor1.h"
 #include "org_deepin_dde_kwayland_windowmanager.h"
 #include "org_deepin_dde_kwayland_plasmawindow.h"
@@ -33,12 +34,14 @@ public:
     bool wlShowingDesktop();
     uint wlActiveWindow();
 
-    /************************* WMSwitcher ***************************/
-    QString getCurrentWM();
-
     /************************* StartManager ***************************/
     void launchApp(QString desktopFile, uint32_t timestamp, QStringList files);
     void launchAppAction(QString desktopFile, QString action, uint32_t timestamp);
+
+    void launchAppUsingApplication1Manager(QString desktopFile, uint32_t timestamp, QStringList files);
+    void launchAppActionUsingApplication1Manager(QString desktopFile, QString action, uint32_t timestamp);
+    void launchAppUsingApplicationManager1(QString dbusObjectPath, uint32_t timestamp, QStringList files);
+    void launchAppActionUsingApplicationManager1(QString dbusObjectPath, QString action, uint32_t timestamp);
 
     /************************* AlRecorder1 ***************************/
     void markAppLaunched(const QString &filePath);
@@ -57,6 +60,8 @@ public:
     /************************* bamf ***************************/
     // XWindow -> desktopFile
     QString getDesktopFromWindowByBamf(XWindow windowId);
+    QString desktopEscapeToObjectPath(QString desktopFilePath);
+    bool newStartManagerAvaliable();
 
 private Q_SLOTS:
     void handleWlActiveWindowChange();
@@ -70,6 +75,9 @@ private:
     org::deepin::dde::WMSwitcher1 *m_wmSwitcher;
     org::deepin::dde::KWayland1::WindowManager *m_kwaylandManager;
     org::deepin::dde::XEventMonitor1 *m_xEventMonitor;
+    org::deepin::dde::Launcher1 *m_launcher;
+
+    std::once_flag m_isNewStartManagerAvaliableInited;
 };
 
 #endif // DBUSHANDLER_H

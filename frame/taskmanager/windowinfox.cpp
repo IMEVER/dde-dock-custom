@@ -49,7 +49,7 @@ bool WindowInfoX::shouldSkip()
         m_updateCalled = true;
     }
 
-    if (hasWmStateSkipTaskBar() || isValidModal() || shouldSkipWithWMClass())
+    if (hasWmStateSkipTaskBar() || hasWmStateModal() || shouldSkipWithWMClass())
         return true;
 
     for (auto atom : m_wmWindowType) {
@@ -100,6 +100,10 @@ bool WindowInfoX::isMinimized()
     return containAtom(m_wmState, XCB->getAtom("_NET_WM_STATE_HIDDEN"));
 }
 
+bool WindowInfoX::isMaximized() {
+    return containAtom(m_wmState, XCB->getAtom("_NET_WM_STATE_MAXIMIZED_VERT")) and containAtom(m_wmState, XCB->getAtom("_NET_WM_STATE_MAXIMIZED_HORZ"));
+}
+
 int64_t WindowInfoX::getCreatedTime()
 {
     return m_createdTime;
@@ -122,34 +126,25 @@ bool WindowInfoX::allowClose()
      || (m_motifWmHints.functions & MotifFunctionClose) != 0)
         return true;
 
-    for (auto action : m_wmAllowedActions) {
-        if (action == XCB->getAtom("_NET_WM_ACTION_CLOSE")) {
-            return true;
-        }
-    }
-
-    return false;
+    return m_wmAllowedActions.contains(XCB->getAtom("_NET_WM_ACTION_CLOSE"));
 }
 
 QString WindowInfoX::getDisplayName()
 {
-    XWindow winId = xid;
     //QString role = wmRole;
     QString className(m_wmClass.className.c_str());
-    QString instance;
-    if (m_wmClass.instanceName.size() > 0) {
-        int pos = QString(m_wmClass.instanceName.c_str()).lastIndexOf('/');
-        if (pos != -1)
-            instance.remove(0, pos + 1);
-    }
-    qInfo() << "getDisplayName class:" << className << " ,instance:" << instance;
-
     //if (!role.isEmpty() && !className.isEmpty())
     //    return className + " " + role;
 
     if (!className.isEmpty())
         return className;
 
+    QString instance(m_wmClass.instanceName.c_str());
+    if (instance.size() > 0) {
+        int pos = instance.lastIndexOf('/');
+        if (pos != -1)
+            instance.remove(0, pos + 1);
+    }
     if (!instance.isEmpty())
         return instance;
 
@@ -169,7 +164,7 @@ QString WindowInfoX::getDisplayName()
             return exe;
     }
 
-    return QString("window:%1").arg(winId);
+    return QString("window:%1").arg(xid);
 }
 
 void WindowInfoX::killClient()
@@ -288,7 +283,7 @@ QString WindowInfoX::genInnerId(WindowInfoX *winInfo)
 
     QByteArray encryText = QCryptographicHash::hash(str.toLatin1(), QCryptographicHash::Md5);
     QString innerId = windowHashPrefix + encryText.toHex();
-    qInfo() << "genInnerId window " << winId << " innerId :" << innerId;
+    // qInfo() << "genInnerId window " << winId << " innerId :" << innerId;
     return innerId;
 }
 
@@ -329,7 +324,11 @@ void WindowInfoX::updateWmName()
     if (!name.empty())
         m_wmName = name.c_str();
 
-    title = getTitle();
+    auto newTitle = getTitle();
+    if(newTitle != title) {
+        title = newTitle;
+        emit titleChanged(title);
+    }
 }
 
 void WindowInfoX::updateIcon()
@@ -401,11 +400,6 @@ bool WindowInfoX::hasWmStateModal()
     return containAtom(m_wmState, XCB->getAtom("_NET_WM_STATE_MODAL"));
 }
 
-bool WindowInfoX::isValidModal()
-{
-    return hasWmStateModal() && hasWmStateModal();
-}
-
 // 通过WMClass判断是否需要隐藏此窗口
 bool WindowInfoX::shouldSkipWithWMClass()
 {
@@ -426,19 +420,19 @@ void WindowInfoX::updateProcessInfo()
 {
     XWindow winId = xid;
     pid = XCB->getWMPid(winId);
-    qInfo() << "updateProcessInfo: pid=" << pid;
+    // qInfo() << "updateProcessInfo: pid=" << pid;
     m_processInfo.reset(new ProcessInfo(pid));
     if (!m_processInfo->isValid()) {
         // try WM_COMMAND
         auto wmComand = XCB->getWMCommand(winId);
         if (wmComand.size() > 0) {
             QStringList cmds;
-            std::transform(wmComand.begin(), wmComand.end(), std::back_inserter(cmds), [=] (std::string cmd){ return QString::fromStdString(cmd);});
+            std::transform(wmComand.begin(), wmComand.end(), std::back_inserter(cmds), [] (std::string cmd){ return QString::fromStdString(cmd);});
             m_processInfo.reset(new ProcessInfo(cmds));
         }
     }
 
-    qInfo() << "updateProcessInfo: pid is " << pid;
+    // qInfo() << "updateProcessInfo: pid is " << pid;
 }
 
 bool WindowInfoX::getUpdateCalled()

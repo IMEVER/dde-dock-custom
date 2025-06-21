@@ -27,30 +27,18 @@
 #include <QSet>
 #include <DApplication>
 
+#define SETTING DockSettings::instance()
+
 DockItemManager::DockItemManager() : QObject()
     , m_taskmanager(TaskManager::instance())
-    , m_qsettings(new QSettings(QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation) + "/setting.ini", QSettings::IniFormat))
 {
-    m_qsettings->setIniCodec(QTextCodec::codecForName("UTF-8"));
+    m_timer = new QTimer(this);
+    m_timer->setInterval(100);
+    m_timer->setSingleShot(true);
+    connect(m_timer, &QTimer::timeout, this, &DockItemManager::itemCountChanged);
 
-    // 应用信号
-    connect(m_taskmanager, &TaskManager::entryAdded, this, [this](const Entry *entry, int index){
-        appItemAdded(entry, index, true);
-    });
-    connect(m_taskmanager, &TaskManager::entryRemoved, this, static_cast<void (DockItemManager::*)(const QString &)>(&DockItemManager::appItemRemoved), Qt::QueuedConnection);
-    connect(m_taskmanager, &TaskManager::serviceRestarted, this, &DockItemManager::reloadAppItems);
-    // connect(DockSettings::instance(), &DockSettings::showMultiWindowChanged, this, &DockItemManager::onShowMultiWindowChanged);
-
-    if (Dtk::Widget::DApplication *app = qobject_cast<Dtk::Widget::DApplication *>(qApp)) {
+    if (Dtk::Widget::DApplication *app = qobject_cast<Dtk::Widget::DApplication *>(qApp))
         connect(app, &Dtk::Widget::DApplication::iconThemeChanged, this, &DockItemManager::refreshItemsIcon);
-    }
-
-    connect(qApp, &QApplication::aboutToQuit, this, &QObject::deleteLater);
-
-    // reloadAppItems();
-
-    // 刷新图标
-    // QMetaObject::invokeMethod(this, "refreshItemsIcon", Qt::QueuedConnection);
 }
 
 
@@ -62,93 +50,9 @@ DockItemManager *DockItemManager::instance()
 
 void DockItemManager::refreshItemsIcon() {
     for (auto item : m_itemList) {
-        if (item.isNull())
-            continue;
-
         item->refreshIcon();
         item->update();
     }
-}
-
-MergeMode DockItemManager::getDockMergeMode()
-{
-    int i = m_qsettings->value("mergeMode", MergeDock).toInt();
-    if(i < 0 || i > 1)
-        i = 0;
-    return MergeMode(i);
-}
-
-void DockItemManager::saveDockMergeMode(MergeMode mode)
-{
-    if(mode != getDockMergeMode())
-    {
-        m_qsettings->setValue("mergeMode", mode);
-        m_qsettings->sync();
-        emit mergeModeChanged(mode);
-    }
-}
-
-bool DockItemManager::isEnableHoverScaleAnimation()
-{
-    return m_qsettings->value("animation/hover", true).toBool();
-}
-
-bool DockItemManager::isEnableInOutAnimation()
-{
-    return m_qsettings->value("animation/inout", true).toBool();
-}
-
-bool DockItemManager::isEnableDragAnimation()
-{
-    return m_qsettings->value("animation/drag", true).toBool();
-}
-
-bool DockItemManager::isEnableHoverHighlight()
-{
-    return m_qsettings->value("animation/highlight", true).toBool();
-}
-
-void DockItemManager::setHoverScaleAnimation(bool enable)
-{
-    if(enable != isEnableHoverScaleAnimation())
-        m_qsettings->setValue("animation/hover", enable);
-}
-
-void DockItemManager::setInOutAnimation(bool enable)
-{
-    if(enable != isEnableInOutAnimation())
-        m_qsettings->setValue("animation/inout", enable);
-}
-
-void DockItemManager::setDragAnimation(bool enable)
-{
-    m_qsettings->setValue("animation/drag", enable);
-}
-
-void DockItemManager::setHoverHighlight(bool enable)
-{
-    if(isEnableHoverHighlight() != enable) {
-        m_qsettings->setValue("animation/highlight", enable);
-        emit hoverHighlighted(enable);
-    }
-}
-
-DockItemManager::ActivateAnimationType DockItemManager::animationType() {
-    return m_qsettings->value("animation/activate", Jump).value<ActivateAnimationType>();
-}
-
-void DockItemManager::setAnimationType(ActivateAnimationType type) {
-    m_qsettings->setValue("animation/activate", type);
-    m_qsettings->sync();
-}
-
-bool DockItemManager::hasWindowItem()
-{
-    for(auto item : m_itemList)
-        if(item->itemType() == DockItem::App && qobject_cast<AppItem *>(item)->windowCount() > 0)
-            return true;
-
-    return false;
 }
 
 int DockItemManager::itemSize()
@@ -156,40 +60,14 @@ int DockItemManager::itemSize()
     return DockSettings::instance()->getWindowSizeFashion();
 }
 
-int DockItemManager::itemCount()
-{
-    int count = m_itemList.count() + m_folderList.count() + 1 + 1;
-    for(auto item : m_dirList)
-        count = count - item->currentCount() + 1;
-
-    for(auto item : m_itemList)
-        if(item->itemType() == DockItem::App)
-            count += qobject_cast<AppItem *>(item)->windowCount();
-
-    return count;
-}
-
-const QList<QPointer<AppItem>> DockItemManager::itemList()
-{
-    return m_itemList;
-}
-
 bool DockItemManager::appIsOnDock(const QString &appDesktop) const
 {
     return m_taskmanager->isDocked(appDesktop);
 }
 
-void DockItemManager::itemMoved(AppItem *const sourceItem, AppItem *const targetItem)
+void DockItemManager::itemMoved(QStringList &apps)
 {
-    Q_ASSERT(sourceItem != targetItem);
-
-    const int moveIndex = m_itemList.indexOf(sourceItem);
-    const int replaceIndex = m_itemList.indexOf(targetItem);
-
-    m_itemList.removeAt(moveIndex);
-    m_itemList.insert(replaceIndex, sourceItem);
-
-    m_taskmanager->moveEntry(moveIndex, replaceIndex);
+    m_taskmanager->updateEntryOrder(apps);
 }
 
 void DockItemManager::itemAdded(const QString &appDesktop, int idx)
@@ -197,86 +75,63 @@ void DockItemManager::itemAdded(const QString &appDesktop, int idx)
     m_taskmanager->requestDock(appDesktop, idx);
 }
 
-void DockItemManager::appItemAdded(const Entry *entry, const int index, bool updateFrame)
+void DockItemManager::appItemAdded(const Entry *entry, int index)
 {
-    AppItem *item = new AppItem(entry);
-
-    if (m_appIDist.contains(item->appId())) {
-        item->deleteLater();
+    if (m_itemList.contains(entry->getId()))
         return;
-    }
 
-    m_itemList.insert(index, item);
-    m_appIDist.append(item->appId());
+    AppItem *item = new AppItem(entry);
+    m_itemList.insert(entry->getId(), item);
 
-    // connect(item, &DockItem::requestRefreshWindowVisible, this, &DockItemManager::requestRefershWindowVisible, Qt::UniqueConnection);
-    connect(item, &DockItem::requestWindowAutoHide, this, &DockItemManager::requestWindowAutoHide, Qt::UniqueConnection);
+    connect(item, &DockItem::destroyed, m_timer, qOverload<>(&QTimer::start));
     connect(item, &AppItem::requestPreviewWindow, m_taskmanager, &TaskManager::previewWindow);
     connect(item, &AppItem::requestCancelPreview, m_taskmanager, &TaskManager::cancelPreviewWindow);
     connect(item, &AppItem::windowCountChanged, this, &DockItemManager::onAppWindowCountChanged);
     connect(this, &DockItemManager::requestUpdateDockItem, item, &AppItem::requestUpdateEntryGeometries);
 
-    connect(item, &AppItem::windowItemInserted, item, [this](WindowItem *item){
+    connect(item, &AppItem::windowItemInserted, item, [this](WindowItem * item){
         emit itemInserted(-1, item);
+        connect(item, &DockItem::destroyed, m_timer, qOverload<>(&QTimer::start));
         emit itemCountChanged();
     });
-    connect(item, &AppItem::windowItemRemoved, item, [this](WindowItem *item, bool animation){
-        emit itemRemoved(item, animation);
-        if(animation)
-            connect(item, &DockItem::inoutFinished, this, [this](bool in){ emit itemCountChanged(); });
-        else
-            emit itemCountChanged();
-    });
+    connect(item, &AppItem::windowItemRemoved, this, [this](WindowItem *item){ emit itemRemoved(item); });
 
     for(auto dirItem : m_dirList)
     {
-        if(dirItem->hasId(item->getDesktopFile()))
+        if(dirItem->hasId(item->appId()))
         {
             dirItem->addItem(item);
 
             if(index == -1 && dirItem->currentCount() == 1)
             {
-                emit itemInserted(-1, dirItem, updateFrame);
-                if(updateFrame) emit itemCountChanged();
+                emit itemInserted(-1, dirItem);
+                m_timer->start();
             }
-            item->fetchWindowInfos();
             return;
         }
     }
 
-    // 插入dockItem
-    emit itemInserted(index != -1 ? index : m_itemList.size(), item);
+    emit itemInserted(index, item);
     // 向后插入多开窗口
     // updateMultiItems(item, true);
-
-    item->fetchWindowInfos();
-
-    if(updateFrame) emit itemCountChanged();
+    m_timer->start();
 }
 
 void DockItemManager::appItemRemoved(const QString &appId)
 {
-    bool bingo = false;
-    for (auto app : m_itemList) {
-        if (!app->isValid() || app->appId() == appId) {
-            appItemRemoved(app);
-            bingo = true;
-        }
-    }
-    if(bingo)
-        QTimer::singleShot(500, [ this ] { emit itemCountChanged(); });
-    m_appIDist.removeAll(appId);
+    if(auto item = m_itemList.value(appId))
+        appItemRemoved(item);
 }
 
-void DockItemManager::appItemRemoved(AppItem *appItem, bool animation)
+void DockItemManager::appItemRemoved(AppItem *appItem)
 {
-    m_itemList.removeOne(appItem);
-    appItem->removeWindowItem(animation);
+    m_itemList.remove(appItem->appId());
+    appItem->removeWindowItem();
     if(appItem->getPlace() == DockItem::DirPlace) {
         appItem->getDirItem()->removeItem(appItem, false);
         appItem->deleteLater();
     } else
-        emit itemRemoved(appItem, animation);
+        emit itemRemoved(appItem);
 }
 
 void DockItemManager::reloadAppItems()
@@ -284,31 +139,26 @@ void DockItemManager::reloadAppItems()
     static bool first = true;
     if(first)
     {
-        emit itemInserted(0, new LauncherItem, false);
-        emit itemInserted(0, new TrashItem, false);
-        loadFolderData();
-        for(auto item : m_folderList) emit itemInserted(0, item, false);
+        emit itemInserted(0, new LauncherItem);
+        emit itemInserted(0, new TrashItem);
+
+        for(auto path : SETTING->loadLoaders())
+            createFolder(path);
+
+        for(auto item : m_folderList) emit itemInserted(0, item);
         first = false;
+
+        // 应用信号
+        connect(m_taskmanager, &TaskManager::entryAdded, this, [this](const Entry *entry, int index){
+            appItemAdded(entry, index);
+        });
+        connect(m_taskmanager, &TaskManager::entryRemoved, this, static_cast<void (DockItemManager::*)(const QString &)>(&DockItemManager::appItemRemoved));
+
+        loadDirAppData();
+        for (auto entry : m_taskmanager->getEntries()) appItemAdded(entry, -1);
+
+        m_timer->start();
     }
-    else
-    {
-        while (!m_itemList.isEmpty())
-            appItemRemoved(qobject_cast<AppItem *>(m_itemList.first().data()), false);
-        m_itemList.clear();
-        m_appIDist.clear();
-
-        for(auto item : m_dirList)
-        {
-            emit itemRemoved(item, false);
-            // QTimer::singleShot(10, [ item ] { item->deleteLater(); });
-        }
-        m_dirList.clear();
-    }
-
-    loadDirAppData();
-    for (auto entry : m_taskmanager->getEntries()) appItemAdded(entry, -1, false);
-
-    emit itemCountChanged();
 }
 
 DirItem *DockItemManager::createDir(const QString title)
@@ -316,31 +166,23 @@ DirItem *DockItemManager::createDir(const QString title)
     DirItem *item = new DirItem(title);
     m_dirList.append(item);
     connect(item, &DirItem::updateContent, this, &DockItemManager::updateDirApp);
-    connect(item, &DockItem::requestWindowAutoHide, this, &DockItemManager::requestWindowAutoHide, Qt::UniqueConnection);
-    connect(item, &DockItem::destroyed, this, &DockItemManager::itemCountChanged);
+    connect(item, &DockItem::destroyed, m_timer, qOverload<>(&QTimer::start));
     return item;
 }
 
 FolderItem *DockItemManager::createFolder(const QString path) {
     FolderItem *folder = new FolderItem(path);
-    connect(folder, &DockItem::requestWindowAutoHide, this, &DockItemManager::requestWindowAutoHide, Qt::UniqueConnection);
     connect(folder, &DockItem::destroyed, this, [this, path] {
-        itemCountChanged();
+        m_timer->start();
+        QStringList folders;
+        for(auto folder : m_folderList)
+            folders << folder->getPath();
 
-        int index = m_folderList.count();
-        m_qsettings->beginWriteArray("folder", index);
-        m_qsettings->setArrayIndex(index);
-        m_qsettings->remove("");
-        while(--index >= 0) {
-            m_qsettings->setArrayIndex(index);
-            m_qsettings->setValue("path", m_folderList.at(index)->getPath());
-        }
-        m_qsettings->endArray();
-        m_qsettings->sync();
+        SETTING->updateFolders(folders);
     });
     connect(folder, &FolderItem::undocked, this, [this, folder]{
         m_folderList.removeOne(folder);
-        emit itemRemoved(folder, true);
+        emit itemRemoved(folder);
     });
     m_folderList.append(folder);
     return folder;
@@ -352,70 +194,45 @@ void DockItemManager::folderAdded(const QString &path)
         if(item->getPath() == path) return;
 
     FolderItem *folder = createFolder(path);
-    emit itemCountChanged();
-    emit itemInserted(0, folder, true);
+    m_timer->start();
+    emit itemInserted(0, folder);
 
-    m_qsettings->beginWriteArray("folder");
-    m_qsettings->setArrayIndex(m_folderList.count() - 1);
-    m_qsettings->setValue("path", path);
-    m_qsettings->endArray();
-    m_qsettings->sync();
+    SETTING->addFolder(path, m_folderList.count() - 1);
 }
 
 void DockItemManager::loadDirAppData()
 {
-    int count = m_qsettings->value("count", 0).toInt();
-    while (count >=1)
+    for (auto dir : SETTING->loadDirDatas())
     {
-        DirItem *item = createDir(m_qsettings->value(QString("dir_%1/title").arg(count), "").toString());
-        item->setIndex(m_qsettings->value(QString("dir_%1/index").arg(count), -1).toInt());
-        QStringList desktopFiles = m_qsettings->value(QString("dir_%1/ids").arg(count), QStringList()).value<QStringList>();
-        item->setIds(QSet<QString>(desktopFiles.begin(), desktopFiles.end()));
-        count--;
+        DirItem *item = createDir(dir.title);
+        item->setIndex(dir.index);
+        item->setIds(dir.ids);
     }
 }
 
 void DockItemManager::updateDirApp()
 {
     QList<DirItem*> emptyList;
-    m_qsettings->setFallbacksEnabled(true);
-    int index = 0, originCount = m_qsettings->value("count", 0).toInt();
+    QList<DirData> dirDatas;
+
     for(auto itemDir : m_dirList)
     {
-        QSet<QString> ids;
-        for(auto item : itemDir->getAppList())
-            ids.insert(item->getDesktopFile());
+        auto ids = itemDir->getIds();
 
         if(ids.isEmpty()) {
             emptyList.append(itemDir);
             continue;
         }
 
-        index++;
-        m_qsettings->setValue(QString("dir_%1/title").arg(index), itemDir->getTitle());
-        m_qsettings->setValue(QString("dir_%1/index").arg(index), itemDir->getIndex());
-        m_qsettings->setValue(QString("dir_%1/ids").arg(index), QStringList(ids.values()));
+        dirDatas.append(DirData{itemDir->getTitle(), itemDir->getIndex(), itemDir->getIds()});
     }
 
-    while(index < originCount)
-        m_qsettings->remove(QString("dir_%1").arg(originCount--));
-
-    m_qsettings->setValue("count", index);
-    m_qsettings->sync();
+    SETTING->setDirDatas(dirDatas);
 
     for(auto item : emptyList) {
         m_dirList.removeOne(item);
-        emit itemRemoved(item, true);
+        emit itemRemoved(item);
     }
-}
-
-void DockItemManager::loadFolderData() {
-    int index = m_qsettings->beginReadArray("folder");
-    while(--index >= 0) {
-        m_qsettings->setArrayIndex(index);
-        createFolder(m_qsettings->value("path").toString());
-    }
-    m_qsettings->endArray();
 }
 
 void DockItemManager::onAppWindowCountChanged()

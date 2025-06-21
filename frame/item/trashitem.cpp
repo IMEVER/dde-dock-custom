@@ -2,10 +2,8 @@
 
 #include "util/utils.h"
 
-#include <QPainter>
 #include <QProcess>
 #include <QMouseEvent>
-#include <QApplication>
 #include <QDir>
 #include <QStandardPaths>
 #include <DDesktopServices>
@@ -46,7 +44,7 @@ void TrashItem::refershIcon()
 void TrashItem::mousePressEvent(QMouseEvent *e)
 {
     if (e->button() == Qt::LeftButton)
-        QProcess::startDetached("xdg-open", {TRASHFILE});
+        openTrash();
 
     DockItem::mousePressEvent(e);
 }
@@ -87,23 +85,26 @@ void TrashItem::dropEvent(QDropEvent *e)
 
     // interface.asyncCallWithArgumentList("Trash", args);
 
-    Dtk::Widget::DDesktopServices::trash(e->mimeData()->urls());
+    Dtk::Gui::DDesktopServices::trash(e->mimeData()->urls());
 }
 
 void TrashItem::invokedMenuItem(const QString &itemId, const bool checked)
 {
     if (itemId == "open")
-        QProcess::startDetached("xdg-open", {TRASHFILE});
+        openTrash();
     else if (itemId == "clear")
     {
         if (QMessageBox::Ok == QMessageBox::warning(this, "警告", "清空后数据将不可恢复！\n确认清空回收站？", QMessageBox::Cancel | QMessageBox::Ok, QMessageBox::Ok))
         {
             m_watcher->blockSignals(true);
-            QProcess::execute("rm", {"-r", TRASHFILE, TRASHINFO});
-            QDir dir(TRASHPATH);
-            dir.mkdir("files");
-            dir.mkdir("info");
-            Dtk::Widget::DDesktopServices::playSystemSoundEffect(Dtk::Widget::DDesktopServices::SSE_EmptyTrash);
+            // QProcess::execute("rm", {"-r", TRASHFILE, TRASHINFO});
+            // QDir dir(TRASHPATH);
+            // dir.mkdir("files");
+            // dir.mkdir("info");
+
+            QProcess::startDetached("gio", {"trash", "--empty"});
+
+            Dtk::Gui::DDesktopServices::playSystemSoundEffect(Dtk::Gui::DDesktopServices::SSE_EmptyTrash);
             refershIcon();
             m_watcher->blockSignals(false);
         }
@@ -115,4 +116,8 @@ const QString TrashItem::contextMenu() const
     return QString("{\"items\": [ {\"itemText\": \"打开回收站\", \"itemId\": \"open\", \"isActive\": true}, \
         {\"itemText\": \"清空回收站\", \"itemId\": \"clear\", \"isActive\": %1} ]}")
         .arg(m_count == 0 ? "false" : "true");
+}
+
+void TrashItem::openTrash() {
+    QProcess::startDetached("xdg-open", {"trash:///"});
 }

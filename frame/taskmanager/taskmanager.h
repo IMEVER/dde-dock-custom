@@ -39,17 +39,13 @@ public:
 
     bool shouldShowOnDock(WindowInfoBase *info);
     void setDdeLauncherVisible(bool visible);
-    void setTrayGridWidgetVisible(bool visible);
-    QString getWMName();
-    void setWMName(QString name);
     void setPropHideState(HideState state);
     void attachWindow(WindowInfoBase *info);
-    void detachWindow(WindowInfoBase *info);
+    void detachWindow(WindowInfoBase *info, bool del=true);
 
     void launchApp(const QString desktopFile, uint32_t timestamp, QStringList files);
     void launchAppAction(const QString desktopFile, QString action, uint32_t timestamp);
 
-    bool is3DWM();
     bool isWaylandEnv();
     WindowInfoK *handleActiveWindowChangedK(uint activeWin);
     void saveDockedApps();
@@ -62,13 +58,7 @@ public:
     void unRegisterWindowWayland(const QString &objPath);
     bool isShowingDesktop();
 
-    AppInfo *identifyWindow(WindowInfoBase *winInfo, QString &innerId);
-    void markAppLaunched(AppInfo *appInfo);
-
-    ForceQuitAppMode getForceQuitAppStatus();
-    QVector<QString> getWinIconPreferredApps();
-    void handleLauncherItemDeleted(QString itemPath);
-    void handleLauncherItemUpdated(QString itemPath);
+    AppInfo *identifyWindow(WindowInfoBase *winInfo);
 
     QRect getFrontendWindowRect();
     QStringList getDockedApps();
@@ -98,26 +88,23 @@ public:
     bool isActiveWindow(const WindowInfoBase *win);
     WindowInfoBase *getActiveWindow();
     void doActiveWindow(XWindow xid);
-    QList<XWindow> getClientList();
-    void setClientList(QList<XWindow> value);
 
     void closeWindow(XWindow windowId);
     void MinimizeWindow(XWindow windowId);
-    QStringList getEntryIDs();
     void setFrontendWindowRect(int32_t x, int32_t y, uint width, uint height);
     bool isDocked(const QString desktopFile);
     bool requestDock(QString desktopFile, int index);
     bool requestUndock(QString desktopFile);
-    void setShowMultiWindow(bool visible);
-    bool showMultiWindow() const;
     void moveEntry(int oldIndex, int newIndex);
+    void updateEntryOrder(QStringList&);
     bool isOnDock(QString desktopFile);
     QString queryWindowIdentifyMethod(XWindow windowId);
-    QStringList getDockedAppsDesktopFiles();
-    void removeEntryFromDock(Entry *entry);
 
     void previewWindow(uint xid);
     void cancelPreviewWindow();
+
+    QList<XWindow> getClientList() { return m_clientList; }
+    void setClientList(QList<XWindow> list) { m_clientList = list; }
 
 Q_SIGNALS:
     void serviceRestarted();
@@ -125,8 +112,8 @@ Q_SIGNALS:
     void entryRemoved(QString id);
     void hideStateChanged(int);
     void frontendWindowRectChanged(const QRect &dockRect);
+    void launcherVisibleChanged(bool);
     void showRecentChanged(bool);
-    void showMultiWindowChanged(bool);
 
 public Q_SLOTS:
     void updateHideState(bool delay);
@@ -141,32 +128,24 @@ private:
     void initEntries();
     void loadAppInfos();
     void initClientList();
-    WindowInfoX *findWindowByXidX(XWindow xid);
-    WindowInfoK *findWindowByXidK(XWindow xid);
     bool isWindowDockOverlapX(XWindow xid);
     bool hasInterSectionX(const Geometry &windowRect, QRect dockRect);
     bool isWindowDockOverlapK(WindowInfoBase *info);
     bool hasInterSectionK(const DockRect &windowRect, QRect dockRect);
-    Entry *getDockedEntryByDesktopFile(const QString &desktopFile);
     bool shouldHideOnSmartHideMode();
     QVector<XWindow> getActiveWinGroup(XWindow xid);
     void updateRecentApps();
 
 private:
     void onShowRecentChanged(bool visible);
-    void onShowMultiWindowChanged(bool visible);
 
 private:
     bool m_isWayland; // 判断是否为wayland环境
     bool m_showRecent;
-    bool m_showMultiWindow;
 
-    QString m_wmName; // 窗管名称
     HideState m_hideState;    // 记录任务栏隐藏状态
     QRect m_frontendWindowRect;    // 前端任务栏大小, 用于智能隐藏时判断窗口是否重合
-    ForceQuitAppMode m_forceQuitAppStatus; // 强制退出应用状态
     bool m_ddeLauncherVisible;
-    bool m_trayGridWidgetVisible;
 
     Entries *m_entries;   // 所有应用实例
     X11Manager *m_x11Manager;     // X11窗口管理
@@ -176,7 +155,6 @@ private:
     QTimer *m_smartHideTimer; // 任务栏智能隐藏定时器
     DBusHandler *m_dbusHandler;   // 处理dbus交互
     WindowInfoBase *m_activeWindow;// 记录当前活跃窗口信息
-    WindowInfoBase *m_activeWindowOld;// 记录前一个活跃窗口信息
 
     QList<XWindow> m_clientList; // 所有窗口
 };

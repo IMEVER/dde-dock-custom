@@ -30,7 +30,7 @@ ProcessInfo::ProcessInfo(int pid)
     }
 
     // args
-    qInfo() << "ProcessInfo: exe=" << m_exe << " cwd=" << m_cwd << " cmdLine=" << (m_cmdLine[0].isEmpty() ? " " : m_cmdLine[0]);
+    // qInfo() << "ProcessInfo: exe=" << m_exe << " cwd=" << m_cwd << " cmdLine=" << (m_cmdLine[0].isEmpty() ? " " : m_cmdLine[0]);
     auto verifyExe =  [](QString exe, QString cwd, QString firstArg){
         if (firstArg.size() == 0) return false;
 

@@ -101,6 +101,10 @@ bool WindowInfoK::isMinimized()
     return m_plasmaWindow->IsMinimized();
 }
 
+bool WindowInfoK::isMaximized() {
+    return m_plasmaWindow->IsMaximized();
+}
+
 bool WindowInfoK::changeXid(XWindow _xid)
 {
     xid = _xid;

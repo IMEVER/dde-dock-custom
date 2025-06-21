@@ -66,7 +66,7 @@ const QPixmap Utils::loadSvg(const QString &iconName, const QSize size, const qr
 const QPixmap Utils::lighterEffect(const QPixmap pixmap, const int delta)
 {
     if(pixmap.width() == 0) return pixmap;
-    
+
     QImage image = pixmap.toImage();
 
     const int width = image.width();
@@ -208,17 +208,6 @@ QGSettings *Utils::SettingsPtr(const QString &schema_id, const QByteArray &path,
     }
     qDebug() << "Cannot find gsettings, schema_id:" << schema_id;
     return nullptr;
-}
-
-/**
- * @brief SettingsPtr 根据给定信息返回一个QGSettings指针
- * @param module 传入QGSettings构造函数时，会添加"com.deepin.dde.dock.module."前缀
- * @param path If non-empty, specifies the path for a relocatable schema
- * @param parent 创建指针的付对象
- * @return
- */
-const QGSettings *Utils::ModuleSettingsPtr(const QString &module, const QByteArray &path, QObject *parent) {
-    return Utils::SettingsPtr("com.deepin.dde.dock.module." + module, path, parent);
 }
 
 /* convert 'some-key' to 'someKey' or 'SomeKey'.

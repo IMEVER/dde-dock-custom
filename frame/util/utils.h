@@ -40,7 +40,6 @@ public:
     static QScreen *screenAtByScaled(const QPoint &point);
     static QGSettings *SettingsPtr(const QString &schema_id, const QByteArray &path = QByteArray(), QObject *parent = nullptr);
     static QString qtify_name(const char *name);
-    static const QGSettings *ModuleSettingsPtr(const QString &module, const QByteArray &path = QByteArray(), QObject *parent = nullptr);
     static const QVariant SettingValue(const QString &schema_id, const QByteArray &path = QByteArray(), const QString &key = QString(), const QVariant &fallback = QVariant());
     static bool SettingSaveValue(const QString &schema_id, const QByteArray &path, const QString &key, const QVariant &value );
 };

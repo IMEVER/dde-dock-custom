@@ -14,7 +14,6 @@
 Entries::Entries(TaskManager *_taskmanager)
  : m_taskmanager(_taskmanager)
 {
-
 }
 
 QVector<Entry *> Entries::filterDockedEntries()
@@ -37,16 +36,25 @@ Entry *Entries::getByInnerId(QString innerId)
     return ret;
 }
 
-void Entries::append(Entry *entry)
+void Entries::append(Entry *entry, bool beforeRecent)
 {
-    insert(entry, -1);
+    int index = -1;
+    if(beforeRecent)
+        for(int i=m_items.size()-1; i >= 0; i--) {
+            if(m_items.at(i)->hasWindow() || m_items.at(i)->getIsDocked()) {
+                index = i+1;
+                break;
+            }
+        }
+
+    insert(entry, index);
 }
 
 void Entries::insert(Entry *entry, int index)
 {
-    // 如果当前应用在列表中存在(通常是该应用为最近打开应用但是关闭了最近打开应用的接口或者当前为高效模式)
-    if (m_items.contains(entry))
-        m_items.removeOne(entry);
+    if(index != -1 and m_items.indexOf(entry) == index) return;
+
+    m_items.removeAll(entry);
 
     if (index < 0 || index >= m_items.size()) {
         // append
@@ -57,21 +65,7 @@ void Entries::insert(Entry *entry, int index)
         m_items.insert(index, entry);
     }
 
-    insertCb(entry, index);
-}
-
-void Entries::remove(Entry *entry)
-{
-    for (auto iter = m_items.begin(); iter != m_items.end();) {
-        if ((*iter)->getId() == entry->getId()) {
-            iter = m_items.erase(iter);
-        } else {
-            iter++;
-        }
-    }
-
-    removeCb(entry);
-    entry->deleteLater();
+    Q_EMIT m_taskmanager->entryAdded(entry, index);
 }
 
 void Entries::move(int oldIndex, int newIndex)
@@ -80,6 +74,12 @@ void Entries::move(int oldIndex, int newIndex)
         return;
 
     m_items.swapItemsAt(oldIndex, newIndex);
+}
+
+void Entries::updateOrder(QStringList &apps) {
+    std::sort(m_items.begin(), m_items.end(), [&apps](Entry *first, Entry *second) {
+        return apps.indexOf(first->getId()) <= apps.indexOf(second->getId());
+    });
 }
 
 Entry *Entries::getByWindowPid(int pid)
@@ -95,42 +95,11 @@ Entry *Entries::getByWindowPid(int pid)
     return ret;
 }
 
-QStringList Entries::getEntryIDs()
-{
-    QStringList list;
-    if (DockSettings::instance()->showRecent()) {
-        for (Entry *item : m_items) list << item->getId();
-    } else {
-        // 如果是高效模式或者没有开启显示最近应用的功能，那么未驻留并且没有子窗口的就不显示
-        // 换句话说，只显示已经驻留或者有子窗口的应用
-        for (Entry *item : m_items) {
-            if (item->getIsDocked() || item->hasWindow())
-                list << item->getId();
-        }
-    }
-
-    return list;
-}
-
 Entry *Entries::getByWindowId(XWindow windowId)
 {
     Entry *ret = nullptr;
     for (auto &entry : m_items) {
         if (entry->getWindowInfoByWinId(windowId)) {
-            ret = entry;
-            break;
-         }
-    }
-
-    return ret;
-}
-
-Entry *Entries::getByDesktopFilePath(const QString &filePath)
-{
-    Entry *ret = nullptr;
-    for (auto &entry : m_items) {
-        qDebug() << entry->getName();
-        if (entry->getFileName() == filePath) {
             ret = entry;
             break;
         }
@@ -142,29 +111,25 @@ Entry *Entries::getByDesktopFilePath(const QString &filePath)
 QList<Entry*> Entries::getEntries()
 {
     QList<Entry*> list;
-    if (DockSettings::instance()->showRecent()) {
-        for (Entry *item : m_items)
+    auto showRec = DockSettings::instance()->showRecent();
+    // 如果是高效模式或者没有开启显示最近应用的功能，那么未驻留并且没有子窗口的就不显示
+    // 换句话说，只显示已经驻留或者有子窗口的应用
+    for (auto item : m_items)
+        if (showRec or item->getIsDocked() or item->hasWindow())
             list << item;
-    } else {
-        // 如果是高效模式或者没有开启显示最近应用的功能，那么未驻留并且没有子窗口的就不显示
-        // 换句话说，只显示已经驻留或者有子窗口的应用
-        for (Entry *item : m_items) {
-            if (!item->getIsDocked() && !item->hasWindow())
-                continue;
-            list << item;
-        }
-    }
 
     return list;
 }
 
-Entry *Entries::getDockedEntryByDesktopFile(const QString &desktopFile)
+Entry *Entries::getEntryById(const QString &appId, bool needDocked)
 {
     Entry *ret = nullptr;
-    for (auto entry : filterDockedEntries()) {
-        if ((entry->isValid()) && desktopFile == entry->getFileName()) {
-            ret = entry;
-            break;
+    for (auto entry : m_items) {
+        if(appId == entry->getId()) {
+            if (!needDocked or (entry->isValid() and entry->getIsDocked())) {
+                ret = entry;
+                break;
+            }
         }
     }
 
@@ -189,10 +154,9 @@ QString Entries::queryWindowIdentifyMethod(XWindow windowId)
 void Entries::handleActiveWindowChanged(XWindow activeWindId)
 {
     for (auto entry : m_items) {
-        auto windowInfo = entry->getWindowInfoByWinId(activeWindId);
-        if (windowInfo) {
-            entry->setPropIsActive(true);
+        if(auto windowInfo = entry->getWindowInfoByWinId(activeWindId)) {
             entry->setCurrentWindowInfo(windowInfo);
+            entry->setPropIsActive(true);
             entry->updateName();
             entry->updateIcon();
         } else {
@@ -203,9 +167,8 @@ void Entries::handleActiveWindowChanged(XWindow activeWindId)
 
 void Entries::updateEntriesMenu()
 {
-    for (auto entry : m_items) {
+    for (auto entry : m_items)
         entry->updateMenu();
-    }
 }
 
 const QList<Entry *> Entries::unDockedEntries() const
@@ -229,29 +192,24 @@ void Entries::moveEntryToLast(Entry *entry)
     }
 }
 
-void Entries::insertCb(Entry *entry, int index)
+void Entries::remove(Entry *entry)
 {
-    if (entry->getIsDocked() || entry->hasWindow() || DockSettings::instance()->showRecent()){
-        Q_EMIT m_taskmanager->entryAdded(entry, index);
-    }
-}
+    m_items.removeAll(entry);
+    QTimer::singleShot(1000, entry, &Entry::deleteLater);
 
-void Entries::removeCb(Entry *entry)
-{
     Q_EMIT m_taskmanager->entryRemoved(entry->getId());
 }
 
 bool Entries::shouldInRecent()
 {
     // 如果当前移除的应用是未驻留应用，则判断未驻留应用的数量是否小于等于3，则让其始终显示
-    QList<Entry *> unDocktrys;
-    for (Entry *entry : m_items) {
+    int count = 0;
+    for (Entry *entry : m_items)
         if (entry->isValid() && !entry->getIsDocked() && !entry->hasWindow())
-            unDocktrys << entry;
-    }
+            count++;
 
     // 如果当前未驻留应用的数量小于3个，则认为后续的应用应该显示到最近打开应用
-    return (unDocktrys.size() <= MAX_UNOPEN_RECENT_COUNT);
+    return count <= MAX_UNOPEN_RECENT_COUNT;
 }
 
 void Entries::removeLastRecent()
@@ -261,54 +219,35 @@ void Entries::removeLastRecent()
     Entry *unDockEntry = nullptr;
     QList<Entry *> removeEntrys;
 
-    for (Entry *entry : m_items) {
-        if (entry->getIsDocked())
-            continue;
-
+    for (auto entry : m_items) {
         // 此处只移除没有子窗口的图标
-        if (!entry->hasWindow()) {
+        if (!entry->getIsDocked() and !entry->hasWindow()) {
             if (!entry->isValid())
                 removeEntrys << entry; // 如果应用已经被卸载，那么需要删除
-            else if(!unDockEntry || unDockEntry->lastOpenTime() > entry->lastOpenTime())
+            else if(!unDockEntry || unDockEntry->lastUpdateTime() > entry->lastUpdateTime())
                 unDockEntry = entry;
             unDockCount++;
         }
     }
-    if (unDockCount >= MAX_UNOPEN_RECENT_COUNT && unDockEntry) {
+    if (unDockCount > MAX_UNOPEN_RECENT_COUNT && unDockEntry)
         // 只有当最近使用区域的图标大于等于某个数值（3）的时候，并且存在没有子窗口的Entry，那么就移除该Entry
         removeEntrys << unDockEntry;
-    }
-    for (Entry *entry : removeEntrys) {
-        m_items.removeOne(entry);
-        removeCb(entry);
-        entry->deleteLater();
-    }
+
+    for (Entry *entry : removeEntrys)
+        remove(entry);
 }
 
 void Entries::updateShowRecent()
 {
-    bool showRecent = DockSettings::instance()->showRecent();
-    if (showRecent) {
-        // 如果显示最近打开应用，则发送新增信号
-        for (Entry *entry : m_items) {
-            // 已经驻留的或者有子窗口的本来就在任务栏上面，无需发送信号
-            entry->updateMode();
-            if (entry->getIsDocked() || entry->hasWindow())
-                continue;
-
-            // QString objPath = entry->path();
-            int index = m_items.indexOf(entry);
-            Q_EMIT m_taskmanager->entryAdded(entry, index);
-        }
-    } else {
+    if(DockSettings::instance()->showRecent() == false) {
         // 如果是隐藏最近打开的应用，则发送移除的信号
-        for (Entry *entry : m_items) {
+        QList<Entry*> list;
+        for (Entry *entry : m_items)
             // 已经驻留的或者有子窗口的本来就在任务栏上面，无需发送信号
-            entry->updateMode();
-            if (entry->getIsDocked() || entry->hasWindow())
-                continue;
+            if (!entry->getIsDocked() and entry->hasWindow())
+                list << entry;
 
-            Q_EMIT m_taskmanager->entryRemoved(entry->getId());
-        }
+        for(auto entry : list)
+            remove(entry);
     }
 }

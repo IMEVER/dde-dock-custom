@@ -31,29 +31,18 @@
 
 #define SETTING DockSettings::instance()
 #define XCB XCBUtils::instance()
-bool shouldShowEntry(Entry *entry)
-{
-    auto appInfo = entry->getAppInfo();
-    if (appInfo && appInfo->isValidApp()) {
-        QString path = entry->getAppInfo()->getFileName();
-        DesktopInfo desktopInfo(path);
-        return desktopInfo.shouldShow();
-    }
-    return false;
-}
 
 TaskManager::TaskManager(QObject *parent)
  : m_showRecent(DockSettings::instance()->showRecent())
  , m_hideState(HideState::Unknown)
  , m_ddeLauncherVisible(false)
- , m_trayGridWidgetVisible(false)
  , m_entries(new Entries(this))
  , m_windowIdentify(new WindowIdentify(this))
  , m_dbusHandler(new DBusHandler(this))
  , m_activeWindow(nullptr)
- , m_activeWindowOld(nullptr)
 {
     qRegisterMetaType<WindowInfoMap>("WindowInfoMap");
+    qRegisterMetaType<WindowInfo>("WindowInfo");
     qRegisterMetaType<uint32_t>("uint32_t");
     if (isWaylandSession()) {
         m_isWayland = true;
@@ -75,13 +64,15 @@ TaskManager::TaskManager(QObject *parent)
     connect(m_smartHideTimer, &QTimer::timeout, this, &TaskManager::smartHideModeTimerExpired);
 
     if (!m_isWayland) {
-        std::thread thread([&] {
+        QTimer::singleShot(1000, [this]{
+        std::thread thread([this] {
             // Xlib方式
             m_x11Manager->listenXEventUseXlib();
             // XCB方式
             //listenXEventUseXCB();
         });
         thread.detach();
+        });
         m_x11Manager->listenRootWindowXEvent();
         connect(m_x11Manager, &X11Manager::requestUpdateHideState, this, &TaskManager::updateHideState);
         connect(m_x11Manager, &X11Manager::requestHandleActiveWindowChange, this, &TaskManager::handleActiveWindowChanged);
@@ -105,7 +96,7 @@ bool TaskManager::dockEntry(Entry *entry, bool moveToEnd)
         return false;
 
     AppInfo *appInfo = entry->getAppInfo();
-    auto needScratchDesktop = [&]{
+    auto needScratchDesktop = [appInfo]{
         if (!appInfo) {
             qDebug() << "needScratchDesktop: yes, appInfo is nil";
             return true;
@@ -142,14 +133,14 @@ bool TaskManager::dockEntry(Entry *entry, bool moveToEnd)
                 newDesktopFile = newFile;
         } else if(auto current = entry->getCurrentWindowInfo()) {
                 QString appId = current->getInnerId();
-                QString title = current->getDisplayName();
-                QString icon = current->getIcon();
-                if (icon.isEmpty()) icon = "application-default-icon";
-                QString cmd = entry->getCmdLine() + "%U";
                 QString fileNmae = scratchDir + appId + ".desktop";
-                QString desktopContent = QString(dockedItemTemplate).arg(title).arg(cmd).arg(icon);
                 QFile file(fileNmae);
                 if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+                    QString title = current->getDisplayName();
+                    QString icon = current->getIcon();
+                    if (icon.isEmpty()) icon = "application-default-icon";
+                    QString cmd = entry->getCmdLine() + "%U";
+                    QString desktopContent = QString(dockedItemTemplate).arg(title).arg(cmd).arg(icon);
                     file.write(desktopContent.toStdString().c_str(), desktopContent.size());
                     file.close();
                     newDesktopFile = fileNmae;
@@ -159,10 +150,10 @@ bool TaskManager::dockEntry(Entry *entry, bool moveToEnd)
         if (newDesktopFile.isEmpty())
             return false;
 
+
         appInfo = new AppInfo(newDesktopFile);
         entry->setAppInfo(appInfo);
         entry->updateIcon();
-        entry->setInnerId(appInfo->getInnerId());
     }
 
     // 如果是最近打开应用，通过右键菜单的方式驻留，且当前是时尚模式，那么就让entry驻留到末尾
@@ -171,7 +162,6 @@ bool TaskManager::dockEntry(Entry *entry, bool moveToEnd)
 
     entry->setIsDocked(true);
     entry->updateMenu();
-    entry->updateMode();
     return true;
 }
 
@@ -185,11 +175,10 @@ void TaskManager::undockEntry(Entry *entry, bool moveToEnd)
         qDebug() << "undockEntry: " << entry->getId() << " is not docked";
         // 当应用图标在最近打开区域的时候，此时该应用是未驻留的应用，如果该最近打开应用没有打开窗口，将这个图标
         // 拖动到回收站了，此时调用的是undock方法，根据需求，需要将该图标删除
-        if (!entry->hasWindow()) {
+        if (!entry->hasWindow())
             // 没有子窗口的情况下，从列表中移除
             removeAppEntry(entry);
-            saveDockedApps();
-        }
+
         return;
     }
 
@@ -206,23 +195,18 @@ void TaskManager::undockEntry(Entry *entry, bool moveToEnd)
     }
 
     if (entry->hasWindow()) {
-        // 移除驻留后，如果当前应用存在子窗口，那么会将移除最近使用应用中最后一个没有子窗口的窗口
-        m_entries->removeLastRecent();
         if (desktopFile.contains(scratchDir) && entry->getCurrentWindowInfo()) {
             QFileInfo info(desktopFile);
             QString baseName = info.completeBaseName();
             if (baseName.startsWith(windowHashPrefix)) {
                 // desktop base starts with w:
                 // 由于有 Pid 识别方法在，在这里不能用 m.identifyWindow 再次识别
-                entry->setInnerId(entry->getCurrentWindowInfo()->getInnerId());
                 entry->setAppInfo(nullptr);  // 此处设置Entry的app为空， 在Entry中调用app相关信息前判断指针是否为空
             } else {
                 // desktop base starts with d:
-                QString innerId;
-                AppInfo *app = m_windowIdentify->identifyWindow(entry->getCurrentWindowInfo(), innerId);
+                AppInfo *app = m_windowIdentify->identifyWindow(entry->getCurrentWindowInfo());
                 // TODO update entry's innerId
                 entry->setAppInfo(app);
-                entry->setInnerId(innerId);
             }
         }
         // 如果存在窗口，在时尚模式下，就会移动到最近打开区域，此时让它移动到最后
@@ -233,8 +217,6 @@ void TaskManager::undockEntry(Entry *entry, bool moveToEnd)
         entry->setIsDocked(false);
         entry->updateName();
         entry->updateMenu();
-        // 更新模式， 是在应用区域还是在最近打开区域
-        entry->updateMode();
     } else {
         // 直接移除
         removeAppEntry(entry);
@@ -244,63 +226,15 @@ void TaskManager::undockEntry(Entry *entry, bool moveToEnd)
 }
 
 /**
- * @brief TaskManager::shouldShowOnDock 判断是否应该显示到任务栏
- * @param info
- * @return
- */
-bool TaskManager::shouldShowOnDock(WindowInfoBase *info)
-{
-    if (info->getWindowType() == "X11") {
-        XWindow winId = info->getXid();
-        bool isReg = m_x11Manager->findWindowByXid(winId);
-        bool isContainedInClientList = m_clientList.indexOf(winId) != -1;
-        bool shouldSkip = info->shouldSkip();
-        bool isGood = XCB->isGoodWindow(winId);
-        qDebug() << "shouldShowOnDock X11: isReg:" << isReg << " isContainedInClientList:" << isContainedInClientList << " shouldSkip:" << shouldSkip << " isGood:" << isGood;
-
-        return isReg && isContainedInClientList && isGood && !shouldSkip;
-    } else if (info->getWindowType() == "Wayland") {
-        return !info->shouldSkip();
-    }
-
-    return false;
-}
-
-/**
  * @brief TaskManager::setDdeLauncherVisible 记录当前启动器是否可见
  * @param visible
  */
 void TaskManager::setDdeLauncherVisible(bool visible)
 {
-    m_ddeLauncherVisible = visible;
-}
-
-/**
- * @brief TaskManager::setTrayGridWidgetVisible 记录当前扩展托盘是否可见
- * @param visible
- */
-void TaskManager::setTrayGridWidgetVisible(bool visible)
-{
-    m_trayGridWidgetVisible = visible;
-}
-
-
-/**
- * @brief TaskManager::getWMName 获取窗管名称
- * @return
- */
-QString TaskManager::getWMName()
-{
-    return m_wmName;
-}
-
-/**
- * @brief TaskManager::setWMName 设置窗管名称
- * @param name 窗管名称
- */
-void TaskManager::setWMName(QString name)
-{
-    m_wmName = name;
+    if(m_ddeLauncherVisible != visible) {
+        m_ddeLauncherVisible = visible;
+        emit launcherVisibleChanged(visible);
+    }
 }
 
 /**
@@ -356,10 +290,7 @@ HideMode TaskManager::getDockHideMode()
  */
 bool TaskManager::isActiveWindow(const WindowInfoBase *win)
 {
-    if (!win)
-        return false;
-
-    return win == getActiveWindow();
+    return win and (win == m_activeWindow);
 }
 
 /**
@@ -368,11 +299,7 @@ bool TaskManager::isActiveWindow(const WindowInfoBase *win)
  */
 WindowInfoBase *TaskManager::getActiveWindow()
 {
-    if (!m_activeWindow)
-        return m_activeWindowOld;
-
     return m_activeWindow;
-
 }
 
 void TaskManager::doActiveWindow(XWindow xid)
@@ -390,26 +317,9 @@ void TaskManager::doActiveWindow(XWindow xid)
     }
 
     XCB->changeActiveWindow(xid);
-    QTimer::singleShot(50, [&] {
+    QTimer::singleShot(50, this, [xid] {
         XCB->restackWindow(xid);
     });
-}
-
-/**
- * @brief TaskManager::getClientList 获取窗口client列表
- * @return
- */
-QList<XWindow> TaskManager::getClientList()
-{
-    return QList<XWindow>(m_clientList);
-}
-
-/**
- * @brief TaskManager::setClientList 设置窗口client列表
- */
-void TaskManager::setClientList(QList<XWindow> value)
-{
-    m_clientList = value;
 }
 
 /**
@@ -445,15 +355,6 @@ void TaskManager::MinimizeWindow(XWindow windowId)
 }
 
 /**
- * @brief TaskManager::getEntryIDs 获取所有应用Id
- * @return
- */
-QStringList TaskManager::getEntryIDs()
-{
-    return m_entries->getEntryIDs();
-}
-
-/**
  * @brief TaskManager::setFrontendWindowRect 设置任务栏Rect
  * @param x
  * @param y
@@ -483,7 +384,7 @@ void TaskManager::setFrontendWindowRect(int32_t x, int32_t y, uint width, uint h
  */
 bool TaskManager::isDocked(const QString desktopFile)
 {
-    auto entry = getDockedEntryByDesktopFile(desktopFile);
+    auto entry = m_entries->getEntryById(desktopFile.mid(desktopFile.lastIndexOf('/')+1).remove(".desktop"), true);
     return !!entry;
 }
 
@@ -498,16 +399,23 @@ bool TaskManager::requestDock(QString desktopFile, int index)
     qDebug() << "RequestDock: " << desktopFile;
     AppInfo *app = new AppInfo(desktopFile);
     if (!app || !app->isValidApp()) {
+        delete app;
         qDebug() << "RequestDock: invalid desktopFile";
         return false;
     }
 
     Entry *entry = m_entries->getByInnerId(app->getInnerId());
-    if (!entry)
-        entry = new Entry(this, app, app->getInnerId());
-
-    if (!dockEntry(entry))
-        return false;
+    if (!entry) {
+        entry = new Entry(this, app);
+        if (!dockEntry(entry)) {
+            entry->deleteLater();
+            return false;
+        }
+    } else {
+        delete app;
+        if (!dockEntry(entry))
+            return false;
+    }
 
     m_entries->insert(entry, index);
 
@@ -522,12 +430,12 @@ bool TaskManager::requestDock(QString desktopFile, int index)
  */
 bool TaskManager::requestUndock(QString desktopFile)
 {
-   auto entry = getDockedEntryByDesktopFile(desktopFile);
-   if (!entry)
-       return false;
+    auto entry = m_entries->getEntryById(desktopFile.mid(desktopFile.lastIndexOf('/')+1).remove(".desktop"), true);
+    if (!entry)
+        return false;
 
-   undockEntry(entry);
-   return true;
+    undockEntry(entry);
+    return true;
 }
 
 /**
@@ -541,6 +449,11 @@ void TaskManager::moveEntry(int oldIndex, int newIndex)
     saveDockedApps();
 }
 
+void TaskManager::updateEntryOrder(QStringList &apps) {
+    m_entries->updateOrder(apps);
+    saveDockedApps();
+}
+
 /**
  * @brief TaskManager::isOnDock 是否在任务栏
  * @param desktopFile desktopFile文件全路径
@@ -548,7 +461,7 @@ void TaskManager::moveEntry(int oldIndex, int newIndex)
  */
 bool TaskManager::isOnDock(QString desktopFile)
 {
-    return m_entries->getByDesktopFilePath(desktopFile);
+    return m_entries->getEntryById(desktopFile.mid(desktopFile.lastIndexOf('/')+1).remove(".desktop"));
 }
 
 /**
@@ -559,29 +472,6 @@ bool TaskManager::isOnDock(QString desktopFile)
 QString TaskManager::queryWindowIdentifyMethod(XWindow windowId)
 {
     return m_entries->queryWindowIdentifyMethod(windowId);
-}
-
-/**
- * @brief TaskManager::getDockedAppsDesktopFiles 获取驻留应用desktop文件
- * @return
- */
-QStringList TaskManager::getDockedAppsDesktopFiles()
-{
-    QStringList ret;
-    for (auto entry: m_entries->filterDockedEntries()) {
-        ret << entry->getFileName();
-    }
-
-    return ret;
-}
-
-void TaskManager::setShowMultiWindow(bool visible)
-{
-    if (m_showMultiWindow == visible)
-        return;
-
-    SETTING->setShowMultiWindow(visible);
-    onShowMultiWindowChanged(visible);
 }
 
 /**
@@ -600,17 +490,10 @@ void TaskManager::smartHideModeTimerExpired()
 void TaskManager::initSettings()
 {
     qDebug() << "init dock settings";
-    m_forceQuitAppStatus = SETTING->getForceQuitAppMode();
     connect(SETTING, &DockSettings::hideModeChanged, this, [ this ](HideMode mode) {
         this->updateHideState(false);
     });
-    connect(SETTING, &DockSettings::forceQuitAppChanged, this, [ this ](ForceQuitAppMode mode) {
-        qDebug() << "forceQuitApp change to " << int(mode);
-        m_forceQuitAppStatus = mode;
-        m_entries->updateEntriesMenu();
-    });
     connect(SETTING, &DockSettings::showRecentChanged, this, &TaskManager::onShowRecentChanged);
-    connect(SETTING, &DockSettings::showMultiWindowChanged, this, &TaskManager::onShowMultiWindowChanged);
 }
 
 /**
@@ -636,20 +519,22 @@ void TaskManager::loadAppInfos()
                 continue;
 
             AppInfo *appInfo = new AppInfo(info);
-            Entry *entryObj = new Entry(this, appInfo, appInfo->getInnerId());
+            Entry *entryObj = new Entry(this, appInfo);
             entryObj->setIsDocked(isDocked);
-            entryObj->updateMode();
             entryObj->updateMenu();
             m_entries->append(entryObj);
         }
     };
 
     loadApps(SETTING->getDockedApps(), true);
-    QStringList recentApps = SETTING->getRecentApps();
-    if (recentApps.size() > MAX_UNOPEN_RECENT_COUNT)
-        recentApps = recentApps.mid(0, MAX_UNOPEN_RECENT_COUNT);
-    loadApps(recentApps, false);
-    saveDockedApps();
+
+    if(m_showRecent) {
+        QStringList recentApps = SETTING->getRecentApps();
+        if (recentApps.size() > MAX_UNOPEN_RECENT_COUNT)
+            recentApps = recentApps.mid(0, MAX_UNOPEN_RECENT_COUNT);
+        loadApps(recentApps, false);
+    }
+    // saveDockedApps();
 }
 
 /**
@@ -661,37 +546,17 @@ void TaskManager::initClientList()
         m_dbusHandler->loadClientList();
     } else {
         QList<XWindow> clients;
-        for (auto c : XCB->instance()->getClientList())
+        for (auto c : XCB->getClientList())
             clients.push_back(c);
 
         // 依次注册窗口
         std::sort(clients.begin(), clients.end());
         m_clientList = clients;
         for (auto winId : m_clientList) {
-            WindowInfoX *winInfo = m_x11Manager->registerWindow(winId);
-            attachOrDetachWindow(static_cast<WindowInfoBase *>(winInfo));
+            if(auto winInfo = m_x11Manager->registerWindow(winId))
+                attachOrDetachWindow(static_cast<WindowInfoBase *>(winInfo));
         }
     }
-}
-
-/**
- * @brief TaskManager::findWindowByXidX 通过id获取窗口信息
- * @param xid
- * @return
- */
-WindowInfoX *TaskManager::findWindowByXidX(XWindow xid)
-{
-    return m_x11Manager->findWindowByXid(xid);
-}
-
-/**
- * @brief TaskManager::findWindowByXidK 通过xid获取窗口  TODO wayland和x11下窗口尽量完全剥离， 不应该存在通过xid查询wayland窗口的情况
- * @param xid
- * @return
- */
-WindowInfoK *TaskManager::findWindowByXidK(XWindow xid)
-{
-    return m_waylandManager->findWindowByXid(xid);
 }
 
 /**
@@ -732,6 +597,9 @@ bool TaskManager::isWindowDockOverlapX(XWindow xid)
         qDebug() << "isWindowDockOverlapX: wmDesktop:" << wmDesktop << " is not equal to currentDesktop:" << currentDesktop;
         return false;
     }
+
+    if(m_activeWindow and m_activeWindow->isMaximized())
+        return true;
 
     // 检查窗口和任务栏窗口是否存在重叠
     auto winRect = XCB->getWindowGeometry(xid);
@@ -808,33 +676,23 @@ bool TaskManager::hasInterSectionK(const DockRect &windowRect, QRect dockRect)
 }
 
 /**
- * @brief TaskManager::getDockedEntryByDesktopFile 获取应用实例
- * @param desktopFile desktopFile文件全路径
- * @return
- */
-Entry *TaskManager::getDockedEntryByDesktopFile(const QString &desktopFile)
-{
-    return m_entries->getDockedEntryByDesktopFile(desktopFile);
-}
-
-/**
  * @brief TaskManager::shouldHideOnSmartHideMode 判断智能隐藏模式下当前任务栏是否应该隐藏
  * @return
  */
 bool TaskManager::shouldHideOnSmartHideMode()
 {
-    if (!m_activeWindow || m_ddeLauncherVisible || m_trayGridWidgetVisible)
+    if (!m_activeWindow || m_ddeLauncherVisible)
         return false;
 
     if (!m_isWayland) {
         XWindow activeWinId = m_activeWindow->getXid();
 
         // dde launcher is invisible, but it is still active window
-        WMClass winClass = XCB->getWMClass(activeWinId);
-        if (winClass.instanceName.size() > 0 && winClass.instanceName.c_str() == ddeLauncherWMClass) {
-            qDebug() << "shouldHideOnSmartHideMode: active window is dde launcher";
-            return false;
-        }
+        // WMClass winClass = XCB->getWMClass(activeWinId);
+        // if (winClass.instanceName.size() > 0 && winClass.instanceName.c_str() == ddeLauncherWMClass) {
+        //     qDebug() << "shouldHideOnSmartHideMode: active window is dde launcher";
+        //     return false;
+        // }
 
         QVector<XWindow> list = getActiveWinGroup(activeWinId);
         for (XWindow xid : list) {
@@ -861,7 +719,7 @@ QVector<XWindow> TaskManager::getActiveWinGroup(XWindow xid)
 
     std::list<XWindow> winList = XCB->getClientListStacking();
     if (winList.empty()
-            || !std::any_of(winList.begin(), winList.end(), [&](XWindow id) { return id == xid;}) // not found active window in clientListStacking"
+            || !std::any_of(winList.begin(), winList.end(), [xid](XWindow id) { return id == xid;}) // not found active window in clientListStacking"
         ||  *winList.begin() == 0) // root window
         return ret;
 
@@ -923,7 +781,7 @@ QVector<XWindow> TaskManager::getActiveWinGroup(XWindow xid)
  */
 void TaskManager::updateHideState(bool delay)
 {
-    if (m_ddeLauncherVisible || m_trayGridWidgetVisible) {
+    if (m_ddeLauncherVisible) {
         setPropHideState(HideState::Show);
         return;
     }
@@ -962,19 +820,40 @@ void TaskManager::setPropHideState(HideState state)
 }
 
 /**
+ * @brief TaskManager::shouldShowOnDock 判断是否应该显示到任务栏
+ * @param info
+ * @return
+ */
+bool TaskManager::shouldShowOnDock(WindowInfoBase *info)
+{
+    if (info->getWindowType() == "X11") {
+        XWindow winId = info->getXid();
+        bool isReg = m_x11Manager->findWindowByXid(winId);
+        if(!isReg) return false;
+        bool isContainedInClientList = m_clientList.indexOf(winId) != -1;
+        if(!isContainedInClientList) return false;
+        bool shouldSkip = info->shouldSkip();
+        if(shouldSkip) return false;
+        bool isGood = XCB->isGoodWindow(winId);
+
+        return isReg && isContainedInClientList && isGood && !shouldSkip;
+    } else if (info->getWindowType() == "Wayland") {
+        return !info->shouldSkip();
+    }
+
+    return false;
+}
+
+/**
  * @brief TaskManager::attachOrDetachWindow 关联或分离窗口
  * @param info
  */
 void TaskManager::attachOrDetachWindow(WindowInfoBase *info)
 {
-    if (!info)
-        return;
-
     bool shouldDock = shouldShowOnDock(info);
 
     // 顺序解析窗口合并或分离操作
-    Entry *entry = info->getEntry();
-    if (entry) {
+    if (info->getEntry()) {
         // detach
         if (!shouldDock)
             detachWindow(info);
@@ -982,21 +861,15 @@ void TaskManager::attachOrDetachWindow(WindowInfoBase *info)
         // attach
         if (info->getEntryInnerId().isEmpty()) {
             // 窗口entryInnerId为空表示未识别，需要识别窗口并创建entryInnerId
-            QString innerId;
-            AppInfo *appInfo = m_windowIdentify->identifyWindow(info, innerId);
+            AppInfo *appInfo = m_windowIdentify->identifyWindow(info);
             // 窗口entryInnerId即AppInfo的innerId， 用来将窗口和应用绑定关系
-            info->setEntryInnerId(innerId);
             info->setAppInfo(appInfo);
-            markAppLaunched(appInfo);
         }
 
         // winInfo初始化后影响判断是否在任务栏显示图标，需判断
         if (shouldShowOnDock(info))
             attachWindow(info);
     }
-
-    // 在新增窗口后，同步最近打开应用到com.deepin.dde.dock.json的DConfig配置文件中
-    updateRecentApps();
 }
 
 /**
@@ -1007,29 +880,38 @@ void TaskManager::attachWindow(WindowInfoBase *info)
 {
     // TODO: entries中存在innerid为空的entry， 导致后续新应用通过innerid获取应用一直能获取到
     Entry *entry = m_entries->getByInnerId(info->getEntryInnerId());
-    if (entry) {
-        // entry existed
-        entry->attachWindow(info);
-    } else {
-        m_entries->removeLastRecent();
-        entry = new Entry(this, info->getAppInfo(), info->getEntryInnerId());
-        if (entry->attachWindow(info))
-            m_entries->append(entry);
+    if (!entry) {
+        entry = new Entry(this, info);
+        m_entries->append(entry, true);
+        // Q_EMIT entryAdded(entry, -1);
     }
+    entry->attachWindow(info);
 }
 
 /**
  * @brief TaskManager::detachWindow 分离窗口
  * @param info 窗口信息
  */
-void TaskManager::detachWindow(WindowInfoBase *info)
+void TaskManager::detachWindow(WindowInfoBase *info, bool del)
 {
-    Entry *entry = m_entries->getByWindowId(info->getXid());
-    if (!entry)
-        return;
+    auto shouldShowEntry = [](Entry *entry)
+    {
+        auto appInfo = entry->getAppInfo();
+        return appInfo and appInfo->isValidApp() and appInfo->shouldShow();
+    };
 
-    if (entry->detachWindow(info))
-        removeEntryFromDock(entry);
+    if(auto entry = m_entries->getByWindowId(info->getXid())) {
+        if(del and m_activeWindow == info) m_activeWindow = nullptr;
+
+        if (entry->detachWindow(info, del)) {
+            if (!m_showRecent or !shouldShowEntry(entry))
+                removeAppEntry(entry);
+            else if (!m_entries->shouldInRecent()) {
+                m_entries->removeLastRecent();
+                updateRecentApps();
+            }
+        }
+    }
 }
 
 /**
@@ -1051,22 +933,6 @@ void TaskManager::launchApp(const QString desktopFile, uint32_t timestamp, QStri
 void TaskManager::launchAppAction(const QString desktopFile, QString action, uint32_t timestamp)
 {
     m_dbusHandler->launchAppAction(desktopFile, action, timestamp);
-}
-
-/**
- * @brief TaskManager::is3DWM 当前窗口模式 2D/3D
- * @return
- */
-bool TaskManager::is3DWM()
-{
-    bool ret = false;
-    if  (m_wmName.isEmpty())
-        m_wmName = m_dbusHandler->getCurrentWM();
-
-    if (m_wmName == "deepin wm")
-        ret = true;
-
-    return ret;
 }
 
 /**
@@ -1094,13 +960,6 @@ WindowInfoK *TaskManager::handleActiveWindowChangedK(uint activeWin)
  */
 void TaskManager::handleActiveWindowChanged(WindowInfoBase *info)
 {
-    qDebug() << "handleActiveWindowChanged";
-    if (!info) {
-        m_activeWindowOld = m_activeWindow;
-        m_activeWindow = nullptr;
-        return;
-    }
-
     m_activeWindow = info;
     XWindow winId = m_activeWindow->getXid();
     m_entries->handleActiveWindowChanged(winId);
@@ -1113,10 +972,8 @@ void TaskManager::handleActiveWindowChanged(WindowInfoBase *info)
 void TaskManager::saveDockedApps()
 {
     QStringList dockedApps;
-    for (auto entry : m_entries->filterDockedEntries()) {
-        QString path = entry->getAppInfo()->getFileName();
-        dockedApps << path;
-    }
+    for (auto entry : m_entries->filterDockedEntries())
+        dockedApps << entry->getId();
 
     SETTING->setDockedApps(dockedApps);
 
@@ -1126,44 +983,21 @@ void TaskManager::saveDockedApps()
 
 void TaskManager::updateRecentApps()
 {
+    if(!m_showRecent) return;
+
+    auto shouldShowEntry = [](Entry *entry)
+    {
+        auto appInfo = entry->getAppInfo();
+        return appInfo and appInfo->isValidApp() and appInfo->shouldShow();
+    };
+
     QStringList unDockedApps;
-    QList<Entry *> recentEntrys = m_entries->unDockedEntries();
-    for (Entry *entry : recentEntrys) {
-        if (shouldShowEntry(entry)) {
-            unDockedApps << entry->getAppInfo()->getFileName();
-        }
-    }
+    for (Entry *entry : m_entries->unDockedEntries())
+        if (shouldShowEntry(entry))
+            unDockedApps << entry->getId();
 
     // 保存未驻留的应用作为最近打开的应用
     SETTING->setRecentApps(unDockedApps);
-}
-
-void TaskManager::removeEntryFromDock(Entry *entry)
-{
-    // 如果是最近打开应用
-    if (m_entries->shouldInRecent()) {
-        // 更新entry的导出窗口信息
-        entry->updateExportWindowInfos();
-        // 更新entry的右键菜单的信息
-        entry->updateMenu();
-        // 更新entry的当前窗口的信息
-        entry->setCurrentWindowInfo(nullptr);
-        updateRecentApps();
-        // 如果是高效模式，则发送消息或者关闭了显示最近应用的功能，则从任务栏移除
-        // 或者时尚模式显示最近应用时，当前应用不应该驻留最近应用时，需要移除
-        if (!m_showRecent && !entry->getIsDocked()) {
-            Q_EMIT entryRemoved(entry->getId());
-        } else if (m_showRecent && !entry->getIsDocked()) {
-            if (shouldShowEntry(entry)) {
-                return;
-            }
-            removeAppEntry(entry);
-            updateRecentApps();
-        }
-    } else {
-        removeAppEntry(entry);
-        updateRecentApps();
-    }
 }
 
 void TaskManager::onShowRecentChanged(bool visible)
@@ -1176,24 +1010,16 @@ void TaskManager::onShowRecentChanged(bool visible)
     Q_EMIT showRecentChanged(visible);
 }
 
-void TaskManager::onShowMultiWindowChanged(bool visible)
-{
-    if (m_showMultiWindow == visible)
-        return;
-
-    m_showMultiWindow = visible;
-    Q_EMIT showMultiWindowChanged(visible);
-}
-
 /** 移除应用实例
  * @brief TaskManager::removeAppEntry
  * @param entry
  */
 void TaskManager::removeAppEntry(Entry *entry)
 {
-    if (entry) {
-        m_entries->remove(entry);
-    }
+    bool docked = entry->getIsDocked();
+    m_entries->remove(entry);
+    if(!docked)
+        updateRecentApps();
 }
 
 /**
@@ -1260,72 +1086,9 @@ bool TaskManager::isShowingDesktop()
  * @param innerId
  * @return
  */
-AppInfo *TaskManager::identifyWindow(WindowInfoBase *winInfo, QString &innerId)
+AppInfo *TaskManager::identifyWindow(WindowInfoBase *winInfo)
 {
-    return m_windowIdentify->identifyWindow(winInfo, innerId);
-}
-
-/**
- * @brief TaskManager::markAppLaunched 标识应用已启动
- * @param appInfo
- */
-void TaskManager::markAppLaunched(AppInfo *appInfo)
-{
-    if (!appInfo || !appInfo->isValidApp())
-        return;
-
-    QString desktopFile = appInfo->getFileName();
-    qDebug() << "markAppLaunched: desktopFile is " << desktopFile;
-}
-
-/**
- * @brief TaskManager::getForceQuitAppStatus 获取强制关闭应用状态
- * @return
- */
-ForceQuitAppMode TaskManager::getForceQuitAppStatus()
-{
-    return m_forceQuitAppStatus;
-}
-
-/**
- * @brief TaskManager::getWinIconPreferredApps 获取推荐的应用窗口图标
- * @return
- */
-QVector<QString> TaskManager::getWinIconPreferredApps()
-{
-    return SETTING->getWinIconPreferredApps();
-}
-
-/**
- * @brief TaskManager::handleLauncherItemDeleted 处理launcher item被删除信号
- * @param itemPath
- */
-void TaskManager::handleLauncherItemDeleted(QString itemPath)
-{
-    for (auto entry : m_entries->filterDockedEntries()) {
-        if (entry->getFileName() == itemPath) {
-            undockEntry(entry);
-            break;
-        }
-    }
-}
-
-/**
- * @brief TaskManager::handleLauncherItemUpdated 在收到 launcher item 更新的信号后，需要更新相关信息，包括 appInfo、innerId、名称、图标、菜单。
- * @param itemPath
- */
-void TaskManager::handleLauncherItemUpdated(QString itemPath)
-{
-    Entry *entry = m_entries->getByDesktopFilePath(itemPath);
-    if (!entry)
-        return;
-
-    AppInfo *app = new AppInfo(itemPath);
-    entry->setAppInfo(app);
-    entry->setInnerId(app->getInnerId());
-    entry->updateName();
-    entry->updateMenu();
-    entry->forceUpdateIcon(); // 可能存在Icon图片改变,但Icon名称未改变的情况,因此强制发Icon的属性改变信号
+    return m_windowIdentify->identifyWindow(winInfo);
 }
 
 /**
@@ -1494,9 +1257,4 @@ void TaskManager::previewWindow(uint xid)
 void TaskManager::cancelPreviewWindow()
 {
     m_dbusHandler->cancelPreviewWindow();
-}
-
-bool TaskManager::showMultiWindow() const
-{
-    return m_showMultiWindow;
 }

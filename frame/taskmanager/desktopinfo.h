@@ -54,12 +54,10 @@ typedef struct DesktopAction
 // 应用Desktop信息类
 class DesktopInfo {
 public:
-    explicit DesktopInfo(const QString &desktopfile);
+    explicit DesktopInfo(const QString &desktopfile=QString());
     DesktopInfo(const DesktopInfo &other);
-    ~DesktopInfo();
 
     static bool isDesktopAction(const QString &name);
-    static DesktopInfo getDesktopInfoById(const QString &appId);
 
     bool shouldShow();
     bool getIsHidden();
@@ -72,13 +70,13 @@ public:
 
     void setDesktopOverrideExec(const QString &execStr);
 
-    QString getId();
     QString getName();
     QString getIcon();
     QString getExecutable();
     QString getGenericName();
     QString getCommandLine();
     QString getDesktopFilePath();
+    inline QString getBaseFileName() const { return m_baseFileName; }
 
     QStringList getKeywords();
     QStringList getCategories();
@@ -86,6 +84,8 @@ public:
     QList<DesktopAction> getActions();
 
     QSettings *getDesktopFile();
+
+    DesktopInfo &operator=(DesktopInfo &&);
 
 private:
     bool findExecutable(const QString &exec);
@@ -96,10 +96,10 @@ private:
 
     bool m_isValid;
 
-    QString m_id;
     QString m_name;
     QString m_icon;
     QString m_desktopFilePath;
+    QString m_baseFileName;
 
     // Desktopfile ini format
     QScopedPointer<QSettings> m_desktopFile;

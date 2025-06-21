@@ -41,9 +41,10 @@ void AppInfo::init(DesktopInfo &info)
 
     m_innerId = genInnerIdWithDesktopInfo(info);
     m_fileName = info.getDesktopFilePath();
-    m_id = info.getId();
+    m_baseFileName = info.getBaseFileName();
     m_icon = info.getIcon();
     m_installed = info.isInstalled();
+    m_shouldShow = info.shouldShow();
     auto actions = info.getActions();
     std::copy(actions.begin(), actions.end(), std::back_inserter(m_actions));
 }

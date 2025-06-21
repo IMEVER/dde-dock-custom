@@ -86,10 +86,6 @@ int main(int argc, char *argv[])
 
     RegisterDdeSession();
 
-#ifndef QT_DEBUG
-    QDir::setCurrent(QApplication::applicationDirPath());
-#endif
-
     MainWindow mw;
     DBusDockAdaptors adaptor(&mw);
     DockDaemonDBusAdaptor dockDaemonAdaptor(&mw);

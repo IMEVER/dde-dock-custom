@@ -6,15 +6,20 @@
 #include "../taskmanager/windowinfomap.h"
 
 class AppItem;
+
+typedef uint32_t XWindow;
+
 class WindowItem : public DockItem
 {
     Q_OBJECT
 
     public:
-        explicit WindowItem(AppItem *appItem, WId wId, WindowInfo windowInfoBase, bool closeable, QWidget *parent=Q_NULLPTR);
+        explicit WindowItem(AppItem *appItem, WindowInfo windowInfo, QWidget *parent=Q_NULLPTR);
         ~WindowItem();
         ItemType itemType() const override { return DockItem::Window; }
         void fetchSnapshot();
+        void setActive(bool active);
+        void updateTitle(const QString &);
 
     protected:
         void paintEvent(QPaintEvent *e) override;
@@ -23,24 +28,26 @@ class WindowItem : public DockItem
         void moveEvent(QMoveEvent *e) override;
         void resizeEvent(QResizeEvent *e) override;
         void enterEvent(QEvent *e) override;
+        void hideEvent(QHideEvent *e) override;
+        void showEvent(QShowEvent *e) override;
         void leaveEvent(QEvent *e) override;
         void dragEnterEvent(QDragEnterEvent *e) override;
-        void dragMoveEvent(QDragMoveEvent *e) override;
         void dropEvent(QDropEvent *e) override;
 
+        QPixmap itemPixmap() override;
         void invokedMenuItem(const QString &itemId, const bool checked) Q_DECL_OVERRIDE;
         const QString contextMenu() const Q_DECL_OVERRIDE;
 
     private:
         void showPreview();
         void showHoverTips() override;
-        void closeWindow();
+        // void closeWindow();
 
     private:
         AppItem *m_appItem;
-        WId m_WId;
+        XWindow m_WId;
         WindowInfo m_windowInfo;
-        bool m_closeable;
+        bool m_isActive;
         QImage m_snapshot;
         QRectF m_snapshotSrcRect;
         QTimer *timer;

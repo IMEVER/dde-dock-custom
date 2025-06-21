@@ -37,7 +37,8 @@ DockPopupWindow::DockPopupWindow(QWidget *parent) : DArrowRectangle(ArrowBottom,
     m_enableMouseRelease(true),
     m_model(false),
     m_eventInter(new XEventMonitorInter("org.deepin.dde.XEventMonitor1", "/org/deepin/dde/XEventMonitor1", QDBusConnection::sessionBus())),
-    m_extendWidget(nullptr)
+    m_extendWidget(nullptr),
+    m_parent(nullptr)
 {
 
     setWindowFlags(Qt::X11BypassWindowManagerHint | Qt::WindowStaysOnTopHint | Qt::WindowDoesNotAcceptFocus);
@@ -59,16 +60,18 @@ void DockPopupWindow::setContent(QWidget *content)
 {
     if(QWidget *lastWidget = getContent()) {
         if(lastWidget == content) {
-            resize(content->sizeHint());
+            // resize(content->sizeHint());
+            resizeWithContent();
             return;
         }
         lastWidget->removeEventFilter(this);
         lastWidget->setVisible(false);
-        disconnect(this, &DockPopupWindow::accept, nullptr, nullptr);
+        lastWidget->setParent(m_parent);
     }
     content->installEventFilter(this);
 
-    resize(content->sizeHint());
+    // resize(content->sizeHint());
+    m_parent = content->parentWidget();
     DArrowRectangle::setContent(content);
 }
 
@@ -77,7 +80,7 @@ void DockPopupWindow::setExtendWidget(QWidget *widget)
     if(m_extendWidget) disconnect(m_extendWidget, &QWidget::destroyed, this, 0);
 
     m_extendWidget = widget;
-    connect(widget, &QWidget::destroyed, this, [ this ] { m_extendWidget = nullptr; }, Qt::UniqueConnection);
+    if(widget) connect(widget, &QWidget::destroyed, this, [ this ] { m_extendWidget = nullptr; m_parent = nullptr; }, Qt::UniqueConnection);
 }
 
 QWidget *DockPopupWindow::extendWidget() const
@@ -90,7 +93,7 @@ void DockPopupWindow::show(const QPoint &pos, const bool model)
 {
     m_model = model;
 
-    show(pos.x(), pos.y());
+    DArrowRectangle::show(pos.x(), pos.y());
 
     if (m_registerKey.isEmpty() == false) {
         m_eventInter->UnregisterArea(m_registerKey);
@@ -99,13 +102,6 @@ void DockPopupWindow::show(const QPoint &pos, const bool model)
 
     if (m_model)
         m_registerKey = m_eventInter->RegisterFullScreen();
-}
-
-void DockPopupWindow::show(const int x, const int y)
-{
-    m_lastPoint = QPoint(x, y);
-
-    DArrowRectangle::show(x, y);
 }
 
 void DockPopupWindow::hide()
@@ -126,14 +122,22 @@ bool DockPopupWindow::eventFilter(QObject *o, QEvent *e)
     if (e->type() == QEvent::Resize && isVisible())
     {
         QTimer::singleShot(10, this, [this] {
-            // NOTE(sbw): double check is necessary, in this time, the popup maybe already hided.
-            if (isVisible())
-                show(m_lastPoint, m_model);
+            resizeWithContent();
         });
     } else if(e->type() == QEvent::Hide)
         hide();
 
     return false;
+}
+
+void DockPopupWindow::showEvent(QShowEvent *event) {
+    DArrowRectangle::showEvent(event);
+    if(m_model) emit requestWindowAutoHide(false);
+}
+
+void DockPopupWindow::hideEvent(QHideEvent *event) {
+    DArrowRectangle::hideEvent(event);
+    if(m_model) emit requestWindowAutoHide(true);
 }
 
 void DockPopupWindow::onButtonPress(int type, int x, int y, const QString &key)
@@ -166,6 +170,5 @@ void DockPopupWindow::onButtonPress(int type, int x, int y, const QString &key)
         }
     }
 
-    emit accept();
     hide();
 }

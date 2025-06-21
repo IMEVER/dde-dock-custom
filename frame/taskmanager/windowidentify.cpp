@@ -67,7 +67,6 @@ WindowIdentify::WindowIdentify(TaskManager *_taskmanager, QObject *parent)
  : QObject(parent)
  , m_taskmanager(_taskmanager)
 {
-    m_identifyWindowFuns << qMakePair(QString("Android") , &identifyWindowAndroid);
     m_identifyWindowFuns << qMakePair(QString("PidEnv"), &identifyWindowByPidEnv);
     m_identifyWindowFuns << qMakePair(QString("CmdlineTurboBooster"), &identifyWindowByCmdlineTurboBooster);
     m_identifyWindowFuns << qMakePair(QString("Cmdline-XWalk"), &identifyWindowByCmdlineXWalk);
@@ -81,21 +80,21 @@ WindowIdentify::WindowIdentify(TaskManager *_taskmanager, QObject *parent)
     m_identifyWindowFuns << qMakePair(QString("WmClass"), &identifyWindowByWmClass);
 }
 
-AppInfo *WindowIdentify::identifyWindow(WindowInfoBase *winInfo, QString &innerId)
+AppInfo *WindowIdentify::identifyWindow(WindowInfoBase *winInfo)
 {
     if (!winInfo)
         return nullptr;
 
     qDebug() << "identifyWindow: window id " << winInfo->getXid() << " innerId " << winInfo->getInnerId();
     if (winInfo->getWindowType() == "X11")
-        return identifyWindowX11(static_cast<WindowInfoX *>(winInfo), innerId);
+        return identifyWindowX11(static_cast<WindowInfoX *>(winInfo));
     if (winInfo->getWindowType() == "Wayland")
-        return  identifyWindowWayland(static_cast<WindowInfoK *>(winInfo), innerId);
+        return  identifyWindowWayland(static_cast<WindowInfoK *>(winInfo));
 
     return nullptr;
 }
 
-AppInfo *WindowIdentify::identifyWindowX11(WindowInfoX *winInfo, QString &innerId)
+AppInfo *WindowIdentify::identifyWindowX11(WindowInfoX *winInfo)
 {
     AppInfo *appInfo = nullptr;
     if (winInfo->getInnerId().isEmpty()) {
@@ -107,16 +106,16 @@ AppInfo *WindowIdentify::identifyWindowX11(WindowInfoX *winInfo, QString &innerI
         QString name = iter->first;
         IdentifyFunc func = iter->second;
         qDebug() << "identifyWindowX11: try " << name;
-        appInfo = func(m_taskmanager, winInfo, innerId);
+        appInfo = func(m_taskmanager, winInfo);
         if (appInfo) {  // TODO: if name == "Pid", appInfo may by nullptr
             // 识别成功
             qDebug() << "identify Window by " << name << " innerId " << appInfo->getInnerId() << " success!";
             AppInfo *fixedAppInfo = fixAutostartAppInfo(appInfo->getFileName());
             if (fixedAppInfo) {
+                // WMClass wmClass = winInfo->getWMClass();qInfo() << name << " " << QString(wmClass.className.c_str()) << " " << QString(wmClass.instanceName.c_str());
                 delete appInfo;
                 appInfo = fixedAppInfo;
                 appInfo->setIdentifyMethod(name + "+FixAutostart");
-                innerId = appInfo->getInnerId();
             } else {
                 appInfo->setIdentifyMethod(name);
             }
@@ -126,11 +125,10 @@ AppInfo *WindowIdentify::identifyWindowX11(WindowInfoX *winInfo, QString &innerI
 
     qDebug() << "identifyWindowX11: failed";
     // 如果识别窗口失败，则该app的entryInnerId使用当前窗口的innerId
-    innerId = winInfo->getInnerId();
     return appInfo;
 }
 
-AppInfo *WindowIdentify::identifyWindowWayland(WindowInfoK *winInfo, QString &innerId)
+AppInfo *WindowIdentify::identifyWindowWayland(WindowInfoK *winInfo)
 {
     // TODO: 对桌面调起的文管应用做规避处理，需要在此处添加，因为初始化时appId和title为空
     if (winInfo->getAppId() == "dde-desktop" && m_taskmanager->shouldShowOnDock(winInfo)) {
@@ -164,52 +162,27 @@ AppInfo *WindowIdentify::identifyWindowWayland(WindowInfoK *winInfo, QString &in
         }
     }
 
-    if (appInfo)
-        innerId = appInfo->getInnerId();
-
     return appInfo;
 }
 
-AppInfo *WindowIdentify::identifyWindowAndroid(TaskManager *_taskmanager, WindowInfoX *winInfo, QString &innerId)
-{
-    AppInfo *ret = nullptr;
-    int32_t androidId = getAndroidUengineId(winInfo->getXid());
-    QString androidName = getAndroidUengineName(winInfo->getXid());
-    if (androidId != -1 && androidName != "") {
-        QString desktopPath = "/usr/share/applications/uengine." + androidName + ".desktop";
-        DesktopInfo desktopInfo(desktopPath);
-        if (!desktopInfo.isValidDesktop()) {
-            qInfo() << "identifyWindowAndroid: not exist DesktopFile " << desktopPath;
-            return ret;
-        }
-
-        ret = new AppInfo(desktopInfo);
-        ret->setIdentifyMethod("Android");
-        innerId = ret->getInnerId();
-    }
-
-    return ret;
-}
-
-AppInfo *WindowIdentify::identifyWindowByPidEnv(TaskManager *_taskmanager, WindowInfoX *winInfo, QString &innerId)
+AppInfo *WindowIdentify::identifyWindowByPidEnv(TaskManager *_taskmanager, WindowInfoX *winInfo)
 {
     AppInfo *ret = nullptr;
     int pid = winInfo->getPid();
     auto process = winInfo->getProcess();
-    qInfo() << "identifyWindowByPidEnv: pid=" << pid << " WindowId=" << winInfo->getXid();
+    // qInfo() << "identifyWindowByPidEnv: pid=" << pid << " WindowId=" << winInfo->getXid();
 
     if (pid == 0 || !process) {
         return ret;
     }
 
     QString launchedDesktopFile = process->getEnv("GIO_LAUNCHED_DESKTOP_FILE");
+    if (launchedDesktopFile.isEmpty())
+        return ret;
+
     QString launchedDesktopFilePidStr = process->getEnv("GIO_LAUNCHED_DESKTOP_FILE_PID");
     int launchedDesktopFilePid = launchedDesktopFilePidStr.toInt();
-    qInfo() << "launchedDesktopFilePid=" << launchedDesktopFilePid << " launchedDesktopFile=" << launchedDesktopFile;
-
-    if (launchedDesktopFile.isEmpty()) {
-            return ret;
-    }
+    // qInfo() << "launchedDesktopFilePid=" << launchedDesktopFilePid << " launchedDesktopFile=" << launchedDesktopFile;
 
     auto pidIsSh = [](int pid) -> bool {
         ProcessInfo parentProcess(pid);
@@ -218,11 +191,11 @@ AppInfo *WindowIdentify::identifyWindowByPidEnv(TaskManager *_taskmanager, Windo
             return false;
         }
 
-        qInfo() << "ppid equal" << "parentCmdLine[0]:" << parentCmdLine[0];
+        // qInfo() << "ppid equal" << "parentCmdLine[0]:" << parentCmdLine[0];
         QString cmd0 = parentCmdLine[0];
         int pos = cmd0.lastIndexOf('/');
         if (pos > 0)
-            cmd0 = cmd0.remove(0, pos + 1);
+            cmd0.remove(0, pos + 1);
 
         if (cmd0 == "sh" || cmd0 == "bash"){
             return true;
@@ -239,7 +212,7 @@ AppInfo *WindowIdentify::identifyWindowByPidEnv(TaskManager *_taskmanager, Windo
             }
             if (p.getCmdLine()[0].indexOf("ll-box") != -1) {
                 qDebug() << "process ID" << process->getPid() << "is in linglong container,"
-                         <<"ll-box PID" << p.getPid();
+                        <<"ll-box PID" << p.getPid();
                 return true;
             }
         }
@@ -249,20 +222,19 @@ AppInfo *WindowIdentify::identifyWindowByPidEnv(TaskManager *_taskmanager, Windo
     // 以下几种情况下，才能信任环境变量 GIO_LAUNCHED_DESKTOP_FILE。
     if (pid == launchedDesktopFilePid || // 当窗口pid和launchedDesktopFilePid相同时
         ( process->getPpid() &&
-          process->getPpid() == launchedDesktopFilePid &&
-          pidIsSh(process->getPpid())
+        process->getPpid() == launchedDesktopFilePid &&
+        pidIsSh(process->getPpid())
         ) || // 当窗口的进程的父进程id（即ppid）和launchedDesktopFilePid相同，并且该父进程是sh或bash时。
         processInLinglong(process) // 当窗口pid在玲珑容器中
-       ) {
+    ) {
 
         ret = new AppInfo(launchedDesktopFile);
-        innerId = ret->getInnerId();
     }
 
     return ret;
 }
 
-AppInfo *WindowIdentify::identifyWindowByCmdlineTurboBooster(TaskManager *_taskmanager, WindowInfoX *winInfo, QString &innerId)
+AppInfo *WindowIdentify::identifyWindowByCmdlineTurboBooster(TaskManager *_taskmanager, WindowInfoX *winInfo)
 {
     AppInfo *ret = nullptr;
     int pid = winInfo->getPid();
@@ -273,7 +245,7 @@ AppInfo *WindowIdentify::identifyWindowByCmdlineTurboBooster(TaskManager *_taskm
             QString desktopFile;
             if (cmdline[0].startsWith(".desktop")) {
                 desktopFile = cmdline[0];
-            } else if (QString(cmdline[0]).contains("/applications/")) {
+            } else if (cmdline[0].contains("/applications/")) {
                 QFileInfo fileInfo(cmdline[0]);
                 QString path = fileInfo.path();
                 QString base = fileInfo.completeBaseName();
@@ -286,10 +258,9 @@ AppInfo *WindowIdentify::identifyWindowByCmdlineTurboBooster(TaskManager *_taskm
                     }
                 }
 
-                qInfo() << "identifyWindowByCmdlineTurboBooster: desktopFile is " << desktopFile;
+                // qInfo() << "identifyWindowByCmdlineTurboBooster: desktopFile is " << desktopFile;
                 if (!desktopFile.isEmpty()) {
                     ret = new AppInfo(desktopFile);
-                    innerId = ret->getInnerId();
                 }
             }
         }
@@ -298,9 +269,9 @@ AppInfo *WindowIdentify::identifyWindowByCmdlineTurboBooster(TaskManager *_taskm
     return ret;
 }
 
-AppInfo *WindowIdentify::identifyWindowByCmdlineXWalk(TaskManager *_taskmanager, WindowInfoX *winInfo, QString &innerId)
+AppInfo *WindowIdentify::identifyWindowByCmdlineXWalk(TaskManager *_taskmanager, WindowInfoX *winInfo)
 {
-    qInfo() << "identifyWindowByCmdlineXWalk: windowId=" << winInfo->getXid();
+    // qInfo() << "identifyWindowByCmdlineXWalk: windowId=" << winInfo->getXid();
     AppInfo *ret = nullptr;
     do {
         auto process = winInfo->getProcess();
@@ -308,47 +279,43 @@ AppInfo *WindowIdentify::identifyWindowByCmdlineXWalk(TaskManager *_taskmanager,
             break;
 
         QString exe = process->getExe();
-        QFileInfo file(exe);
-        QString exeBase = file.completeBaseName();
         auto args = process->getArgs();
         if (exe != "xwalk" || args.size() == 0)
             break;
 
         QString lastArg = args[args.size() - 1];
-        file.setFile(lastArg);
+        QFileInfo file(lastArg);
         if (file.completeBaseName() == "manifest.json") {
             auto strs = lastArg.split("/");
             if (strs.size() > 3 && strs[strs.size() - 2].size() > 0) {    // appId为 strs倒数第二个字符串
                 ret = new AppInfo(strs[strs.size() - 2]);
-                innerId = ret->getInnerId();
                 break;
             }
         }
 
-        qInfo() << "identifyWindowByCmdlineXWalk: failed";
+        // qInfo() << "identifyWindowByCmdlineXWalk: failed";
     } while (0);
 
     return ret;
 }
 
-AppInfo *WindowIdentify::identifyWindowByFlatpakAppID(TaskManager *_taskmanager, WindowInfoX *winInfo, QString &innerId)
+AppInfo *WindowIdentify::identifyWindowByFlatpakAppID(TaskManager *_taskmanager, WindowInfoX *winInfo)
 {
     AppInfo *ret = nullptr;
     QString flatpak = winInfo->getFlatpakAppId();
-    qInfo() << "identifyWindowByFlatpakAppID: flatpak:" << flatpak;
+    // qInfo() << "identifyWindowByFlatpakAppID: flatpak:" << flatpak;
     if (flatpak.startsWith("app/")) {
         auto parts = flatpak.split("/");
         if (parts.size() > 0) {
             QString appId = parts[1];
             ret = new AppInfo(appId);
-            innerId = ret->getInnerId();
         }
     }
 
     return ret;
 }
 
-AppInfo *WindowIdentify::identifyWindowByCrxId(TaskManager *_taskmanager, WindowInfoX *winInfo, QString &innerId)
+AppInfo *WindowIdentify::identifyWindowByCrxId(TaskManager *_taskmanager, WindowInfoX *winInfo)
 {
     AppInfo *ret = nullptr;
     WMClass wmClass = XCB->getWMClass(winInfo->getXid());
@@ -359,19 +326,18 @@ AppInfo *WindowIdentify::identifyWindowByCrxId(TaskManager *_taskmanager, Window
     if (className.toLower() == "chromium-browser" && instanceName.toLower().startsWith("crx_")) {
         if (crxAppIdMap.find(instanceName.toLower()) != crxAppIdMap.end()) {
             QString appId = crxAppIdMap[instanceName.toLower()];
-            qInfo() << "identifyWindowByCrxId: appId " << appId;
+            // qInfo() << "identifyWindowByCrxId: appId " << appId;
             ret = new AppInfo(appId);
-            innerId = ret->getInnerId();
         }
     }
 
     return ret;
 }
 
-AppInfo *WindowIdentify::identifyWindowByRule(TaskManager *_taskmanager, WindowInfoX *winInfo, QString &innerId)
+AppInfo *WindowIdentify::identifyWindowByRule(TaskManager *_taskmanager, WindowInfoX *winInfo)
 {
     static WindowPatterns patterns;
-    qInfo() << "identifyWindowByRule: windowId=" << winInfo->getXid();
+    // qInfo() << "identifyWindowByRule: windowId=" << winInfo->getXid();
     AppInfo *ret = nullptr;
     QString matchStr = patterns.match(winInfo);
     if (matchStr.isEmpty())
@@ -387,17 +353,12 @@ AppInfo *WindowIdentify::identifyWindowByRule(TaskManager *_taskmanager, WindowI
             if (!launchedDesktopFile.isEmpty())
                 ret = new AppInfo(launchedDesktopFile);
         }
-    } else {
-        qInfo() << "patterns match bad result";
     }
-
-    if (ret)
-        innerId = ret->getInnerId();
 
     return ret;
 }
 
-AppInfo *WindowIdentify::identifyWindowByBamf(TaskManager *_taskmanager, WindowInfoX *winInfo, QString &innerId)
+AppInfo *WindowIdentify::identifyWindowByBamf(TaskManager *_taskmanager, WindowInfoX *winInfo)
 {
     if (_taskmanager->isWaylandEnv()) {
         return nullptr;
@@ -405,7 +366,7 @@ AppInfo *WindowIdentify::identifyWindowByBamf(TaskManager *_taskmanager, WindowI
 
     AppInfo *ret = nullptr;
     XWindow xid = winInfo->getXid();
-    qInfo() << "identifyWindowByBamf:  windowId=" << xid;
+    // qInfo() << "identifyWindowByBamf:  windowId=" << xid;
     QString desktopFile;
     // 重试 bamf 识别，部分的窗口经常要多次调用才能识别到。
     for (int i = 0; i < 3; i++) {
@@ -416,53 +377,53 @@ AppInfo *WindowIdentify::identifyWindowByBamf(TaskManager *_taskmanager, WindowI
 
     if (!desktopFile.isEmpty()) {
         ret = new AppInfo(desktopFile);
-        innerId = ret->getInnerId();
+        if(ret and ret->shouldShow() == false) {
+            delete ret;
+            ret = nullptr;
+        }
     }
-
     return ret;
 }
 
-AppInfo *WindowIdentify::identifyWindowByPid(TaskManager *_taskmanager, WindowInfoX *winInfo, QString &innerId)
+AppInfo *WindowIdentify::identifyWindowByPid(TaskManager *_taskmanager, WindowInfoX *winInfo)
 {
     AppInfo *ret = nullptr;
     if (winInfo->getPid() > 10) {
-        auto entry = _taskmanager->getEntryByWindowId(winInfo->getPid());
+        //FIXME: Not complete
+        auto entry = _taskmanager->getEntryByWindowId(winInfo->getXid());
         if (entry) {
             ret = entry->getAppInfo();
-            innerId = ret->getInnerId();
         }
     }
 
     return ret;
 }
 
-AppInfo *WindowIdentify::identifyWindowByScratch(TaskManager *_taskmanager, WindowInfoX *winInfo, QString &innerId)
+AppInfo *WindowIdentify::identifyWindowByScratch(TaskManager *_taskmanager, WindowInfoX *winInfo)
 {
     AppInfo *ret = nullptr;
     QString desktopFile = scratchDir + winInfo->getInnerId() + ".desktop";
-    qInfo() << "identifyWindowByScratch: xid " << winInfo->getXid() << " desktopFile" << desktopFile;
+    // qInfo() << "identifyWindowByScratch: xid " << winInfo->getXid() << " desktopFile" << desktopFile;
 
     if (QFile::exists(desktopFile)) {
         ret = new AppInfo(desktopFile);
-        innerId = ret->getInnerId();
     }
     return ret;
 }
 
-AppInfo *WindowIdentify::identifyWindowByGtkAppId(TaskManager *_taskmanager, WindowInfoX *winInfo, QString &innerId)
+AppInfo *WindowIdentify::identifyWindowByGtkAppId(TaskManager *_taskmanager, WindowInfoX *winInfo)
 {
     AppInfo *ret = nullptr;
     QString gtkAppId = winInfo->getGtkAppId();
     if (!gtkAppId.isEmpty()) {
         ret = new AppInfo(gtkAppId);
-        innerId = ret->getInnerId();
     }
 
-    qInfo() << "identifyWindowByGtkAppId: gtkAppId:" << gtkAppId;
+    // qInfo() << "identifyWindowByGtkAppId: gtkAppId:" << gtkAppId;
     return ret;
 }
 
-AppInfo *WindowIdentify::identifyWindowByWmClass(TaskManager *_taskmanager, WindowInfoX *winInfo, QString &innerId)
+AppInfo *WindowIdentify::identifyWindowByWmClass(TaskManager *_taskmanager, WindowInfoX *winInfo)
 {
     WMClass wmClass = winInfo->getWMClass();
     if (wmClass.instanceName.size() > 0) {
@@ -471,30 +432,25 @@ AppInfo *WindowIdentify::identifyWindowByWmClass(TaskManager *_taskmanager, Wind
         // wm class instance is Brackets
         // try app id org.deepin.flatdeb.brackets
         //ret = new AppInfo("org.deepin.flatdeb." + QString(wmClass.instanceName.c_str()).toLower());
-        if (DesktopInfo("org.deepin.flatdeb." + QString(wmClass.instanceName.c_str()).toLower()).isValidDesktop()) {
-            AppInfo *appInfo = new AppInfo("org.deepin.flatdeb." + QString(wmClass.instanceName.c_str()).toLower());
-            innerId = appInfo->getInnerId();
-            return appInfo;
-        }
+        DesktopInfo info("org.deepin.flatdeb." + QString(wmClass.instanceName.c_str()).toLower());
+        if (!info.isValidDesktop())
+            info = DesktopInfo(QString::fromStdString(wmClass.instanceName));
 
-        if (DesktopInfo(QString::fromStdString(wmClass.instanceName)).isValidDesktop()) {
-            AppInfo *appInfo = new AppInfo(wmClass.instanceName.c_str());
-            innerId = appInfo->getInnerId();
+        if (info.isValidDesktop()) {
+            AppInfo *appInfo = new AppInfo(info);
             return appInfo;
         }
     }
 
     if (wmClass.className.size() > 0) {
         QString filename = QString::fromStdString(wmClass.className);
-        bool isValid = DesktopInfo(filename).isValidDesktop();
-        if (!isValid) {
+        DesktopInfo info(filename);
+        if (!info.isValidDesktop()) {
             filename = BamfDesktop::instance()->fileName(wmClass.instanceName.c_str());
-            isValid = DesktopInfo(filename).isValidDesktop();
+            info = DesktopInfo(filename);
         }
-
-        if (isValid) {
-            AppInfo *appInfo = new AppInfo(filename);
-            innerId = appInfo->getInnerId();
+        if(info.isValidDesktop()) {
+            AppInfo *appInfo = new AppInfo(info);
             return appInfo;
         }
     }
@@ -508,23 +464,11 @@ AppInfo *WindowIdentify::fixAutostartAppInfo(QString fileName)
     QString filePath = file.absolutePath();
     bool isAutoStart = false;
     for (auto dir : QStandardPaths::standardLocations(QStandardPaths::ConfigLocation)) {
-        if (dir.contains(filePath)) {
+        if (filePath.startsWith(dir)) {
             isAutoStart = true;
             break;
         }
     }
 
     return isAutoStart ? new AppInfo(file.completeBaseName()) : nullptr;
-}
-
-int32_t WindowIdentify::getAndroidUengineId(XWindow winId)
-{
-    // TODO 获取AndroidUengineId
-    return 0;
-}
-
-QString WindowIdentify::getAndroidUengineName(XWindow winId)
-{
-    // TODO 获取AndroidUengineName
-    return "";
 }

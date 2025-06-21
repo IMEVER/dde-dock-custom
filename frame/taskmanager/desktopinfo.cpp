@@ -18,14 +18,16 @@
 static QString desktopFileSuffix = ".desktop";
 
 DesktopInfo::DesktopInfo(const QString &desktopfile)
-    : m_isValid(true)
 {
-    QString desktopfilepath(desktopfile);
-    QFileInfo desktopFileInfo(desktopfilepath);
-    if (!(desktopfilepath.endsWith(desktopFileSuffix))) {
-        desktopfilepath = desktopfilepath + desktopFileSuffix;
-        desktopFileInfo.setFile(desktopfilepath);
+    if(desktopfile.isEmpty()) {
+        m_isValid = false;
+        return;
     }
+    QString desktopfilepath(desktopfile);
+    if (!(desktopfilepath.endsWith(desktopFileSuffix)))
+        desktopfilepath = desktopfilepath + desktopFileSuffix;
+
+    QFileInfo desktopFileInfo(desktopfilepath);
 
     if (!desktopFileInfo.isAbsolute()) {
         for (auto dir: QStandardPaths::standardLocations(QStandardPaths::ApplicationsLocation)) {
@@ -37,12 +39,14 @@ DesktopInfo::DesktopInfo(const QString &desktopfile)
         }
     }
 
-    m_desktopFilePath = desktopFileInfo.absoluteFilePath();
-    m_isValid = desktopFileInfo.isAbsolute() && QFile::exists(desktopFileInfo.absoluteFilePath());
-    m_desktopFile.reset(new QSettings(m_desktopFilePath, QSettings::IniFormat));
-    m_desktopFile->setIniCodec("utf-8");
+    m_isValid = desktopFileInfo.isAbsolute() && desktopFileInfo.exists();
 
     if(m_isValid) {
+        m_desktopFilePath = desktopFileInfo.absoluteFilePath();
+        m_baseFileName = desktopFileInfo.completeBaseName();
+        m_desktopFile.reset(new QSettings(m_desktopFilePath, QSettings::IniFormat));
+        m_desktopFile->setIniCodec("utf-8");
+
         // check DesktopInfo valid
         QStringList mainKeys = m_desktopFile->childGroups();
         if (mainKeys.size() == 0)
@@ -57,26 +61,38 @@ DesktopInfo::DesktopInfo(const QString &desktopfile)
         }
     }
 
-    m_name = getLocaleStr(MainSection, KeyName);
-    m_icon = m_desktopFile->value(MainSection + '/' + KeyIcon).toString();
-    m_id = getId();
+    if(m_isValid) {
+        m_name = getLocaleStr(MainSection, KeyName);
+        m_icon = m_desktopFile->value(MainSection + '/' + KeyIcon).toString();
+    }
 }
 
 DesktopInfo::DesktopInfo(const DesktopInfo &other) {
     m_isValid = other.m_isValid;
 
-    m_id = other.m_id;
     m_name = other.m_name;
     m_icon = other.m_icon;
     m_desktopFilePath = other.m_desktopFilePath;
+    m_baseFileName = other.m_baseFileName;
 
     // Desktopfile ini format
     m_desktopFile.reset(other.m_desktopFile.data());
+    const_cast<DesktopInfo&>(other).m_desktopFile.take();
 }
 
-DesktopInfo::~DesktopInfo()
-{
+DesktopInfo &DesktopInfo::operator=(DesktopInfo &&other) {
+    if(this != &other) {
+        m_isValid = other.m_isValid;
 
+        m_name = other.m_name;
+        m_icon = other.m_icon;
+        m_desktopFilePath = other.m_desktopFilePath;
+        m_baseFileName = other.m_baseFileName;
+
+        // Desktopfile ini format
+        m_desktopFile.swap(other.m_desktopFile);
+    }
+    return *this;
 }
 
 QString DesktopInfo::getDesktopFilePath()
@@ -125,10 +141,6 @@ bool DesktopInfo::getIsHidden()
 
 bool DesktopInfo::getShowIn(QStringList desktopEnvs)
 {
-#ifdef QT_DEBUG
-    qDebug() << "desktop file path: " << m_desktopFilePath;
-#endif
-
     if (desktopEnvs.size() == 0) {
         static const auto currentDesktops = QString(getenv("XDG_CURRENT_DESKTOP")).split(":");
         desktopEnvs = currentDesktops;
@@ -137,26 +149,14 @@ bool DesktopInfo::getShowIn(QStringList desktopEnvs)
     QStringList onlyShowIn = m_desktopFile->value(MainSection + '/' + KeyOnlyShowIn).toStringList();
     QStringList notShowIn = m_desktopFile->value(MainSection + '/' + KeyNotShowIn).toStringList();
 
-#ifdef QT_DEBUG
-    qDebug() << "onlyShowIn:" << onlyShowIn <<
-                ", notShowIn:" << notShowIn <<
-                ", desktopEnvs:" << desktopEnvs;
-#endif
-
     for (const auto &desktop : desktopEnvs) {
-        bool ret = std::any_of(onlyShowIn.begin(), onlyShowIn.end(),
-                               [&desktop](const auto &d) {return d == desktop;});
-#ifdef QT_DEBUG
-        qInfo() << Q_FUNC_INFO << "onlyShowIn, result:" << ret;
-#endif
+        bool ret = std::any_of(onlyShowIn.begin(), onlyShowIn.end(), [&desktop](const auto &d) {return d == desktop;});
+
         if (ret)
             return true;
 
-        ret = std::any_of(notShowIn.begin(), notShowIn.end(),
-                          [&desktop](const auto &d) {return d == desktop;});
-#ifdef QT_DEBUG
-        qInfo() << Q_FUNC_INFO << "notShowIn, result:" << ret;
-#endif
+        ret = std::any_of(notShowIn.begin(), notShowIn.end(), [&desktop](const auto &d) {return d == desktop;});
+
         if (ret)
             return false;
     }
@@ -184,22 +184,6 @@ QList<DesktopAction> DesktopInfo::getActions()
     }
 
     return actions;
-}
-
-// 使用appId获取DesktopInfo需检查有效性
-DesktopInfo DesktopInfo::getDesktopInfoById(const QString &appId)
-{
-    QString desktopfile(appId);
-    if (!desktopfile.endsWith(".desktop")) desktopfile.append(".desktop");
-    for (const auto & dir : QStandardPaths::standardLocations(QStandardPaths::ApplicationsLocation)) {
-        QString filePath = dir + "/" + desktopfile;
-        //检测文件有效性
-        if (QFile::exists(filePath)) {
-            return DesktopInfo(filePath);
-        }
-    }
-
-    return DesktopInfo("");
 }
 
 bool DesktopInfo::getTerminal()
@@ -253,11 +237,6 @@ QStringList DesktopInfo::getCategories()
 QSettings *DesktopInfo::getDesktopFile()
 {
     return m_desktopFile.data();
-}
-
-QString DesktopInfo::getId()
-{
-    return m_id;
 }
 
 QString DesktopInfo::getLocaleStr(const QString &section, const QString &key)

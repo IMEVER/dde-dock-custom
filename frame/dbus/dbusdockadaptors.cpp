@@ -23,22 +23,22 @@
 #include "../util/utils.h"
 #include "../window/mainwindow.h"
 #include "TopPanelInterface.h"
+#include "../util/docksettings.h"
 
-#include <QGSettings>
 #include <QDBusMetaType>
 
 QDebug operator<<(QDebug argument, const DockItemInfo &info)
 {
     argument << "name:" << info.name << ", displayName:" << info.displayName
             << "itemKey:" << info.itemKey << "SettingKey:" << info.settingKey
-            << "icon_light:" << info.iconLight << "icon_dark:" << info.iconDark << "visible:" << info.visible;
+            << "icon_light:" << info.dccIcon << "visible:" << info.visible;
     return argument;
 }
 
 QDBusArgument &operator<<(QDBusArgument &arg, const DockItemInfo &info)
 {
     arg.beginStructure();
-    arg << info.name << info.displayName << info.itemKey << info.settingKey << info.iconLight << info.iconDark << info.visible;
+    arg << info.name << info.displayName << info.itemKey << info.settingKey << info.dccIcon << info.visible;
     arg.endStructure();
     return arg;
 }
@@ -46,7 +46,7 @@ QDBusArgument &operator<<(QDBusArgument &arg, const DockItemInfo &info)
 const QDBusArgument &operator>>(const QDBusArgument &arg, DockItemInfo &info)
 {
     arg.beginStructure();
-    arg >> info.name >> info.displayName >> info.itemKey >> info.settingKey >> info.iconLight >> info.iconDark >> info.visible;
+    arg >> info.name >> info.displayName >> info.itemKey >> info.settingKey >> info.dccIcon >> info.visible;
     arg.endStructure();
     return arg;
 }
@@ -61,20 +61,11 @@ void registerPluginInfoMetaType()
 
 DBusDockAdaptors::DBusDockAdaptors(MainWindow* parent)
     : QDBusAbstractAdaptor(parent)
-    , m_gsettings(Utils::SettingsPtr("com.deepin.dde.dock.mainwindow", QByteArray(), this))
     , m_window(parent)
 {
     registerPluginInfoMetaType();
 
     connect(parent, &MainWindow::geometryChanged, this, &DBusDockAdaptors::geometryChanged);
-
-    if (m_gsettings) {
-        connect(m_gsettings, &QGSettings::changed, this, [ = ] (const QString &key) {
-            if (key == "onlyShowPrimary") {
-                Q_EMIT showInPrimaryChanged(m_gsettings->get(key).toBool());
-            }
-        });
-    }
 
     m_topPanelInterface = new TopPanelInterface("me.imever.TopPanel", "/me/imever/TopPanel", QDBusConnection::sessionBus(), this);
     connect(m_topPanelInterface, &TopPanelInterface::pluginVisibleChanged, this, &DBusDockAdaptors::pluginVisibleChanged);
@@ -147,7 +138,7 @@ QRect DBusDockAdaptors::geometry() const
 
 bool DBusDockAdaptors::showInPrimary() const
 {
-    return Utils::SettingValue("com.deepin.dde.dock.mainwindow", QByteArray(), "onlyShowPrimary", false).toBool();
+    return DockSettings::instance()->showInPrimary();
 }
 
 void DBusDockAdaptors::setShowInPrimary(bool showInPrimary)
@@ -155,8 +146,7 @@ void DBusDockAdaptors::setShowInPrimary(bool showInPrimary)
     if (this->showInPrimary() == showInPrimary)
         return;
 
-    if (Utils::SettingSaveValue("com.deepin.dde.dock.mainwindow", QByteArray(), "onlyShowPrimary", showInPrimary)) {
-        Q_EMIT showInPrimaryChanged(showInPrimary);
-    }
+    DockSettings::instance()->setShowInPrimary(showInPrimary);
+    Q_EMIT showInPrimaryChanged(showInPrimary);
 }
 
